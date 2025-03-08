@@ -16,21 +16,11 @@ import NetworkBackground from "@/components/network-background";
 
 export default function Hero() {
   const [text, setText] = useState("");
-  const fullText = "Automate Recurring Payments on Solana";
+
   const [index, setIndex] = useState(0);
   const statsRef = useRef(null);
   const isInView = useInView(statsRef, { once: true, amount: 0.3 });
   const [hoverWallet, setHoverWallet] = useState(null);
-
-  useEffect(() => {
-    if (index < fullText.length) {
-      const timeout = setTimeout(() => {
-        setText((prev) => prev + fullText[index]);
-        setIndex(index + 1);
-      }, 100);
-      return () => clearTimeout(timeout);
-    }
-  }, [index]);
 
   const scrollToStats = () => {
     statsRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -39,22 +29,22 @@ export default function Hero() {
   const wallets = [
     {
       name: "Phantom",
-      logo: "https://cryptologos.cc/logos/phantom-phntm-logo.png",
+      logo: "/Phantom-Logo-Purple.svg",
       color: "from-purple-500 to-blue-500",
     },
     {
       name: "Solflare",
-      logo: "https://solflare.com/assets/logo-icon.svg",
+      logo: "/Solflare-Solana-Wallet-Logo.png",
       color: "from-orange-500 to-red-500",
     },
     {
       name: "Backpack",
-      logo: "https://backpack.app/assets/icon.svg",
+      logo: "/Default_Logo_Horizontal_RedAndWhite.png",
       color: "from-blue-500 to-teal-500",
     },
     {
-      name: "Glow",
-      logo: "https://glow.app/glow-logo.svg",
+      name: "Metamask",
+      logo: "/MetaMask-logo-white.svg",
       color: "from-pink-500 to-purple-500",
     },
   ];
@@ -116,7 +106,7 @@ export default function Hero() {
 
             <h1 className="font-space text-4xl md:text-6xl font-bold">
               <span className="bg-gradient-to-r from-blue-500 via-purple-600 to-teal-500 bg-clip-text text-transparent">
-                {text}
+                Automate Recurring Payments on Solana
                 <span className="animate-pulse">|</span>
               </span>
             </h1>
@@ -126,14 +116,14 @@ export default function Hero() {
               ease. No more manual transfers or missed payments.
             </p>
 
-            <div className="flex flex-col sm:flex-row gap-4 mt-4">
-              <Button className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-6 py-6 h-auto text-lg group shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 transition-all duration-300">
+            <div className="flex flex-col sm:flex-row gap-4">
+              <Button className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white  py-3 h-auto text-lg group shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 transition-all duration-300">
                 Get Started
                 <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
               </Button>
               <Button
                 variant="outline"
-                className="border-blue-500/50 text-blue-500 hover:bg-blue-500/10 hover:text-white hover:border-blue-500 px-6 py-6 h-auto text-lg transition-all duration-300"
+                className="border-blue-500/50 text-blue-500 hover:bg-blue-500/10 hover:text-white hover:border-blue-500 py-3 h-auto text-lg transition-all duration-300"
               >
                 View Documentation
               </Button>
@@ -234,7 +224,7 @@ export default function Hero() {
           className="mt-20 relative"
         >
           <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 via-purple-600/10 to-teal-500/10 rounded-xl"></div>
-          <div className="border-t border-border/20 pt-10">
+          <div className="border-t border-border/20 pt-10 py-6 px-6">
             <h3 className="text-center text-2xl font-bold text-foreground mb-8 bg-gradient-to-r from-blue-500 to-purple-600 bg-clip-text text-transparent">
               Powerful Benefits
             </h3>
