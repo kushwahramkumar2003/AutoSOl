@@ -2,45 +2,163 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Menu, X, BookOpen, Wallet, ChevronDown } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  NavigationMenu,
+  NavigationMenuContent,
+  NavigationMenuItem,
+  NavigationMenuLink,
+  NavigationMenuList,
+  NavigationMenuTrigger,
+  navigationMenuTriggerStyle,
+} from "@/components/ui/navigation-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  Menu,
+  BookOpen,
+  Wallet,
+  ChevronDown,
+  User,
+  Settings,
+  LogOut,
+  Bell,
+  Home,
+  BarChart3,
+  FileText,
+  HelpCircle,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
-export default function Navbar() {
+interface NavLink {
+  href: string;
+  label: string;
+  icon?: React.ReactNode;
+  children?: NavLink[];
+}
+
+interface NavbarProps {
+  isAuthenticated?: boolean;
+  userAvatar?: string;
+  userName?: string;
+  userInitials?: string;
+  onLogout?: () => void;
+  onSettingsClick?: () => void;
+  onProfileClick?: () => void;
+  notifications?: number;
+}
+
+export default function Navbar({
+  isAuthenticated = false,
+  userAvatar,
+  userName = "User",
+  userInitials = "U",
+  onLogout,
+  onSettingsClick,
+  onProfileClick,
+  notifications = 0,
+}: NavbarProps) {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [activeSection, setActiveSection] = useState("");
+  const pathname = usePathname();
+
+  // Public navigation links
+  const publicLinks: NavLink[] = [
+    { href: "/#features", label: "Features" },
+    { href: "/#how-it-works", label: "How It Works" },
+    {
+      href: "#",
+      label: "Resources",
+      children: [
+        {
+          href: "/docs",
+          label: "Documentation",
+          icon: <FileText className="w-4 h-4 mr-2" />,
+        },
+        {
+          href: "/guides",
+          label: "Guides",
+          icon: <BookOpen className="w-4 h-4 mr-2" />,
+        },
+        {
+          href: "/help",
+          label: "FAQs",
+          icon: <HelpCircle className="w-4 h-4 mr-2" />,
+        },
+      ],
+    },
+    { href: "/#pricing", label: "Pricing" },
+  ];
+
+  // Authenticated navigation links
+  const authLinks: NavLink[] = [
+    {
+      href: "/dashboard",
+      label: "Dashboard",
+      icon: <Home className="w-4 h-4 mr-2" />,
+    },
+    {
+      href: "/analytics",
+      label: "Analytics",
+      icon: <BarChart3 className="w-4 h-4 mr-2" />,
+    },
+    {
+      href: "#",
+      label: "Resources",
+      icon: <FileText className="w-4 h-4 mr-2" />,
+      children: [
+        {
+          href: "/docs",
+          label: "Documentation",
+          icon: <FileText className="w-4 h-4 mr-2" />,
+        },
+        {
+          href: "/guides",
+          label: "Guides",
+          icon: <BookOpen className="w-4 h-4 mr-2" />,
+        },
+        {
+          href: "/help",
+          label: "Help Center",
+          icon: <HelpCircle className="w-4 h-4 mr-2" />,
+        },
+      ],
+    },
+  ];
+
+  const navLinks = isAuthenticated ? authLinks : publicLinks;
 
   useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 10);
-
-      // Update active section based on scroll position
-      const sections = ["features", "how-it-works", "technical", "pricing"];
-      const currentSection = sections.find((section) => {
-        const element = document.getElementById(section);
-        if (element) {
-          const rect = element.getBoundingClientRect();
-          return rect.top <= 100 && rect.bottom >= 100;
-        }
-        return false;
-      });
-
-      if (currentSection) {
-        setActiveSection(currentSection);
-      }
     };
 
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  const navLinks = [
-    { href: "#features", label: "Features" },
-    { href: "#how-it-works", label: "How It Works" },
-    { href: "#technical", label: "Technical" },
-    { href: "#pricing", label: "Pricing" },
-  ];
+  // Check if the current path matches a nav link
+  const isActive = (href: string) => {
+    if (href.startsWith("/#")) {
+      return pathname === "/" && href !== "/";
+    }
+    return pathname === href || pathname.startsWith(`${href}/`);
+  };
 
   return (
     <header
@@ -67,98 +185,300 @@ export default function Navbar() {
         </Link>
 
         {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center gap-8">
-          {navLinks.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={`text-sm font-medium relative group ${
-                activeSection === link.href.substring(1)
-                  ? "text-foreground"
-                  : "text-muted-foreground"
-              } hover:text-foreground transition-colors`}
-            >
-              {link.label}
-              <span
-                className={`absolute -bottom-1 left-0 h-0.5 bg-gradient-to-r from-blue-500 to-purple-600 transition-all duration-300 ${
-                  activeSection === link.href.substring(1) ? "w-full" : "w-0"
-                } group-hover:w-full`}
-              ></span>
-            </Link>
-          ))}
-        </nav>
-
-        {/* Desktop Actions */}
-        <div className="hidden md:flex items-center gap-4">
-          <Button
-            variant="outline"
-            className="border-border/60 text-foreground hover:bg-muted hover:text-foreground hover:border-blue-500/30 transition-all focus-visible:ring-2 focus-visible:ring-blue-500/40 rounded-lg"
-          >
-            <BookOpen className="mr-2 h-4 w-4 text-blue-400" />
-            Documentation
-          </Button>
-          <Button className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white transition-all shadow-md shadow-blue-500/20 hover:shadow-blue-500/40 rounded-lg">
-            <Wallet className="mr-2 h-4 w-4" />
-            Connect Wallet
-          </Button>
+        <div className="hidden lg:flex items-center gap-6">
+          <NavigationMenu>
+            <NavigationMenuList>
+              {navLinks.map((link) =>
+                link.children ? (
+                  <NavigationMenuItem key={link.label}>
+                    <NavigationMenuTrigger
+                      className={cn(
+                        "text-sm bg-transparent",
+                        isActive(link.href)
+                          ? "text-foreground"
+                          : "text-muted-foreground"
+                      )}
+                    >
+                      {link.label}
+                    </NavigationMenuTrigger>
+                    <NavigationMenuContent>
+                      <ul className="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2 lg:w-[600px]">
+                        {link.children.map((childLink) => (
+                          <li key={childLink.label}>
+                            <Link href={childLink.href} passHref legacyBehavior>
+                              <NavigationMenuLink
+                                className={cn(
+                                  "block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
+                                  isActive(childLink.href) ? "bg-accent/50" : ""
+                                )}
+                              >
+                                <div className="flex items-center">
+                                  {childLink.icon}
+                                  <div className="text-sm font-medium leading-none">
+                                    {childLink.label}
+                                  </div>
+                                </div>
+                              </NavigationMenuLink>
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    </NavigationMenuContent>
+                  </NavigationMenuItem>
+                ) : (
+                  <NavigationMenuItem key={link.label}>
+                    <Link href={link.href} legacyBehavior passHref>
+                      <NavigationMenuLink
+                        className={cn(
+                          navigationMenuTriggerStyle(),
+                          "text-sm bg-transparent",
+                          isActive(link.href)
+                            ? "text-foreground bg-accent/30"
+                            : "text-muted-foreground"
+                        )}
+                      >
+                        <span className="flex items-center">
+                          {link.icon}
+                          {link.label}
+                        </span>
+                      </NavigationMenuLink>
+                    </Link>
+                  </NavigationMenuItem>
+                )
+              )}
+            </NavigationMenuList>
+          </NavigationMenu>
         </div>
 
-        {/* Mobile Menu Button */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="md:hidden text-foreground hover:bg-muted rounded-lg"
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          aria-label="Toggle menu"
-        >
-          {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-        </Button>
-      </div>
+        {/* Desktop Actions */}
+        <div className="hidden lg:flex items-center gap-4">
+          {isAuthenticated ? (
+            <>
+              {/* Notification icon */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="relative hover:bg-muted"
+                aria-label="Notifications"
+              >
+                <Bell className="h-5 w-5" />
+                {notifications > 0 && (
+                  <span className="absolute top-0 right-0 h-4 w-4 rounded-full bg-red-500 text-white text-xs flex items-center justify-center">
+                    {notifications > 9 ? "9+" : notifications}
+                  </span>
+                )}
+              </Button>
 
-      {/* Mobile Menu */}
-      <AnimatePresence>
-        {isMobileMenuOpen && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.3 }}
-            className="md:hidden bg-background/95 backdrop-blur-md border-b border-border/40"
-          >
-            <div className="container mx-auto px-4 py-4 flex flex-col gap-4">
-              {navLinks.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className={`py-3 px-4 hover:bg-muted rounded-lg transition-all flex items-center ${
-                    activeSection === link.href.substring(1)
-                      ? "text-foreground bg-muted/50"
-                      : "text-muted-foreground"
-                  }`}
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
-                  <div className="w-2 h-2 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 mr-3"></div>
-                  {link.label}
-                </Link>
-              ))}
-
-              <div className="border-t border-border/30 my-2"></div>
-
-              <div className="flex flex-col gap-3 pt-2">
-                <Button
-                  variant="outline"
-                  className="w-full border-border/60 text-foreground hover:bg-muted hover:border-blue-500/30 flex items-center justify-center"
-                >
+              {/* User Menu */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="p-0 hover:bg-transparent">
+                    <div className="flex items-center gap-2">
+                      <Avatar className="h-8 w-8 border border-border">
+                        <AvatarImage src={userAvatar} alt={userName} />
+                        <AvatarFallback className="bg-gradient-to-tr from-blue-500 to-purple-600 text-white">
+                          {userInitials}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="hidden md:block text-left">
+                        <p className="text-sm font-medium">{userName}</p>
+                        <p className="text-xs text-muted-foreground">Account</p>
+                      </div>
+                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={onProfileClick}>
+                    <User className="mr-2 h-4 w-4" />
+                    Profile
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={onSettingsClick}>
+                    <Settings className="mr-2 h-4 w-4" />
+                    Settings
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={onLogout}>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Logout
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </>
+          ) : (
+            <>
+              <Button
+                variant="outline"
+                className="border-border/60 text-foreground hover:bg-muted hover:text-foreground hover:border-blue-500/30 transition-all focus-visible:ring-2 focus-visible:ring-blue-500/40 rounded-lg"
+                asChild
+              >
+                <Link href="/docs">
                   <BookOpen className="mr-2 h-4 w-4 text-blue-400" />
                   Documentation
-                </Button>
-                <Button className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white shadow-md shadow-blue-500/20 flex items-center justify-center">
+                </Link>
+              </Button>
+              <Button
+                className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white transition-all shadow-md shadow-blue-500/20 hover:shadow-blue-500/40 rounded-lg"
+                asChild
+              >
+                <Link href="/login">
                   <Wallet className="mr-2 h-4 w-4" />
                   Connect Wallet
-                </Button>
-              </div>
+                </Link>
+              </Button>
+            </>
+          )}
+        </div>
 
-              <div className="flex justify-center mt-4">
+        {/* Mobile Menu Button and Sheet */}
+        <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+          <SheetTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="lg:hidden text-foreground hover:bg-muted rounded-lg"
+              aria-label="Toggle menu"
+            >
+              <Menu size={24} />
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="right" className="lg:hidden p-0 w-80">
+            <SheetHeader className="p-6 border-b">
+              <SheetTitle>
+                <div className="flex items-center gap-2">
+                  <div className="h-10 w-10 rounded-full bg-gradient-to-tr from-blue-500 to-purple-600 flex items-center justify-center">
+                    <span className="text-white font-bold text-sm">A</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="font-bold text-xl text-foreground font-space gradient-text">
+                      AutoSOL
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      Smart Contract Automation
+                    </span>
+                  </div>
+                </div>
+              </SheetTitle>
+            </SheetHeader>
+
+            <div className="px-6 py-4">
+              {isAuthenticated && (
+                <div className="flex items-center gap-3 p-4 mb-2 bg-muted/50 rounded-lg">
+                  <Avatar className="h-10 w-10 border border-border">
+                    <AvatarImage src={userAvatar} alt={userName} />
+                    <AvatarFallback className="bg-gradient-to-tr from-blue-500 to-purple-600 text-white">
+                      {userInitials}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="text-sm font-medium">{userName}</p>
+                    <p className="text-xs text-muted-foreground">Account</p>
+                  </div>
+                </div>
+              )}
+
+              <nav className="flex flex-col gap-1 py-2">
+                {navLinks.map((link) =>
+                  link.children ? (
+                    <div key={link.label} className="mb-2">
+                      <div className="flex items-center px-4 py-2 text-sm font-medium text-foreground">
+                        {link.icon}
+                        {link.label}
+                      </div>
+                      <div className="ml-4 border-l border-border/50 pl-4 mt-1">
+                        {link.children.map((childLink) => (
+                          <Link
+                            key={childLink.label}
+                            href={childLink.href}
+                            className={cn(
+                              "flex items-center px-4 py-2 text-sm rounded-md transition-colors",
+                              isActive(childLink.href)
+                                ? "bg-accent text-foreground font-medium"
+                                : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                            )}
+                            onClick={() => setIsMobileMenuOpen(false)}
+                          >
+                            {childLink.icon}
+                            {childLink.label}
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <Link
+                      key={link.label}
+                      href={link.href}
+                      className={cn(
+                        "flex items-center px-4 py-2 text-sm rounded-md transition-colors",
+                        isActive(link.href)
+                          ? "bg-accent text-foreground font-medium"
+                          : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                      )}
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      {link.icon}
+                      {link.label}
+                    </Link>
+                  )
+                )}
+              </nav>
+            </div>
+
+            <div className="border-t border-border/30 p-6 mt-auto">
+              {isAuthenticated ? (
+                <div className="flex flex-col gap-3">
+                  <Button
+                    variant="outline"
+                    className="justify-start"
+                    onClick={() => {
+                      onSettingsClick?.();
+                      setIsMobileMenuOpen(false);
+                    }}
+                  >
+                    <Settings className="mr-2 h-4 w-4" />
+                    Settings
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    className="justify-start"
+                    onClick={() => {
+                      onLogout?.();
+                      setIsMobileMenuOpen(false);
+                    }}
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Logout
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  <Button variant="outline" className="w-full" asChild>
+                    <Link
+                      href="/docs"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      <BookOpen className="mr-2 h-4 w-4 text-blue-400" />
+                      Documentation
+                    </Link>
+                  </Button>
+                  <Button
+                    className="w-full bg-gradient-to-r from-blue-500 to-purple-600"
+                    asChild
+                  >
+                    <Link
+                      href="/login"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      <Wallet className="mr-2 h-4 w-4" />
+                      Connect Wallet
+                    </Link>
+                  </Button>
+                </div>
+              )}
+
+              <div className="flex justify-center mt-6">
                 <div className="flex gap-5">
                   <a
                     href="https://twitter.com"
@@ -211,9 +531,9 @@ export default function Navbar() {
                 </div>
               </div>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </SheetContent>
+        </Sheet>
+      </div>
     </header>
   );
 }

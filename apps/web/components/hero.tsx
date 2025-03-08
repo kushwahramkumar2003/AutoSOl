@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { motion, useInView, AnimatePresence } from "framer-motion";
 import {
@@ -15,12 +15,9 @@ import {
 import NetworkBackground from "@/components/network-background";
 
 export default function Hero() {
-  const [text, setText] = useState("");
-
-  const [index, setIndex] = useState(0);
-  const statsRef = useRef(null);
+  const statsRef = useRef<HTMLDivElement>(null);
   const isInView = useInView(statsRef, { once: true, amount: 0.3 });
-  const [hoverWallet, setHoverWallet] = useState(null);
+  const [hoverWallet, setHoverWallet] = useState<number | null>(null);
 
   const scrollToStats = () => {
     statsRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -233,7 +230,7 @@ export default function Hero() {
               {[
                 {
                   label: "Transaction Cost",
-                  value: "<$0.001",
+                  value: "< $0.001",
                   icon: <Coins className="h-6 w-6 text-blue-500" />,
                   description: "Lowest fees in DeFi",
                   bgGradient: "from-blue-500/10 to-blue-600/5",
@@ -298,7 +295,7 @@ export default function Hero() {
       </div>
 
       {/* Add a decorative Solana logo in the background */}
-      <div className="absolute bottom-10 right-10 opacity-10 pointer-events-none">
+      <div className="absolute bottom-[10.5rem] right-10 opacity-10 pointer-events-none">
         <img
           src="https://cryptologos.cc/logos/solana-sol-logo.png"
           alt="Solana Logo"
