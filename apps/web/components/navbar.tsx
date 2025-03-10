@@ -44,6 +44,7 @@ import {
   HelpCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { WalletConnect } from "./wallet-connect";
 
 interface NavLink {
   href: string;
@@ -319,15 +320,8 @@ export default function Navbar({
                   Documentation
                 </Link>
               </Button>
-              <Button
-                className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white transition-all shadow-md shadow-blue-500/20 hover:shadow-blue-500/40 rounded-lg"
-                asChild
-              >
-                <Link href="/login">
-                  <Wallet className="mr-2 h-4 w-4" />
-                  Connect Wallet
-                </Link>
-              </Button>
+
+              <WalletConnect />
             </>
           )}
         </div>

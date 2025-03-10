@@ -1,8 +1,11 @@
 import type { ReactNode } from "react";
 import type { Metadata } from "next";
+import { Toaster } from "@/components/ui/sonner";
 import { Inter, Space_Grotesk } from "next/font/google";
 import "./globals.css";
+import "@solana/wallet-adapter-react-ui/styles.css";
 import Navbar from "@/components/navbar";
+import { Providers } from "@/components/Providers";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -30,10 +33,13 @@ export default function RootLayout({
       <body
         className={`${inter.variable} ${spaceGrotesk.variable} font-sans bg-background min-h-screen`}
       >
-        <Navbar />
-        <main className="pt-6 pb-4 px-2 mx-auto w-full max-w-7xl">
-          {children}
-        </main>
+        <Providers>
+          <Navbar />
+          <main className="pt-6 pb-4 px-2 mx-auto w-full max-w-7xl">
+            {children}
+          </main>
+        </Providers>
+        <Toaster richColors />
       </body>
     </html>
   );
