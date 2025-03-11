@@ -457,18 +457,7 @@ export default function Navbar({
                       Documentation
                     </Link>
                   </Button>
-                  <Button
-                    className="w-full bg-gradient-to-r from-blue-500 to-purple-600"
-                    asChild
-                  >
-                    <Link
-                      href="/login"
-                      onClick={() => setIsMobileMenuOpen(false)}
-                    >
-                      <Wallet className="mr-2 h-4 w-4" />
-                      Connect Wallet
-                    </Link>
-                  </Button>
+                  <WalletConnect />
                 </div>
               )}
 

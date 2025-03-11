@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { WalletConnect } from "@/components/wallet-connect";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import bs58 from "bs58";
 import {
   Card,
   CardContent,
@@ -228,13 +229,13 @@ const AuthPage = () => {
       // Sign the encoded message
       const signatureBytes = await signMessage(message);
       // Convert signature to base64 string
-      const signatureBase64 = Buffer.from(signatureBytes).toString("base64");
+      const signatureBase58 = bs58.encode(signatureBytes);
 
-      setSignature(signatureBase64);
+      setSignature(signatureBase58);
       toast.success("Message signed successfully");
 
       // Attempt to sign in with next-auth
-      await handleSignIn(signatureBase64);
+      await handleSignIn(signatureBase58);
     } catch (error) {
       console.error("Error signing message:", error);
       toast.error("Failed to sign message", {
@@ -255,11 +256,11 @@ const AuthPage = () => {
     setIsLoading(true);
 
     try {
-      const result = await signIn("credentials", {
-        redirect: false,
-        walletAddress: publicKey.toBase58(),
+      const result = await signIn("signin", {
+        publicKey: publicKey.toBase58(),
         signature: sig,
         nonce,
+        redirect: false,
       });
 
       if (result?.error) {
@@ -269,12 +270,14 @@ const AuthPage = () => {
         return;
       }
 
-      toast.success("Signed in successfully", {
-        description: "Redirecting to dashboard...",
-      });
+      if (result?.status === 200) {
+        toast.success("Signed in successfully", {
+          description: "Redirecting to dashboard...",
+        });
 
-      // Redirect to dashboard or home page after successful login
-      window.location.href = "/dashboard";
+        // Redirect to dashboard or home page after successful login
+        window.location.href = "/dashboard";
+      }
     } catch (error) {
       console.error("Sign in error:", error);
       toast.error("Authentication failed", {
@@ -378,8 +381,8 @@ const AuthPage = () => {
                   </div>
 
                   <div className="bg-primary/5 rounded-lg p-4 border border-primary/10">
-                    <div className="flex items-start gap-3">
-                      <ShieldCheck className="h-5 w-5 text-primary mt-0.5" />
+                    <div className="flex flex-row gap-3">
+                      <ShieldCheck className="text-primary mt-0.5" size={100} />
                       <div className="space-y-1">
                         <h3 className="text-sm font-medium">
                           Secure Authentication
