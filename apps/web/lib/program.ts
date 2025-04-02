@@ -1,13 +1,9 @@
+import { idl } from "@/program/idl";
+import { AutoSol } from "@/program/types";
+
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
-import {
-  PublicKey,
-
-  Connection,
-} from "@solana/web3.js";
-
-import idl from "@auto-sol/program/idl";
-import { AutoSol } from "@auto-sol/program/types";
+import { PublicKey, Connection } from "@solana/web3.js";
 
 export const PROGRAM_ID = new PublicKey(
   "6W2YxRyMJoDEWWRsTmh8KdkAuz4AahY2WLMXh3ZEigBf"
