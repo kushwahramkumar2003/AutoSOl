@@ -100,7 +100,9 @@ export default function ReviewStep({ data }: ReviewStepProps) {
               {data.payment.memo && (
                 <div className="pt-2 border-t border-white/10">
                   <h4 className="text-sm text-white/70 mb-1">Memo</h4>
-                  <p className="text-sm italic">"{data.payment.memo}"</p>
+                  <p className="text-sm italic">
+                    &quot;{data.payment.memo}&quot;
+                  </p>
                 </div>
               )}
             </div>

@@ -50,6 +50,7 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@auto-sol/program": "workspace:*",
     "@types/canvas-confetti": "^1",
     "@types/node": "^20",
     "@types/react": "^18",

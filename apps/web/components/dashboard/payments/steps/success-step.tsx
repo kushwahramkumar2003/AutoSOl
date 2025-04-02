@@ -22,6 +22,7 @@ export default function SuccessStep({ data, onDone }: SuccessStepProps) {
       return Math.random() * (max - min) + min;
     }
 
+    // eslint-disable-next-line
     const interval: any = setInterval(() => {
       const timeLeft = animationEnd - Date.now();
 

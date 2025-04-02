@@ -32,7 +32,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Menu,
   BookOpen,
-  Wallet,
   ChevronDown,
   User,
   Settings,

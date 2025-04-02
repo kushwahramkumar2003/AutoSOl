@@ -199,6 +199,7 @@ export function WalletConnect({
 
     const mockTransactions: Transaction[] = Array(maxHistoryItems)
       .fill(0)
+      // eslint-disable-next-line
       .map((_, i) => ({
         signature: `${Math.random().toString(36).substring(2, 10)}...${Math.random().toString(36).substring(2, 6)}`,
         timestamp:

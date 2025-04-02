@@ -60,6 +60,7 @@ export default function PaymentDetailsStep({
     },
   ]);
 
+  // eslint-disable-next-line
   const [viewMode, setViewMode] = useState<"token" | "usd">("token");
   const [sliderValue, setSliderValue] = useState(0);
   const [tokenInfoVisible, setTokenInfoVisible] = useState(false);

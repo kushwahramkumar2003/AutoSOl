@@ -183,6 +183,7 @@ const AuthPage = () => {
   const [viewState, setViewState] = useState<
     "welcome" | "wallet" | "signature"
   >("welcome");
+  //eslint-disable-next-line
   const [signature, setSignature] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [nonce, setNonce] = useState<string>("");

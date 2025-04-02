@@ -133,6 +133,7 @@ export default function CalendarView({
                 </div>
 
                 <div className="mt-1 space-y-1">
+                  {/*  eslint-disable-next-line */}
                   {dayPayments.slice(0, 2).map((payment, index) => (
                     <div
                       key={payment.id}

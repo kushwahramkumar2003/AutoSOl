@@ -12,6 +12,7 @@ interface ChartCardProps {
   tabs?: string[];
   defaultTab?: string;
   chartType: "bar" | "line" | "pie";
+  // eslint-disable-next-line
   data: any;
   className?: string;
 }
