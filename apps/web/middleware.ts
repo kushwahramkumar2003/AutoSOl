@@ -7,12 +7,13 @@ export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   const publicRoutePatterns = [
-    /^\/$/, 
-    /^\/auth$/, 
+    /^\/$/,
+    /^\/auth$/,
     /^\/apology\/[^/]+$/,
-    /^\/api\/auth\/.*/, 
-    /^\/api\/.*/, 
-    /^\/public\/.*/, 
+    /^\/api\/auth\/.*/,
+    /^\/api\/.*/,
+    /^\/public\/.*/,
+    /^\/_next\/static\/.*/,
   ];
 
   const isPublicRoute = publicRoutePatterns.some((pattern) =>
