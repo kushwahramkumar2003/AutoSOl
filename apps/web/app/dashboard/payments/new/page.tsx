@@ -1,14 +1,34 @@
-import type { Metadata } from "next";
-import NewPaymentForm from "@/components/dashboard/payments/new-payment-form";
+"use client";
 
-export const metadata: Metadata = {
-  title: "Create New Payment Schedule | AutoSOL",
-  description: "Schedule automated recurring payments on Solana",
-};
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { PublicKey } from "@solana/web3.js";
+import DashboardHeader from "@/components/dashboard/header";
+import NewPaymentForm from "@/components/dashboard/payments/new-payment-form";
+import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
+import { AlertCircle } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function NewPaymentPage() {
+  const router = useRouter();
+  const { publicKey, connected } = useWallet();
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Default fee vault address - in a real app, this would be fetched from an API or config
+  const FEE_VAULT_ADDRESS = new PublicKey(
+    "6W2YxRyMJoDEWWRsTmh8KdkAuz4AahY2WLMXh3ZEigBf"
+  );
+
+  // Default fee vault token account - in a real app, this would be fetched based on the selected token
+  const FEE_VAULT_TOKEN_ACCOUNT = new PublicKey(
+    "6W2YxRyMJoDEWWRsTmh8KdkAuz4AahY2WLMXh3ZEigBf"
+  );
+
   return (
     <div className="flex flex-col min-h-screen">
+      <DashboardHeader />
+
       <div className="flex-1 p-6">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-white">
@@ -19,7 +39,28 @@ export default function NewPaymentPage() {
           </p>
         </div>
 
-        <NewPaymentForm />
+        {!connected ? (
+          <div className="max-w-4xl mx-auto">
+            <Alert className="bg-dark-200 border-white/10 mb-6">
+              <AlertCircle className="h-5 w-5 text-[#6E56CF]" />
+              <AlertTitle>Wallet connection required</AlertTitle>
+              <AlertDescription>
+                Please connect your wallet to create a payment schedule.
+              </AlertDescription>
+            </Alert>
+
+            <div className="flex justify-center p-12 bg-dark-200 border border-white/10 rounded-lg">
+              <WalletMultiButton className="bg-gradient-to-r from-[#6E56CF] to-[#10B981] hover:from-[#5a46b0] hover:to-[#0e9d6d] text-white px-6 py-6 h-auto text-lg rounded-lg">
+                Connect Wallet
+              </WalletMultiButton>
+            </div>
+          </div>
+        ) : (
+          <NewPaymentForm
+            feeVaultAddress={FEE_VAULT_ADDRESS}
+            feeVaultTokenAccount={FEE_VAULT_TOKEN_ACCOUNT}
+          />
+        )}
       </div>
     </div>
   );
