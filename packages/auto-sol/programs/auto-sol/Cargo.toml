@@ -12,10 +12,11 @@ name = "auto_sol"
 default = []
 cpi = ["no-entrypoint"]
 no-entrypoint = []
-no-idl = []
 no-log-ix-name = []
+no-idl = []
 idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 
 [dependencies]
-anchor-lang = { version = "0.31.0", features = ["init-if-needed"] }
-anchor-spl = "0.31.0"
+anchor-lang = { version = "0.31.1", default-features = false, features = ["derive"] }
+anchor-spl = "0.31.1"
+proc-macro2 = "=1.0.95"

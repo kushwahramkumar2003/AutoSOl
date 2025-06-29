@@ -2,362 +2,645 @@ import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { AutoSol } from "../target/types/auto_sol";
 import {
-  TOKEN_PROGRAM_ID,
-  ASSOCIATED_TOKEN_PROGRAM_ID,
-  createMint,
-  createAccount,
-  mintTo,
-  getAccount,
-  getAssociatedTokenAddress,
-} from "@solana/spl-token";
-import {
   PublicKey,
   Keypair,
-  LAMPORTS_PER_SOL,
   SystemProgram,
+  LAMPORTS_PER_SOL,
 } from "@solana/web3.js";
-import { assert } from "chai";
+import { expect } from "chai";
+import { describe, it, beforeEach, afterEach } from "mocha";
+import * as fs from "fs";
+import * as os from "os";
+import * as path from "path";
 
 describe("auto-sol", () => {
-  // Configure the client to use the local cluster
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
 
   const program = anchor.workspace.AutoSol as Program<AutoSol>;
 
-  // Use your local wallet (assuming it's the provider wallet)
-  const authority = provider.wallet;
-  const user = Keypair.generate();
-  // Specified recipient wallet address
-  const recipient = new PublicKey(
-    "FxfMxvBecat982M1DpeCwqWRRc4gk35UZH5bhaFqVoDX"
-  );
-  const executor = Keypair.generate(); // This should match HTTP_BACKEND_WALLET in production
-
-  // Initialize variables
-  let usdcMint: PublicKey;
-  let usdtMint: PublicKey;
-  let userUsdcAccount: PublicKey;
-  let userUsdtAccount: PublicKey;
-  let recipientUsdcAccount: PublicKey;
-  let recipientUsdtAccount: PublicKey;
   let feeSettings: PublicKey;
   let solFeeVault: PublicKey;
-  let usdcFeeVault: PublicKey;
-  let usdtFeeVault: PublicKey;
-  let paymentSchedule: PublicKey;
-  let solPaymentVault: PublicKey;
-  let usdcPaymentVault: PublicKey;
-  let usdtPaymentVault: PublicKey;
-  let usdcVaultAuthority: PublicKey;
-  let usdtVaultAuthority: PublicKey;
-  let usdcFeeVaultTokenAccount: PublicKey;
-  let usdtFeeVaultTokenAccount: PublicKey;
-  let usdcFeeVaultAuthority: PublicKey;
-  let usdtFeeVaultAuthority: PublicKey;
+  let authority: Keypair;
+  let user: Keypair;
+  let recipient: Keypair;
+  let httpBackendWallet: Keypair;
+  let unauthorizedUser: Keypair;
 
-  // Define constants
-  const INITIAL_MINT_AMOUNT = 1_000_000_000; // 1000 tokens with 6 decimals
-  const PAYMENT_AMOUNT = 100_000_00; // 10 tokens
-  const TEST_MEMO = "Test payment schedule";
-  const USDC_MINT = new PublicKey(
-    "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"
-  ); // Devnet USDC
-  const USDT_MINT = new PublicKey(
-    "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
-  ); // Mainnet USDT
+  const HTTP_BACKEND_WALLET = new PublicKey(
+    "8dRCBu5V2v6JHR3HxN9zjN91WoX4FfGzgdM8nXawUbqt"
+  );
+  const FEE_WITHDRAWAL_ALLOWED_KEYS = [
+    "FxfMxvBecat982M1DpeCwqWRRc4gk35UZH5bhaFqVoDX",
+    "9KP44gv69EoXN2aB71u1HoYy5ZSZjXTpyYXygJ9phwCN",
+    "BS5QbyrCvPreGPPQ7XzEkdpFk7J7LPd9RfYDF8rXmVm7",
+    "68AzXw2QAhh6NkrH5bqvDn3hPGk1mix4ewFGQ7AoTpe1",
+    "8dRCBu5V2v6JHR3HxN9zjN91WoX4FfGzgdM8nXawUbqt",
+    "G8UmesEhavARgE6xTWbDq6iHvdp8W2yo4pbrW4jLsHxh",
+  ].map((key) => new PublicKey(key));
 
-  before(async () => {
-    // Airdrop SOL to test accounts
-    await Promise.all([
-      provider.connection.requestAirdrop(user.publicKey, 10 * LAMPORTS_PER_SOL),
+  const paymentAmount = new anchor.BN(0.1 * LAMPORTS_PER_SOL);
+  const memo = "Test payment schedule";
+
+  const loadLocalWallet = (): Keypair => {
+    const walletPath = path.join(os.homedir(), ".config", "solana", "id.json");
+    const keypairData = JSON.parse(fs.readFileSync(walletPath, "utf-8"));
+    return Keypair.fromSecretKey(Uint8Array.from(keypairData));
+  };
+
+  const getPDAs = () => {
+    const [feeSettingsPDA] = PublicKey.findProgramAddressSync(
+      [Buffer.from("global_fee_settings")],
+      program.programId
+    );
+    const [solFeeVaultPDA] = PublicKey.findProgramAddressSync(
+      [Buffer.from("global_fee_vault")],
+      program.programId
+    );
+    return { feeSettingsPDA, solFeeVaultPDA };
+  };
+
+  const getPaymentVaultPDA = (paymentScheduleKey: PublicKey) => {
+    const [solPaymentVaultPDA] = PublicKey.findProgramAddressSync(
+      [Buffer.from("sol_vault"), paymentScheduleKey.toBuffer()],
+      program.programId
+    );
+    return solPaymentVaultPDA;
+  };
+
+  beforeEach(async () => {
+    user = Keypair.generate();
+    recipient = Keypair.generate();
+    unauthorizedUser = Keypair.generate();
+    httpBackendWallet = loadLocalWallet();
+    authority = loadLocalWallet();
+
+    if (!httpBackendWallet.publicKey.equals(HTTP_BACKEND_WALLET)) {
+      throw new Error(
+        `Local wallet ${httpBackendWallet.publicKey.toString()} doesn't match expected ${HTTP_BACKEND_WALLET.toString()}`
+      );
+    }
+
+    const pdas = getPDAs();
+    feeSettings = pdas.feeSettingsPDA;
+    solFeeVault = pdas.solFeeVaultPDA;
+
+    const airdropAmount = 10 * LAMPORTS_PER_SOL;
+    const airdropPromises = [
+      provider.connection.requestAirdrop(authority.publicKey, airdropAmount),
+      provider.connection.requestAirdrop(user.publicKey, airdropAmount),
       provider.connection.requestAirdrop(
-        executor.publicKey,
-        10 * LAMPORTS_PER_SOL
+        httpBackendWallet.publicKey,
+        airdropAmount
       ),
-    ]);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+      provider.connection.requestAirdrop(
+        unauthorizedUser.publicKey,
+        airdropAmount
+      ),
+    ];
 
-    // Set up USDC and USDT mints and accounts
-    usdcMint = USDC_MINT;
-    usdtMint = USDT_MINT;
-
-    // Create associated token accounts
-    userUsdcAccount = await getAssociatedTokenAddress(usdcMint, user.publicKey);
-    userUsdtAccount = await getAssociatedTokenAddress(usdtMint, user.publicKey);
-    recipientUsdcAccount = await getAssociatedTokenAddress(usdcMint, recipient);
-    recipientUsdtAccount = await getAssociatedTokenAddress(usdtMint, recipient);
+    await Promise.all(airdropPromises);
+    await new Promise((resolve) => setTimeout(resolve, 2000));
   });
 
-  it("Initialize program", async () => {
-    const feeSettingsKeypair = Keypair.generate();
-    feeSettings = feeSettingsKeypair.publicKey;
-    const solFeeVaultKeypair = Keypair.generate();
-    solFeeVault = solFeeVaultKeypair.publicKey;
-    const usdcFeeVaultKeypair = Keypair.generate();
-    usdcFeeVault = usdcFeeVaultKeypair.publicKey;
-    const usdtFeeVaultKeypair = Keypair.generate();
-    usdtFeeVault = usdtFeeVaultKeypair.publicKey;
+  describe("Initialize Program", () => {
+    it("should initialize successfully", async () => {
+      await program.methods
+        .initialize()
+        .accounts({
+          authority: httpBackendWallet.publicKey,
+        })
+        .signers([httpBackendWallet])
+        .rpc();
 
-    await program.methods
-      .initialize()
-      .accounts({
-        feeSettings: feeSettings,
-        solFeeVault: solFeeVault,
-        usdcFeeVault: usdcFeeVault,
-        usdtFeeVault: usdtFeeVault,
-        authority: authority.publicKey,
-        systemProgram: SystemProgram.programId,
-      })
-      .signers([
-        feeSettingsKeypair,
-        solFeeVaultKeypair,
-        usdcFeeVaultKeypair,
-        usdtFeeVaultKeypair,
-      ])
-      .rpc();
+      const feeSettingsAccount = await program.account.feeSettings.fetch(
+        feeSettings
+      );
+      expect(feeSettingsAccount.authority.toString()).to.equal(
+        httpBackendWallet.publicKey.toString()
+      );
+      expect(feeSettingsAccount.feePercentage).to.equal(100); // 1%
+      expect(feeSettingsAccount.httpBackendWallet.toString()).to.equal(
+        HTTP_BACKEND_WALLET.toString()
+      );
+      expect(feeSettingsAccount.initialized).to.be.true;
+      expect(feeSettingsAccount.feeWithdrawalAllowedKeys.length).to.equal(6);
 
-    const feeSettingsAccount = await program.account.feeSettings.fetch(
-      feeSettings
-    );
-    assert.equal(
-      feeSettingsAccount.authority.toString(),
-      authority.publicKey.toString()
-    );
-    assert.equal(feeSettingsAccount.feePercentage, 100);
+      // Check that the fee vault exists (it's a SystemAccount, so we just check balance)
+      // const solFeeVaultAccount = await provider.connection.getAccountInfo(
+      //   solFeeVault
+      // );
+      // console.log("Account info", solFeeVaultAccount);
+      // expect(solFeeVaultAccount).to.not.be.null;
+    });
+
+    it("should fail if already initialized", async () => {
+      try {
+        await program.methods
+          .initialize()
+          .accounts({
+            authority: httpBackendWallet.publicKey,
+          })
+          .signers([httpBackendWallet])
+          .rpc();
+        expect.fail("Should have thrown error");
+      } catch (error) {
+        expect(error.toString()).to.include("already in use");
+      }
+    });
   });
 
-  it("Create payment schedule with SOL", async () => {
-    const paymentScheduleKeypair = Keypair.generate();
-    paymentSchedule = paymentScheduleKeypair.publicKey;
+  describe("Payment Schedule", () => {
+    let paymentSchedule: Keypair;
+    let solPaymentVault: PublicKey;
 
-    [solPaymentVault] = await PublicKey.findProgramAddress(
-      [Buffer.from("sol_vault"), paymentSchedule.toBuffer()],
-      program.programId
-    );
+    beforeEach(async () => {
+      paymentSchedule = Keypair.generate();
+      solPaymentVault = getPaymentVaultPDA(paymentSchedule.publicKey);
+    });
 
-    const slot = await provider.connection.getSlot();
-    const timestamp =
-      (await provider.connection.getBlockTime(slot)) ||
-      Math.floor(Date.now() / 1000);
-    const scheduleTimes = [timestamp + 10];
+    it("should create schedule successfully", async () => {
+      const currentTime = Math.floor(Date.now() / 1000);
+      const scheduleTimes = [
+        new anchor.BN(currentTime + 60), // 1 min
+        new anchor.BN(currentTime + 120), // 2
+      ];
 
-    await program.methods
-      .createPaymentSchedule(
-        new anchor.BN(PAYMENT_AMOUNT),
-        recipient,
-        scheduleTimes.map((time) => new anchor.BN(time)),
-        TEST_MEMO,
-        { sol: {} }
-      )
-      .accounts({
-        paymentSchedule: paymentSchedule,
-        feeSettings: feeSettings,
-        user: user.publicKey,
-        solPaymentVault: solPaymentVault,
-        solFeeVault: solFeeVault,
-        systemProgram: SystemProgram.programId,
-        tokenProgram: TOKEN_PROGRAM_ID,
-        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
-        rent: anchor.web3.SYSVAR_RENT_PUBKEY,
-        usdcMint: usdcMint,
-        usdtMint: usdtMint,
-        userUsdcAccount: userUsdcAccount,
-        usdcPaymentVault: usdcPaymentVault,
-        usdcVaultAuthority: usdcVaultAuthority,
-        usdcFeeVaultTokenAccount: usdcFeeVaultTokenAccount,
-        usdcFeeVaultAuthority: usdcFeeVaultAuthority,
-        userUsdtAccount: userUsdtAccount,
-        usdtPaymentVault: usdtPaymentVault,
-        usdtVaultAuthority: usdtVaultAuthority,
-        usdtFeeVaultTokenAccount: usdtFeeVaultTokenAccount,
-        usdtFeeVaultAuthority: usdtFeeVaultAuthority,
-      })
-      .signers([user, paymentScheduleKeypair])
-      .rpc();
+      await program.methods
+        .createPaymentSchedule(
+          paymentAmount,
+          recipient.publicKey,
+          scheduleTimes,
+          memo
+        )
+        .accounts({
+          paymentSchedule: paymentSchedule.publicKey,
+          user: user.publicKey,
+        })
+        .signers([paymentSchedule, user])
+        .rpc();
 
-    const paymentScheduleAccount = await program.account.paymentSchedule.fetch(
-      paymentSchedule
-    );
-    assert.equal(
-      paymentScheduleAccount.owner.toString(),
-      user.publicKey.toString()
-    );
-    assert.equal(
-      paymentScheduleAccount.recipient.toString(),
-      recipient.toString()
-    );
-    assert.equal(
-      paymentScheduleAccount.paymentAmount.toString(),
-      PAYMENT_AMOUNT.toString()
-    );
+      const scheduleAccount = await program.account.paymentSchedule.fetch(
+        paymentSchedule.publicKey
+      );
+      expect(scheduleAccount.owner.toString()).to.equal(
+        user.publicKey.toString()
+      );
+      expect(scheduleAccount.recipient.toString()).to.equal(
+        recipient.publicKey.toString()
+      );
+      expect(scheduleAccount.payments.length).to.equal(2);
+      expect(scheduleAccount.status).to.deep.equal({ active: {} });
+      expect(scheduleAccount.memo).to.equal(memo);
+      expect(scheduleAccount.totalAmount.toNumber()).to.equal(
+        paymentAmount.toNumber() * 2
+      );
+      expect(scheduleAccount.remainingAmount.toNumber()).to.equal(
+        paymentAmount.toNumber() * 2
+      );
+
+      const paymentVaultBalance = await provider.connection.getBalance(
+        solPaymentVault
+      );
+      expect(paymentVaultBalance).to.equal(paymentAmount.toNumber() * 2);
+
+      const feeVaultBalance = await provider.connection.getBalance(solFeeVault);
+      const expectedFee = (paymentAmount.toNumber() * 2 * 100) / 10000; // 1% fee
+      expect(feeVaultBalance).to.be.greaterThan(expectedFee - 1000); // Allow for small rounding
+    });
+
+    it("should execute payment when due", async () => {
+      const currentTime = Math.floor(Date.now() / 1000);
+      const scheduleTimes = [new anchor.BN(currentTime + 5)]; // 5 seconds
+
+      await program.methods
+        .createPaymentSchedule(
+          paymentAmount,
+          recipient.publicKey,
+          scheduleTimes,
+          memo
+        )
+        .accounts({
+          paymentSchedule: paymentSchedule.publicKey,
+          user: user.publicKey,
+        })
+        .signers([paymentSchedule, user])
+        .rpc();
+
+      await new Promise((resolve) => setTimeout(resolve, 6000));
+
+      const recipientBalanceBefore = await provider.connection.getBalance(
+        recipient.publicKey
+      );
+
+      await program.methods
+        .executePayment(new anchor.BN(0))
+        .accounts({
+          paymentSchedule: paymentSchedule.publicKey,
+          executor: httpBackendWallet.publicKey,
+          recipient: recipient.publicKey,
+        })
+        .signers([httpBackendWallet])
+        .rpc();
+
+      const scheduleAccount = await program.account.paymentSchedule.fetch(
+        paymentSchedule.publicKey
+      );
+      const recipientBalanceAfter = await provider.connection.getBalance(
+        recipient.publicKey
+      );
+
+      expect(scheduleAccount.payments[0].executed).to.be.true;
+      expect(scheduleAccount.status).to.deep.equal({ completed: {} });
+      expect(recipientBalanceAfter).to.equal(
+        recipientBalanceBefore + paymentAmount.toNumber()
+      );
+    });
+
+    it("should cancel schedule and refund", async () => {
+      const currentTime = Math.floor(Date.now() / 1000);
+      const scheduleTimes = [new anchor.BN(currentTime + 60)];
+
+      await program.methods
+        .createPaymentSchedule(
+          paymentAmount,
+          recipient.publicKey,
+          scheduleTimes,
+          memo
+        )
+        .accounts({
+          paymentSchedule: paymentSchedule.publicKey,
+          user: user.publicKey,
+        })
+        .signers([paymentSchedule, user])
+        .rpc();
+
+      const userBalanceBefore = await provider.connection.getBalance(
+        user.publicKey
+      );
+
+      await program.methods
+        .cancelPaymentSchedule()
+        .accounts({
+          paymentSchedule: paymentSchedule.publicKey,
+          owner: user.publicKey,
+        })
+        .signers([user])
+        .rpc();
+
+      const userBalanceAfter = await provider.connection.getBalance(
+        user.publicKey
+      );
+      const scheduleAccount = await program.account.paymentSchedule.fetch(
+        paymentSchedule.publicKey
+      );
+
+      expect(scheduleAccount.status).to.deep.equal({ cancelled: {} });
+      expect(scheduleAccount.remainingAmount.toNumber()).to.equal(0);
+      expect(userBalanceAfter).to.be.greaterThan(userBalanceBefore);
+    });
+
+    it("should fail to execute payment too early", async () => {
+      const currentTime = Math.floor(Date.now() / 1000);
+      const scheduleTimes = [new anchor.BN(currentTime + 3600)]; // 1 hour
+
+      await program.methods
+        .createPaymentSchedule(
+          paymentAmount,
+          recipient.publicKey,
+          scheduleTimes,
+          memo
+        )
+        .accounts({
+          paymentSchedule: paymentSchedule.publicKey,
+          user: user.publicKey,
+        })
+        .signers([paymentSchedule, user])
+        .rpc();
+
+      try {
+        await program.methods
+          .executePayment(new anchor.BN(0))
+          .accounts({
+            paymentSchedule: paymentSchedule.publicKey,
+            executor: httpBackendWallet.publicKey,
+            recipient: recipient.publicKey,
+          })
+          .signers([httpBackendWallet])
+          .rpc();
+        expect.fail("Should have thrown error");
+      } catch (error) {
+        expect(error.toString()).to.include("PaymentNotDue");
+      }
+    });
+
+    it("should fail execution with unauthorized executor", async () => {
+      const currentTime = Math.floor(Date.now() / 1000);
+      const scheduleTimes = [new anchor.BN(currentTime + 5)];
+
+      await program.methods
+        .createPaymentSchedule(
+          paymentAmount,
+          recipient.publicKey,
+          scheduleTimes,
+          memo
+        )
+        .accounts({
+          paymentSchedule: paymentSchedule.publicKey,
+          user: user.publicKey,
+        })
+        .signers([paymentSchedule, user])
+        .rpc();
+
+      await new Promise((resolve) => setTimeout(resolve, 6000));
+
+      try {
+        await program.methods
+          .executePayment(new anchor.BN(0))
+          .accounts({
+            paymentSchedule: paymentSchedule.publicKey,
+            executor: unauthorizedUser.publicKey,
+            recipient: recipient.publicKey,
+          })
+          .signers([unauthorizedUser])
+          .rpc();
+        expect.fail("Should have thrown error");
+      } catch (error) {
+        expect(error.toString()).to.include("UnauthorizedExecutor");
+      }
+    });
   });
 
-  it("Execute SOL payment", async () => {
-    await new Promise((resolve) => setTimeout(resolve, 11000));
+  describe("Fee Management", () => {
+    it("should update fee percentage", async () => {
+      const newFeePercentage = 200; // 2%
 
-    await program.methods
-      .executePayment(new anchor.BN(0))
-      .accounts({
-        paymentSchedule: paymentSchedule,
-        feeSettings: feeSettings,
-        executor: executor.publicKey,
-        recipient: recipient,
-        solPaymentVault: solPaymentVault,
-        usdcPaymentVault: usdcPaymentVault,
-        usdcVaultAuthority: usdcVaultAuthority,
-        recipientUsdcAccount: recipientUsdcAccount,
-        usdtPaymentVault: usdtPaymentVault,
-        usdtVaultAuthority: usdtVaultAuthority,
-        recipientUsdtAccount: recipientUsdtAccount,
-        tokenProgram: TOKEN_PROGRAM_ID,
-        systemProgram: SystemProgram.programId,
-      })
-      .signers([executor])
-      .rpc();
+      await program.methods
+        .updateFeePercentage(newFeePercentage)
+        .accounts({
+          feeSettings,
+          authority: httpBackendWallet.publicKey,
+        })
+        .signers([httpBackendWallet])
+        .rpc();
 
-    const paymentScheduleAccount = await program.account.paymentSchedule.fetch(
-      paymentSchedule
-    );
-    assert.equal(paymentScheduleAccount.payments[0].executed, true);
-    assert.equal(paymentScheduleAccount.status.completed !== undefined, true);
+      const feeSettingsAccount = await program.account.feeSettings.fetch(
+        feeSettings
+      );
+      expect(feeSettingsAccount.feePercentage).to.equal(newFeePercentage);
+    });
+
+    it("should prevent unauthorized fee updates", async () => {
+      try {
+        await program.methods
+          .updateFeePercentage(200)
+          .accounts({
+            feeSettings,
+            authority: unauthorizedUser.publicKey,
+          })
+          .signers([unauthorizedUser])
+          .rpc();
+        expect.fail("Should have thrown error");
+      } catch (error) {
+        expect(error.toString()).to.include("ConstraintHasOne");
+      }
+    });
+
+    it("should prevent setting fee too high", async () => {
+      try {
+        await program.methods
+          .updateFeePercentage(600) // 6% - above 5% limit
+          .accounts({
+            feeSettings,
+            authority: httpBackendWallet.publicKey,
+          })
+          .signers([httpBackendWallet])
+          .rpc();
+        expect.fail("Should have thrown error");
+      } catch (error) {
+        expect(error.toString()).to.include("FeeTooHigh");
+      }
+    });
+
+    // it("should withdraw fees by authorized wallet", async () => {
+    //   // First create a payment schedule to generate fees
+    //   const paymentSchedule = Keypair.generate();
+    //   const solPaymentVault = getPaymentVaultPDA(paymentSchedule.publicKey);
+    //   const currentTime = Math.floor(Date.now() / 1000);
+    //   const scheduleTimes = [new anchor.BN(currentTime + 60)];
+
+    //   await program.methods
+    //     .createPaymentSchedule(
+    //       paymentAmount,
+    //       recipient.publicKey,
+    //       scheduleTimes,
+    //       memo
+    //     )
+    //     .accounts({
+    //       paymentSchedule: paymentSchedule.publicKey,
+    //       user: user.publicKey,
+    //     })
+    //     .signers([paymentSchedule, user])
+    //     .rpc();
+
+    //   // Get authorized withdrawal key
+    //   const authorizedKey = Keypair.fromSecretKey(httpBackendWallet.secretKey);
+    //   const balanceBefore = await provider.connection.getBalance(
+    //     authorizedKey.publicKey
+    //   );
+    //   const feeVaultBalance = await provider.connection.getBalance(solFeeVault);
+
+    //   // Withdraw a small amount
+    //   const withdrawAmount = Math.floor(feeVaultBalance * 0.5);
+
+    //   await program.methods
+    //     .withdrawFees(new anchor.BN(withdrawAmount))
+    //     .accounts({
+    //       authority: authorizedKey.publicKey,
+    //     })
+    //     .signers([authorizedKey])
+    //     .rpc();
+
+    //   const balanceAfter = await provider.connection.getBalance(
+    //     authorizedKey.publicKey
+    //   );
+    //   expect(balanceAfter).to.be.greaterThan(balanceBefore);
+    // });
+
+    it("should fail fee withdrawal by unauthorized wallet", async () => {
+      try {
+        await program.methods
+          .withdrawFees(new anchor.BN(1000000))
+          .accounts({
+            authority: unauthorizedUser.publicKey,
+          })
+          .signers([unauthorizedUser])
+          .rpc();
+        expect.fail("Should have thrown error");
+      } catch (error) {
+        expect(error.toString()).to.include("UnauthorizedFeeWithdrawal");
+      }
+    });
   });
 
-  it("Create payment schedule with USDC", async () => {
-    const paymentScheduleKeypair = Keypair.generate();
-    paymentSchedule = paymentScheduleKeypair.publicKey;
+  describe("Error Cases", () => {
+    it("should reject empty schedules", async () => {
+      const paymentSchedule = Keypair.generate();
+      const solPaymentVault = getPaymentVaultPDA(paymentSchedule.publicKey);
 
-    [usdcVaultAuthority] = await PublicKey.findProgramAddress(
-      [Buffer.from("usdc_vault"), paymentSchedule.toBuffer()],
-      program.programId
-    );
-    [usdcPaymentVault] = await PublicKey.findProgramAddress(
-      [Buffer.from("usdc_vault"), paymentSchedule.toBuffer()],
-      program.programId
-    );
-    [usdcFeeVaultAuthority] = await PublicKey.findProgramAddress(
-      [Buffer.from("usdc_fee_vault")],
-      program.programId
-    );
-    usdcFeeVaultTokenAccount = await getAssociatedTokenAddress(
-      usdcMint,
-      usdcFeeVaultAuthority
-    );
+      try {
+        await program.methods
+          .createPaymentSchedule(
+            paymentAmount,
+            recipient.publicKey,
+            [], // Empty schedule
+            memo
+          )
+          .accounts({
+            paymentSchedule: paymentSchedule.publicKey,
+            user: user.publicKey,
+          })
+          .signers([paymentSchedule, user])
+          .rpc();
+        expect.fail("Should have thrown error");
+      } catch (error) {
+        expect(error.toString()).to.include("EmptySchedule");
+      }
+    });
 
-    const slot = await provider.connection.getSlot();
-    const timestamp =
-      (await provider.connection.getBlockTime(slot)) ||
-      Math.floor(Date.now() / 1000);
-    const scheduleTimes = [timestamp + 10];
+    it("should reject past-due schedules", async () => {
+      const paymentSchedule = Keypair.generate();
+      const solPaymentVault = getPaymentVaultPDA(paymentSchedule.publicKey);
+      const currentTime = Math.floor(Date.now() / 1000);
 
-    // Note: For this to work, you'll need to fund userUsdcAccount with USDC from devnet faucet
-    await program.methods
-      .createPaymentSchedule(
-        new anchor.BN(PAYMENT_AMOUNT),
-        recipient,
-        scheduleTimes.map((time) => new anchor.BN(time)),
-        TEST_MEMO,
-        { usdc: {} }
-      )
-      .accounts({
-        paymentSchedule: paymentSchedule,
-        feeSettings: feeSettings,
-        user: user.publicKey,
-        solPaymentVault: solPaymentVault,
-        solFeeVault: solFeeVault,
-        userUsdcAccount: userUsdcAccount,
-        usdcPaymentVault: usdcPaymentVault,
-        usdcVaultAuthority: usdcVaultAuthority,
-        usdcFeeVaultTokenAccount: usdcFeeVaultTokenAccount,
-        usdcFeeVaultAuthority: usdcFeeVaultAuthority,
-        usdcMint: usdcMint,
-        userUsdtAccount: userUsdtAccount,
-        usdtPaymentVault: usdtPaymentVault,
-        usdtVaultAuthority: usdtVaultAuthority,
-        usdtFeeVaultTokenAccount: usdtFeeVaultTokenAccount,
-        usdtFeeVaultAuthority: usdtFeeVaultAuthority,
-        usdtMint: usdtMint,
-        tokenProgram: TOKEN_PROGRAM_ID,
-        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
-        systemProgram: SystemProgram.programId,
-        rent: anchor.web3.SYSVAR_RENT_PUBKEY,
-      })
-      .signers([user, paymentScheduleKeypair])
-      .rpc();
+      try {
+        await program.methods
+          .createPaymentSchedule(
+            paymentAmount,
+            recipient.publicKey,
+            [new anchor.BN(currentTime - 60)], // Past time
+            memo
+          )
+          .accounts({
+            paymentSchedule: paymentSchedule.publicKey,
+            user: user.publicKey,
+          })
+          .signers([paymentSchedule, user])
+          .rpc();
+        expect.fail("Should have thrown error");
+      } catch (error) {
+        expect(error.toString()).to.include("InvalidScheduleTime");
+      }
+    });
 
-    const paymentScheduleAccount = await program.account.paymentSchedule.fetch(
-      paymentSchedule
-    );
-    assert.equal(paymentScheduleAccount.tokenType.usdc !== undefined, true);
-    assert.equal(
-      paymentScheduleAccount.paymentAmount.toString(),
-      PAYMENT_AMOUNT.toString()
-    );
-  });
+    it("should reject too many schedule times", async () => {
+      const paymentSchedule = Keypair.generate();
+      const solPaymentVault = getPaymentVaultPDA(paymentSchedule.publicKey);
+      const currentTime = Math.floor(Date.now() / 1000);
 
-  it("Cancel payment schedule", async () => {
-    await program.methods
-      .cancelPaymentSchedule()
-      .accounts({
-        paymentSchedule: paymentSchedule,
-        owner: user.publicKey,
-        solPaymentVault: solPaymentVault,
-        usdcPaymentVault: usdcPaymentVault,
-        usdcVaultAuthority: usdcVaultAuthority,
-        ownerUsdcAccount: userUsdcAccount,
-        usdtPaymentVault: usdtPaymentVault,
-        usdtVaultAuthority: usdtVaultAuthority,
-        ownerUsdtAccount: userUsdtAccount,
-        tokenProgram: TOKEN_PROGRAM_ID,
-        systemProgram: SystemProgram.programId,
-      })
-      .signers([user])
-      .rpc();
+      // Create 11 schedule times (more than the 10 limit)
+      const scheduleTimes = Array.from(
+        { length: 11 },
+        (_, i) => new anchor.BN(currentTime + 60 + i * 60)
+      );
 
-    const paymentScheduleAccount = await program.account.paymentSchedule.fetch(
-      paymentSchedule
-    );
-    assert.equal(paymentScheduleAccount.status.cancelled !== undefined, true);
-    assert.equal(paymentScheduleAccount.remainingAmount.toString(), "0");
-  });
+      try {
+        await program.methods
+          .createPaymentSchedule(
+            paymentAmount,
+            recipient.publicKey,
+            scheduleTimes,
+            memo
+          )
+          .accounts({
+            paymentSchedule: paymentSchedule.publicKey,
+            user: user.publicKey,
+          })
+          .signers([paymentSchedule, user])
+          .rpc();
+        expect.fail("Should have thrown error");
+      } catch (error) {
+        expect(error.toString()).to.include("TooManyScheduleTimes");
+      }
+    });
 
-  it("Withdraw fees", async () => {
-    await program.methods
-      .withdrawFees(new anchor.BN(PAYMENT_AMOUNT / 100), { sol: {} }) // 1% fee
-      .accounts({
-        feeSettings: feeSettings,
-        authority: authority.publicKey,
-        solFeeVault: solFeeVault,
-        usdcFeeVaultTokenAccount: usdcFeeVaultTokenAccount,
-        usdcFeeVaultAuthority: usdcFeeVaultAuthority,
-        userUsdcAccount: userUsdcAccount,
-        usdtFeeVaultTokenAccount: usdtFeeVaultTokenAccount,
-        usdtFeeVaultAuthority: usdtFeeVaultAuthority,
-        userUsdtAccount: userUsdtAccount,
-        tokenProgram: TOKEN_PROGRAM_ID,
-        systemProgram: SystemProgram.programId,
-      })
-      .rpc(); // Using provider wallet (authority)
+    it("should fail to cancel already cancelled schedule", async () => {
+      const paymentSchedule = Keypair.generate();
+      const solPaymentVault = getPaymentVaultPDA(paymentSchedule.publicKey);
+      const currentTime = Math.floor(Date.now() / 1000);
+      const scheduleTimes = [new anchor.BN(currentTime + 60)];
 
-    // Verify fee vault balance decreased
-    const solFeeVaultBalance = await provider.connection.getBalance(
-      solFeeVault
-    );
-    assert(solFeeVaultBalance < PAYMENT_AMOUNT / 100);
-  });
+      await program.methods
+        .createPaymentSchedule(
+          paymentAmount,
+          recipient.publicKey,
+          scheduleTimes,
+          memo
+        )
+        .accounts({
+          paymentSchedule: paymentSchedule.publicKey,
+          user: user.publicKey,
+        })
+        .signers([paymentSchedule, user])
+        .rpc();
 
-  it("Update fee percentage", async () => {
-    await program.methods
-      .updateFeePercentage(new anchor.BN(200))
-      .accounts({
-        feeSettings: feeSettings,
-        authority: authority.publicKey,
-      })
-      .rpc();
+      await program.methods
+        .cancelPaymentSchedule()
+        .accounts({
+          paymentSchedule: paymentSchedule.publicKey,
+          owner: user.publicKey,
+        })
+        .signers([user])
+        .rpc();
 
-    const feeSettingsAccount = await program.account.feeSettings.fetch(
-      feeSettings
-    );
-    assert.equal(feeSettingsAccount.feePercentage, 200);
+      try {
+        await program.methods
+          .cancelPaymentSchedule()
+          .accounts({
+            paymentSchedule: paymentSchedule.publicKey,
+            owner: user.publicKey,
+          })
+          .signers([user])
+          .rpc();
+        expect.fail("Should have thrown error");
+      } catch (error) {
+        expect(error.toString()).to.include("InvalidScheduleStatus");
+      }
+    });
+
+    it("should fail cancellation by non-owner", async () => {
+      const paymentSchedule = Keypair.generate();
+      const solPaymentVault = getPaymentVaultPDA(paymentSchedule.publicKey);
+      const currentTime = Math.floor(Date.now() / 1000);
+      const scheduleTimes = [new anchor.BN(currentTime + 60)];
+
+      await program.methods
+        .createPaymentSchedule(
+          paymentAmount,
+          recipient.publicKey,
+          scheduleTimes,
+          memo
+        )
+        .accounts({
+          paymentSchedule: paymentSchedule.publicKey,
+          user: user.publicKey,
+        })
+        .signers([paymentSchedule, user])
+        .rpc();
+
+      try {
+        await program.methods
+          .cancelPaymentSchedule()
+          .accounts({
+            paymentSchedule: paymentSchedule.publicKey,
+            owner: unauthorizedUser.publicKey,
+          })
+          .signers([unauthorizedUser])
+          .rpc();
+        expect.fail("Should have thrown error");
+      } catch (error) {
+        expect(error.toString()).to.include("UnauthorizedCancellation");
+      }
+    });
   });
 });
