@@ -1,0 +1,102 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model PaymentSchedule {
+  id                String   @id
+  owner            String
+  recipient        String
+  totalAmount      BigInt   @map("total_amount")
+  paymentAmount    BigInt   @map("payment_amount")
+  paymentCount     Int      @map("payment_count")
+  paymentsExecuted Int      @default(0) @map("payments_executed")
+  status           PaymentScheduleStatus @default(ACTIVE)
+  createdAt        DateTime @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+  
+  // Relations
+  payments         Payment[]
+  
+  @@map("payment_schedules")
+}
+
+model Payment {
+  id              String   @id @default(cuid())
+  scheduleId      String   @map("schedule_id")
+  paymentIndex    Int      @map("payment_index")
+  amount          BigInt
+  recipient       String
+  executedAt      DateTime @map("executed_at")
+  executedBy      String   @map("executed_by")
+  signature       String   @unique
+  slot            BigInt
+  createdAt       DateTime @default(now()) @map("created_at")
+  
+  // Relations
+  schedule        PaymentSchedule @relation(fields: [scheduleId], references: [id])
+  
+  @@map("payments")
+  @@unique([scheduleId, paymentIndex])
+}
+
+model FeeWithdrawal {
+  id           String   @id @default(cuid())
+  amount       BigInt
+  withdrawnBy  String   @map("withdrawn_by")
+  withdrawnAt  DateTime @map("withdrawn_at")
+  signature    String   @unique
+  slot         BigInt
+  createdAt    DateTime @default(now()) @map("created_at")
+  
+  @@map("fee_withdrawals")
+}
+
+model FeePercentageUpdate {
+  id            String   @id @default(cuid())
+  oldPercentage Int      @map("old_percentage")
+  newPercentage Int      @map("new_percentage")
+  updatedAt     DateTime @map("updated_at")
+  signature     String   @unique
+  slot          BigInt
+  createdAt     DateTime @default(now()) @map("created_at")
+  
+  @@map("fee_percentage_updates")
+}
+
+model EventLog {
+  id         String            @id @default(cuid())
+  eventType  String            @map("event_type")
+  signature  String            @unique
+  slot       BigInt
+  status     EventStatus       @default(PENDING)
+  error      String?
+  retryCount Int               @default(0) @map("retry_count")
+  eventData  Json              @map("event_data")
+  createdAt  DateTime          @default(now()) @map("created_at")
+  updatedAt  DateTime          @updatedAt @map("updated_at")
+  
+  @@map("event_logs")
+}
+
+enum PaymentScheduleStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum EventStatus {
+  PENDING
+  PROCESSED
+  FAILED
+}
