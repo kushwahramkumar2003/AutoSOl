@@ -1,0 +1,16 @@
+{
+  "name": "initializr",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@coral-xyz/anchor": "^0.31.1",
+    "commander": "^14.0.0"
+  }
+}

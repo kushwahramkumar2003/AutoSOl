@@ -1,0 +1,706 @@
+{
+  "address": "98g9uR7WZqinAnSeUgB5nUw3pbR6sNwFuYWW78yPHtva",
+  "metadata": {
+    "name": "auto_sol",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
+  "instructions": [
+    {
+      "name": "cancel_payment_schedule",
+      "discriminator": [247, 11, 247, 22, 50, 82, 144, 58],
+      "accounts": [
+        {
+          "name": "payment_schedule",
+          "writable": true
+        },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "sol_payment_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [115, 111, 108, 95, 118, 97, 117, 108, 116]
+              },
+              {
+                "kind": "account",
+                "path": "payment_schedule"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "create_payment_schedule",
+      "discriminator": [2, 29, 246, 1, 117, 214, 46, 131],
+      "accounts": [
+        {
+          "name": "payment_schedule",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "fee_settings",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103, 108, 111, 98, 97, 108, 95, 102, 101, 101, 95, 115, 101,
+                  116, 116, 105, 110, 103, 115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "sol_payment_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [115, 111, 108, 95, 118, 97, 117, 108, 116]
+              },
+              {
+                "kind": "account",
+                "path": "payment_schedule"
+              }
+            ]
+          }
+        },
+        {
+          "name": "sol_fee_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103, 108, 111, 98, 97, 108, 95, 102, 101, 101, 95, 118, 97,
+                  117, 108, 116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "rent",
+          "address": "SysvarRent111111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "payment_amount",
+          "type": "u64"
+        },
+        {
+          "name": "recipient",
+          "type": "pubkey"
+        },
+        {
+          "name": "schedule_times",
+          "type": {
+            "vec": "i64"
+          }
+        },
+        {
+          "name": "memo",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "execute_payment",
+      "discriminator": [86, 4, 7, 7, 120, 139, 232, 139],
+      "accounts": [
+        {
+          "name": "payment_schedule",
+          "writable": true
+        },
+        {
+          "name": "fee_settings",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103, 108, 111, 98, 97, 108, 95, 102, 101, 101, 95, 115, 101,
+                  116, 116, 105, 110, 103, 115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "executor",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "recipient",
+          "writable": true
+        },
+        {
+          "name": "sol_payment_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [115, 111, 108, 95, 118, 97, 117, 108, 116]
+              },
+              {
+                "kind": "account",
+                "path": "payment_schedule"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "payment_index",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "initialize",
+      "discriminator": [175, 175, 109, 31, 13, 152, 155, 237],
+      "accounts": [
+        {
+          "name": "fee_settings",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103, 108, 111, 98, 97, 108, 95, 102, 101, 101, 95, 115, 101,
+                  116, 116, 105, 110, 103, 115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "sol_fee_vault",
+          "docs": ["Simple PDA without data structure for easy SOL transfers"],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103, 108, 111, 98, 97, 108, 95, 102, 101, 101, 95, 118, 97,
+                  117, 108, 116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "update_fee_percentage",
+      "discriminator": [102, 119, 197, 160, 139, 102, 182, 0],
+      "accounts": [
+        {
+          "name": "fee_settings",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103, 108, 111, 98, 97, 108, 95, 102, 101, 101, 95, 115, 101,
+                  116, 116, 105, 110, 103, 115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": ["fee_settings"]
+        }
+      ],
+      "args": [
+        {
+          "name": "new_fee_percentage",
+          "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "withdraw_fees",
+      "discriminator": [198, 212, 171, 109, 144, 215, 174, 89],
+      "accounts": [
+        {
+          "name": "fee_settings",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103, 108, 111, 98, 97, 108, 95, 102, 101, 101, 95, 115, 101,
+                  116, 116, 105, 110, 103, 115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "sol_fee_vault",
+          "docs": ["Simple PDA without data structure for easy SOL transfers"],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103, 108, 111, 98, 97, 108, 95, 102, 101, 101, 95, 118, 97,
+                  117, 108, 116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "FeeSettings",
+      "discriminator": [251, 152, 237, 9, 118, 2, 153, 254]
+    },
+    {
+      "name": "PaymentSchedule",
+      "discriminator": [220, 252, 154, 129, 139, 124, 204, 75]
+    }
+  ],
+  "events": [
+    {
+      "name": "FeePercentageUpdatedEvent",
+      "discriminator": [159, 56, 203, 216, 111, 194, 177, 206]
+    },
+    {
+      "name": "FeesWithdrawnEvent",
+      "discriminator": [93, 177, 0, 69, 15, 156, 73, 194]
+    },
+    {
+      "name": "PaymentExecutedEvent",
+      "discriminator": [71, 65, 49, 77, 198, 22, 227, 182]
+    },
+    {
+      "name": "PaymentScheduleCancelledEvent",
+      "discriminator": [87, 114, 182, 97, 125, 1, 183, 110]
+    },
+    {
+      "name": "PaymentScheduleCreatedEvent",
+      "discriminator": [43, 244, 87, 216, 27, 10, 99, 229]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "EmptySchedule",
+      "msg": "Payment schedule cannot be empty"
+    },
+    {
+      "code": 6001,
+      "name": "InvalidScheduleTime",
+      "msg": "Schedule time must be in the future"
+    },
+    {
+      "code": 6002,
+      "name": "InsufficientFunds",
+      "msg": "Insufficient funds for scheduled payments and fees"
+    },
+    {
+      "code": 6003,
+      "name": "InvalidScheduleStatus",
+      "msg": "Payment schedule is not active"
+    },
+    {
+      "code": 6004,
+      "name": "InvalidPaymentIndex",
+      "msg": "Invalid payment index"
+    },
+    {
+      "code": 6005,
+      "name": "PaymentAlreadyExecuted",
+      "msg": "Payment has already been executed"
+    },
+    {
+      "code": 6006,
+      "name": "PaymentNotDue",
+      "msg": "Payment is not due yet"
+    },
+    {
+      "code": 6007,
+      "name": "InsufficientVaultFunds",
+      "msg": "Insufficient funds in payment vault"
+    },
+    {
+      "code": 6008,
+      "name": "NoRemainingFunds",
+      "msg": "No remaining funds to refund"
+    },
+    {
+      "code": 6009,
+      "name": "FeeTooHigh",
+      "msg": "Fee percentage cannot exceed 5%"
+    },
+    {
+      "code": 6010,
+      "name": "UnauthorizedExecutor",
+      "msg": "Only HTTP backend wallet can execute payments"
+    },
+    {
+      "code": 6011,
+      "name": "UnauthorizedFeeWithdrawal",
+      "msg": "Only authorized wallets can withdraw fees"
+    },
+    {
+      "code": 6012,
+      "name": "TooManyScheduleTimes",
+      "msg": "Too many schedule times provided"
+    },
+    {
+      "code": 6013,
+      "name": "ProgramAlreadyInitialized",
+      "msg": "Program is already initialized"
+    },
+    {
+      "code": 6014,
+      "name": "InvalidRecipient",
+      "msg": "Invalid recipient for payment"
+    },
+    {
+      "code": 6015,
+      "name": "UnauthorizedCancellation",
+      "msg": "Unauthorized to cancel payment schedule"
+    },
+    {
+      "code": 6016,
+      "name": "Unauthorized",
+      "msg": "Unauthorized access"
+    }
+  ],
+  "types": [
+    {
+      "name": "FeePercentageUpdatedEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "old_percentage",
+            "type": "u16"
+          },
+          {
+            "name": "new_percentage",
+            "type": "u16"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FeeSettings",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "fee_percentage",
+            "type": "u16"
+          },
+          {
+            "name": "http_backend_wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "fee_withdrawal_allowed_keys",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "initialized",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FeesWithdrawnEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "withdrawn_by",
+            "type": "pubkey"
+          },
+          {
+            "name": "withdrawn_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Payment",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "scheduled_time",
+            "type": "i64"
+          },
+          {
+            "name": "executed",
+            "type": "bool"
+          },
+          {
+            "name": "execution_time",
+            "type": "i64"
+          },
+          {
+            "name": "tx_signature",
+            "type": {
+              "option": "pubkey"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "PaymentExecutedEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "schedule_id",
+            "type": "pubkey"
+          },
+          {
+            "name": "payment_index",
+            "type": "u64"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "recipient",
+            "type": "pubkey"
+          },
+          {
+            "name": "executed_at",
+            "type": "i64"
+          },
+          {
+            "name": "executed_by",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PaymentSchedule",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "total_amount",
+            "type": "u64"
+          },
+          {
+            "name": "remaining_amount",
+            "type": "u64"
+          },
+          {
+            "name": "payment_amount",
+            "type": "u64"
+          },
+          {
+            "name": "recipient",
+            "type": "pubkey"
+          },
+          {
+            "name": "payments",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "Payment"
+                }
+              }
+            }
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "ScheduleStatus"
+              }
+            }
+          },
+          {
+            "name": "memo",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PaymentScheduleCancelledEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "schedule_id",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "refund_amount",
+            "type": "u64"
+          },
+          {
+            "name": "cancelled_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PaymentScheduleCreatedEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "schedule_id",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "recipient",
+            "type": "pubkey"
+          },
+          {
+            "name": "total_amount",
+            "type": "u64"
+          },
+          {
+            "name": "payment_amount",
+            "type": "u64"
+          },
+          {
+            "name": "payment_count",
+            "type": "u64"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ScheduleStatus",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Active"
+          },
+          {
+            "name": "Completed"
+          },
+          {
+            "name": "Cancelled"
+          }
+        ]
+      }
+    }
+  ]
+}
