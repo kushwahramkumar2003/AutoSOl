@@ -1,0 +1,17 @@
+{
+  "name": "executer",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/node-schedule": "^2.1.7"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "node-schedule": "^2.1.1",
+    "winston": "^3.17.0"
+  }
+}
