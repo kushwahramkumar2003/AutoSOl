@@ -17,6 +17,7 @@ use std::collections::HashSet;
 use sha2::{Sha256, Digest};
 use dotenv::dotenv;
 use std::env;
+use bs58;
 
 const PROGRAM_ID: &str = "98g9uR7WZqinAnSeUgB5nUw3pbR6sNwFuYWW78yPHtva";
 
@@ -77,11 +78,21 @@ fn calculate_event_discriminator(event_name: &str) -> [u8; 8] {
     discriminator
 }
 
+// Custom serializer for Pubkey as base58 string
+fn pubkey_as_base58<S>(pk: &Pubkey, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    serializer.serialize_str(&pk.to_string())
+}
 
 #[derive(Serialize, Deserialize, BorshDeserialize, BorshSerialize, Clone, Debug)]
 pub struct PaymentScheduleCreatedEvent {
+    #[serde(serialize_with = "pubkey_as_base58")]
     pub schedule_id: Pubkey,
+    #[serde(serialize_with = "pubkey_as_base58")]
     pub owner: Pubkey,
+    #[serde(serialize_with = "pubkey_as_base58")]
     pub recipient: Pubkey,
     pub total_amount: u64,
     pub payment_amount: u64,
@@ -91,17 +102,22 @@ pub struct PaymentScheduleCreatedEvent {
 
 #[derive(Serialize, Deserialize, BorshDeserialize, BorshSerialize, Clone, Debug)]
 pub struct PaymentExecutedEvent {
+    #[serde(serialize_with = "pubkey_as_base58")]
     pub schedule_id: Pubkey,
     pub payment_index: u64,
     pub amount: u64,
+    #[serde(serialize_with = "pubkey_as_base58")]
     pub recipient: Pubkey,
     pub executed_at: i64,
+    #[serde(serialize_with = "pubkey_as_base58")]
     pub executed_by: Pubkey,
 }
 
 #[derive(Serialize, Deserialize, BorshDeserialize, BorshSerialize, Clone, Debug)]
 pub struct PaymentScheduleCancelledEvent {
+    #[serde(serialize_with = "pubkey_as_base58")]
     pub schedule_id: Pubkey,
+    #[serde(serialize_with = "pubkey_as_base58")]
     pub owner: Pubkey,
     pub refund_amount: u64,
     pub cancelled_at: i64,
@@ -110,6 +126,7 @@ pub struct PaymentScheduleCancelledEvent {
 #[derive(Serialize, Deserialize, BorshDeserialize, BorshSerialize, Clone, Debug)]
 pub struct FeesWithdrawnEvent {
     pub amount: u64,
+    #[serde(serialize_with = "pubkey_as_base58")]
     pub withdrawn_by: Pubkey,
     pub withdrawn_at: i64,
 }
@@ -397,6 +414,7 @@ impl BlockchainMonitor {
         
         if let Some(wrapper) = event_wrapper {
             let json_data = serde_json::to_string(&wrapper)?;
+            println!("json_data: {}", json_data);
             let _: () = redis_con.lpush(&self.config.redis_queue, json_data)
                 .map_err(|e| anyhow!("Failed to push to Redis: {}", e))?;
             
