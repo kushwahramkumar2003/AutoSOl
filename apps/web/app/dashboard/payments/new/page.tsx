@@ -14,16 +14,9 @@ export default function NewPaymentPage() {
   const router = useRouter();
   const { publicKey, connected } = useWallet();
   const [isLoading, setIsLoading] = useState(false);
+  
 
-  // Default fee vault address - in a real app, this would be fetched from an API or config
-  const FEE_VAULT_ADDRESS = new PublicKey(
-    "6W2YxRyMJoDEWWRsTmh8KdkAuz4AahY2WLMXh3ZEigBf"
-  );
 
-  // Default fee vault token account - in a real app, this would be fetched based on the selected token
-  const FEE_VAULT_TOKEN_ACCOUNT = new PublicKey(
-    "6W2YxRyMJoDEWWRsTmh8KdkAuz4AahY2WLMXh3ZEigBf"
-  );
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -57,8 +50,7 @@ export default function NewPaymentPage() {
           </div>
         ) : (
           <NewPaymentForm
-            feeVaultAddress={FEE_VAULT_ADDRESS}
-            feeVaultTokenAccount={FEE_VAULT_TOKEN_ACCOUNT}
+           
           />
         )}
       </div>

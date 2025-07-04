@@ -44,6 +44,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { WalletConnect } from "./wallet-connect";
+import Image from "next/image";
 
 interface NavLink {
   href: string;
@@ -171,9 +172,8 @@ export default function Navbar({
       <div className="container mx-auto px-4 flex items-center justify-between">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2 group">
-          <div className="h-10 w-10 rounded-full bg-gradient-to-tr from-blue-500 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-500/20 transition-all duration-300 group-hover:shadow-blue-500/40 group-hover:scale-105">
-            <span className="text-white font-bold text-sm">A</span>
-          </div>
+          <Image src={"/favicon.ico"} alt="logo" height={30} width={30} />
+
           <div className="flex flex-col">
             <span className="font-bold text-xl text-foreground font-space gradient-text">
               AutoSOL
@@ -341,13 +341,17 @@ export default function Navbar({
             <SheetHeader className="p-6 border-b">
               <SheetTitle>
                 <div className="flex items-center gap-2">
-                  <div className="h-10 w-10 rounded-full bg-gradient-to-tr from-blue-500 to-purple-600 flex items-center justify-center">
-                    <span className="text-white font-bold text-sm">A</span>
-                  </div>
+                  <Image
+                    src={"/favicon.ico"}
+                    alt="logo"
+                    height={30}
+                    width={32}
+                  />
                   <div className="flex flex-col">
                     <span className="font-bold text-xl text-foreground font-space gradient-text">
                       AutoSOL
                     </span>
+
                     <span className="text-xs text-muted-foreground">
                       Smart Contract Automation
                     </span>

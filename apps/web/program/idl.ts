@@ -1,5 +1,5 @@
 export const idl = {
-  address: "sg8bwyw6qvK923nNjieJFcJVrwCGWo3XBJGkC1fkt9Z",
+  address: "98g9uR7WZqinAnSeUgB5nUw3pbR6sNwFuYWW78yPHtva",
   metadata: {
     name: "auto_sol",
     version: "0.1.0",
@@ -21,25 +21,14 @@ export const idl = {
           signer: true,
         },
         {
-          name: "payment_vault",
+          name: "sol_payment_vault",
           writable: true,
           pda: {
             seeds: [
-              {
-                kind: "account",
-                path: "payment_schedule",
-              },
               {
                 kind: "const",
-                value: [118, 97, 117, 108, 116],
+                value: [115, 111, 108, 95, 118, 97, 117, 108, 116],
               },
-            ],
-          },
-        },
-        {
-          name: "payment_vault_authority",
-          pda: {
-            seeds: [
               {
                 kind: "account",
                 path: "payment_schedule",
@@ -48,12 +37,8 @@ export const idl = {
           },
         },
         {
-          name: "owner_token_account",
-          writable: true,
-        },
-        {
-          name: "token_program",
-          address: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+          name: "system_program",
+          address: "11111111111111111111111111111111",
         },
       ],
       args: [],
@@ -68,37 +53,33 @@ export const idl = {
           signer: true,
         },
         {
+          name: "fee_settings",
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [
+                  103, 108, 111, 98, 97, 108, 95, 102, 101, 101, 95, 115, 101,
+                  116, 116, 105, 110, 103, 115,
+                ],
+              },
+            ],
+          },
+        },
+        {
           name: "user",
           writable: true,
           signer: true,
         },
         {
-          name: "user_token_account",
-          writable: true,
-        },
-        {
-          name: "mint",
-        },
-        {
-          name: "payment_vault",
+          name: "sol_payment_vault",
           writable: true,
           pda: {
             seeds: [
-              {
-                kind: "account",
-                path: "payment_schedule",
-              },
               {
                 kind: "const",
-                value: [118, 97, 117, 108, 116],
+                value: [115, 111, 108, 95, 118, 97, 117, 108, 116],
               },
-            ],
-          },
-        },
-        {
-          name: "payment_vault_authority",
-          pda: {
-            seeds: [
               {
                 kind: "account",
                 path: "payment_schedule",
@@ -107,15 +88,19 @@ export const idl = {
           },
         },
         {
-          name: "fee_vault",
-        },
-        {
-          name: "fee_vault_token_account",
+          name: "sol_fee_vault",
           writable: true,
-        },
-        {
-          name: "token_program",
-          address: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [
+                  103, 108, 111, 98, 97, 108, 95, 102, 101, 101, 95, 118, 97,
+                  117, 108, 116,
+                ],
+              },
+            ],
+          },
         },
         {
           name: "system_program",
@@ -156,44 +141,47 @@ export const idl = {
           writable: true,
         },
         {
-          name: "payment_vault",
-          writable: true,
+          name: "fee_settings",
           pda: {
             seeds: [
-              {
-                kind: "account",
-                path: "payment_schedule",
-              },
               {
                 kind: "const",
-                value: [118, 97, 117, 108, 116],
+                value: [
+                  103, 108, 111, 98, 97, 108, 95, 102, 101, 101, 95, 115, 101,
+                  116, 116, 105, 110, 103, 115,
+                ],
               },
             ],
           },
         },
         {
-          name: "payment_vault_authority",
-          pda: {
-            seeds: [
-              {
-                kind: "account",
-                path: "payment_schedule",
-              },
-            ],
-          },
-        },
-        {
-          name: "recipient_token_account",
-          writable: true,
-        },
-        {
-          name: "keeper",
+          name: "executor",
           writable: true,
           signer: true,
         },
         {
-          name: "token_program",
-          address: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+          name: "recipient",
+          writable: true,
+        },
+        {
+          name: "sol_payment_vault",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [115, 111, 108, 95, 118, 97, 117, 108, 116],
+              },
+              {
+                kind: "account",
+                path: "payment_schedule",
+              },
+            ],
+          },
+        },
+        {
+          name: "system_program",
+          address: "11111111111111111111111111111111",
         },
       ],
       args: [
@@ -208,9 +196,35 @@ export const idl = {
       discriminator: [175, 175, 109, 31, 13, 152, 155, 237],
       accounts: [
         {
-          name: "fee_vault",
+          name: "fee_settings",
           writable: true,
-          signer: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [
+                  103, 108, 111, 98, 97, 108, 95, 102, 101, 101, 95, 115, 101,
+                  116, 116, 105, 110, 103, 115,
+                ],
+              },
+            ],
+          },
+        },
+        {
+          name: "sol_fee_vault",
+          docs: ["Simple PDA without data structure for easy SOL transfers"],
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [
+                  103, 108, 111, 98, 97, 108, 95, 102, 101, 101, 95, 118, 97,
+                  117, 108, 116,
+                ],
+              },
+            ],
+          },
         },
         {
           name: "authority",
@@ -229,13 +243,25 @@ export const idl = {
       discriminator: [102, 119, 197, 160, 139, 102, 182, 0],
       accounts: [
         {
-          name: "fee_vault",
+          name: "fee_settings",
           writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [
+                  103, 108, 111, 98, 97, 108, 95, 102, 101, 101, 95, 115, 101,
+                  116, 116, 105, 110, 103, 115,
+                ],
+              },
+            ],
+          },
         },
         {
           name: "authority",
           writable: true,
           signer: true,
+          relations: ["fee_settings"],
         },
       ],
       args: [
@@ -245,11 +271,62 @@ export const idl = {
         },
       ],
     },
+    {
+      name: "withdraw_fees",
+      discriminator: [198, 212, 171, 109, 144, 215, 174, 89],
+      accounts: [
+        {
+          name: "fee_settings",
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [
+                  103, 108, 111, 98, 97, 108, 95, 102, 101, 101, 95, 115, 101,
+                  116, 116, 105, 110, 103, 115,
+                ],
+              },
+            ],
+          },
+        },
+        {
+          name: "authority",
+          writable: true,
+          signer: true,
+        },
+        {
+          name: "sol_fee_vault",
+          docs: ["Simple PDA without data structure for easy SOL transfers"],
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [
+                  103, 108, 111, 98, 97, 108, 95, 102, 101, 101, 95, 118, 97,
+                  117, 108, 116,
+                ],
+              },
+            ],
+          },
+        },
+        {
+          name: "system_program",
+          address: "11111111111111111111111111111111",
+        },
+      ],
+      args: [
+        {
+          name: "amount",
+          type: "u64",
+        },
+      ],
+    },
   ],
   accounts: [
     {
-      name: "FeeVault",
-      discriminator: [192, 178, 69, 232, 58, 149, 157, 132],
+      name: "FeeSettings",
+      discriminator: [251, 152, 237, 9, 118, 2, 153, 254],
     },
     {
       name: "PaymentSchedule",
@@ -260,6 +337,10 @@ export const idl = {
     {
       name: "FeePercentageUpdatedEvent",
       discriminator: [159, 56, 203, 216, 111, 194, 177, 206],
+    },
+    {
+      name: "FeesWithdrawnEvent",
+      discriminator: [93, 177, 0, 69, 15, 156, 73, 194],
     },
     {
       name: "PaymentExecutedEvent",
@@ -325,6 +406,41 @@ export const idl = {
       name: "FeeTooHigh",
       msg: "Fee percentage cannot exceed 5%",
     },
+    {
+      code: 6010,
+      name: "UnauthorizedExecutor",
+      msg: "Only HTTP backend wallet can execute payments",
+    },
+    {
+      code: 6011,
+      name: "UnauthorizedFeeWithdrawal",
+      msg: "Only authorized wallets can withdraw fees",
+    },
+    {
+      code: 6012,
+      name: "TooManyScheduleTimes",
+      msg: "Too many schedule times provided",
+    },
+    {
+      code: 6013,
+      name: "ProgramAlreadyInitialized",
+      msg: "Program is already initialized",
+    },
+    {
+      code: 6014,
+      name: "InvalidRecipient",
+      msg: "Invalid recipient for payment",
+    },
+    {
+      code: 6015,
+      name: "UnauthorizedCancellation",
+      msg: "Unauthorized to cancel payment schedule",
+    },
+    {
+      code: 6016,
+      name: "Unauthorized",
+      msg: "Unauthorized access",
+    },
   ],
   types: [
     {
@@ -348,7 +464,7 @@ export const idl = {
       },
     },
     {
-      name: "FeeVault",
+      name: "FeeSettings",
       type: {
         kind: "struct",
         fields: [
@@ -359,6 +475,40 @@ export const idl = {
           {
             name: "fee_percentage",
             type: "u16",
+          },
+          {
+            name: "http_backend_wallet",
+            type: "pubkey",
+          },
+          {
+            name: "fee_withdrawal_allowed_keys",
+            type: {
+              vec: "pubkey",
+            },
+          },
+          {
+            name: "initialized",
+            type: "bool",
+          },
+        ],
+      },
+    },
+    {
+      name: "FeesWithdrawnEvent",
+      type: {
+        kind: "struct",
+        fields: [
+          {
+            name: "amount",
+            type: "u64",
+          },
+          {
+            name: "withdrawn_by",
+            type: "pubkey",
+          },
+          {
+            name: "withdrawn_at",
+            type: "i64",
           },
         ],
       },

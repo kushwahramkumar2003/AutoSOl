@@ -75,15 +75,15 @@ export default function ReviewStep({ data }: ReviewStepProps) {
                   Amount per Payment
                 </h4>
                 <p className="font-medium">
-                  {data.payment.amount} {data.payment.token}
+                  {data.payment.amount} {data.payment.symbol}
                 </p>
               </div>
 
               <div>
                 <h4 className="text-sm text-white/70 mb-1">Fee (1%)</h4>
                 <p className="font-medium">
-                  {feeAmount.toFixed(data.payment.token === "BONK" ? 0 : 4)}{" "}
-                  {data.payment.token}
+                  {feeAmount.toFixed(data.payment.symbol === "BONK" ? 0 : 4)}{" "}
+                  {data.payment.symbol}
                 </p>
               </div>
 
@@ -92,17 +92,15 @@ export default function ReviewStep({ data }: ReviewStepProps) {
                   Total per Payment
                 </h4>
                 <p className="font-medium">
-                  {totalAmount.toFixed(data.payment.token === "BONK" ? 0 : 4)}{" "}
-                  {data.payment.token}
+                  {totalAmount.toFixed(data.payment.symbol === "BONK" ? 0 : 4)}{" "}
+                  {data.payment.symbol}
                 </p>
               </div>
 
               {data.payment.memo && (
                 <div className="pt-2 border-t border-white/10">
                   <h4 className="text-sm text-white/70 mb-1">Memo</h4>
-                  <p className="text-sm italic">
-                    &quot;{data.payment.memo}&quot;
-                  </p>
+                  <p className="text-sm italic">"{data.payment.memo}"</p>
                 </div>
               )}
             </div>
@@ -188,9 +186,9 @@ export default function ReviewStep({ data }: ReviewStepProps) {
                 <div className="text-right">
                   <p className="font-bold text-lg">
                     {totalForAllPayments.toFixed(
-                      data.payment.token === "BONK" ? 0 : 4
+                      data.payment.symbol === "BONK" ? 0 : 4
                     )}{" "}
-                    {data.payment.token}
+                    {data.payment.symbol}
                   </p>
                   <p className="text-sm text-white/70">
                     For all {data.schedule.selectedDates.length} payments
@@ -215,9 +213,9 @@ export default function ReviewStep({ data }: ReviewStepProps) {
               By confirming, you authorize AutoSOL to create this payment
               schedule on the Solana blockchain. The total amount of{" "}
               {totalForAllPayments.toFixed(
-                data.payment.token === "BONK" ? 0 : 4
+                data.payment.symbol === "BONK" ? 0 : 4
               )}{" "}
-              {data.payment.token}
+              {data.payment.symbol}
               (including fees) will be transferred to a secure payment vault.
             </p>
           </div>

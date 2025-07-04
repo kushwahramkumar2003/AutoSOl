@@ -6,7 +6,8 @@ export const config = {
   //   process.env.NODE_ENV === "development"
   //     ? "http://127.0.0.1:8899"
   //     : process.env.RPC_URL || "https://api.devnet.solana.com",
-  rpcEndpoint: "https://api.devnet.solana.com",
+  // rpcEndpoint: "https://api.devnet.solana.com",
+  rpcEndpoint: "http://127.0.0.1:8899",
 
   //   programId: new PublicKey(idl.address),
   nextAuthSecret: process.env.NEXTAUTH_SECRET || "next-auth-secret",

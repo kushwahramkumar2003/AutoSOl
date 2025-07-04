@@ -1,19 +1,17 @@
 import type { ReactNode } from "react";
 import type { Metadata } from "next";
 import { Toaster } from "@/components/ui/sonner";
-import { Inter, Space_Grotesk } from "next/font/google";
+import { Roboto } from "next/font/google";
 import "./globals.css";
 import "@solana/wallet-adapter-react-ui/styles.css";
 import { Providers } from "@/components/Providers";
 
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-});
+import "./fonts/fonts.css";
 
-const spaceGrotesk = Space_Grotesk({
+const roboto = Roboto({
   subsets: ["latin"],
-  variable: "--font-space",
+  weight: ["400", "500", "700"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -30,7 +28,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${inter.variable} ${spaceGrotesk.variable} font-sans bg-background min-h-screen`}
+        className={`${roboto.className} geist-vf geist-mono-vf font-sans, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji" bg-background min-h-screen`}
       >
         <Providers>
           <main className="pt-6 pb-4 px-2 mx-auto w-full max-w-7xl">

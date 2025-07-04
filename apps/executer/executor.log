@@ -1,0 +1,52 @@
+{"level":"info","message":"Loaded execution schedule","times":["0 55 10 * * *","0 0 12 * * *"],"timestamp":"2025-07-03T15:10:28.558Z"}
+{"level":"info","message":"IDL loaded successfully","timestamp":"2025-07-03T15:10:28.633Z"}
+{"executor":"8dRCBu5V2v6JHR3HxN9zjN91WoX4FfGzgdM8nXawUbqt","level":"info","message":"AutoSol Backend initialized on devnet","timestamp":"2025-07-03T15:10:28.645Z"}
+{"executionTimes":["0 55 10 * * *","0 0 12 * * *"],"level":"info","message":"Executor service started","timestamp":"2025-07-03T15:10:28.704Z"}
+{"level":"info","message":"Loaded execution schedule","times":["0 55 10 * * *","0 0 12 * * *"],"timestamp":"2025-07-03T15:10:35.523Z"}
+{"level":"info","message":"IDL loaded successfully","timestamp":"2025-07-03T15:10:35.597Z"}
+{"executor":"8dRCBu5V2v6JHR3HxN9zjN91WoX4FfGzgdM8nXawUbqt","level":"info","message":"AutoSol Backend initialized on devnet","timestamp":"2025-07-03T15:10:35.607Z"}
+{"executionTimes":["0 55 10 * * *","0 0 12 * * *"],"level":"info","message":"Executor service started","timestamp":"2025-07-03T15:10:35.651Z"}
+{"level":"info","message":"Received SIGINT, shutting down...","timestamp":"2025-07-03T15:11:11.498Z"}
+{"level":"info","message":"Loaded execution schedule","times":["0 42 08 * * *","0 0 12 * * *"],"timestamp":"2025-07-03T15:11:12.676Z"}
+{"level":"info","message":"IDL loaded successfully","timestamp":"2025-07-03T15:11:12.748Z"}
+{"executor":"8dRCBu5V2v6JHR3HxN9zjN91WoX4FfGzgdM8nXawUbqt","level":"info","message":"AutoSol Backend initialized on devnet","timestamp":"2025-07-03T15:11:12.758Z"}
+{"executionTimes":["0 42 08 * * *","0 0 12 * * *"],"level":"info","message":"Executor service started","timestamp":"2025-07-03T15:11:12.803Z"}
+{"level":"info","message":"Received SIGINT, shutting down...","timestamp":"2025-07-03T15:12:20.412Z"}
+{"level":"info","message":"Loaded execution schedule","times":["0 43 8 * * *","0 0 12 * * *"],"timestamp":"2025-07-03T15:12:21.477Z"}
+{"level":"info","message":"IDL loaded successfully","timestamp":"2025-07-03T15:12:21.556Z"}
+{"executor":"8dRCBu5V2v6JHR3HxN9zjN91WoX4FfGzgdM8nXawUbqt","level":"info","message":"AutoSol Backend initialized on devnet","timestamp":"2025-07-03T15:12:21.566Z"}
+{"executionTimes":["0 43 8 * * *","0 0 12 * * *"],"level":"info","message":"Executor service started","timestamp":"2025-07-03T15:12:21.614Z"}
+{"level":"info","message":"Received SIGINT, shutting down...","timestamp":"2025-07-03T15:13:51.064Z"}
+{"level":"info","message":"Loaded execution schedule","times":["0 45 20 * * *","0 0 12 * * *"],"timestamp":"2025-07-03T15:14:13.683Z"}
+{"level":"info","message":"IDL loaded successfully","timestamp":"2025-07-03T15:14:13.760Z"}
+{"executor":"8dRCBu5V2v6JHR3HxN9zjN91WoX4FfGzgdM8nXawUbqt","level":"info","message":"AutoSol Backend initialized on devnet","timestamp":"2025-07-03T15:14:13.770Z"}
+{"executionTimes":["0 45 20 * * *","0 0 12 * * *"],"level":"info","message":"Executor service started","timestamp":"2025-07-03T15:14:13.807Z"}
+{"level":"info","message":"Starting scheduled payment execution","time":"2025-07-03T15:15:00.017Z","timestamp":"2025-07-03T15:15:00.017Z"}
+{"level":"info","message":"Scanning for pending payments","timestamp":"2025-07-03T15:15:00.019Z"}
+{"level":"warn","message":"Skipping non-active schedule","scheduleAddress":"AD6qgs3KRM516HWbuo6AXM34ovrVA27WZpPXzD1jdAgz","timestamp":"2025-07-03T15:15:00.061Z"}
+{"level":"info","message":"Payment execution complete","timestamp":"2025-07-03T15:15:00.061Z","totalExecuted":0,"totalFailed":0}
+{"level":"info","message":"Execution completed","results":[],"timestamp":"2025-07-03T15:15:00.061Z","totalExecuted":0,"totalFailed":0}
+{"level":"info","message":"Received SIGINT, shutting down...","timestamp":"2025-07-03T15:16:20.650Z"}
+{"level":"info","message":"Received SIGINT, shutting down...","timestamp":"2025-07-03T15:21:14.195Z"}
+{"level":"info","message":"Loaded execution schedule","times":["0 53 20 * * *","0 0 12 * * *"],"timestamp":"2025-07-03T15:21:15.378Z"}
+{"level":"info","message":"IDL loaded successfully","timestamp":"2025-07-03T15:21:15.455Z"}
+{"executor":"8dRCBu5V2v6JHR3HxN9zjN91WoX4FfGzgdM8nXawUbqt","level":"info","message":"AutoSol Backend initialized on devnet","timestamp":"2025-07-03T15:21:15.465Z"}
+{"executionTimes":["0 53 20 * * *","0 0 12 * * *"],"level":"info","message":"Executor service started","timestamp":"2025-07-03T15:21:15.502Z"}
+{"level":"info","message":"Starting scheduled payment execution","time":"2025-07-03T15:23:00.015Z","timestamp":"2025-07-03T15:23:00.016Z"}
+{"level":"info","message":"Scanning for pending payments","timestamp":"2025-07-03T15:23:00.021Z"}
+{"level":"warn","message":"Skipping non-active schedule","scheduleAddress":"AD6qgs3KRM516HWbuo6AXM34ovrVA27WZpPXzD1jdAgz","timestamp":"2025-07-03T15:23:00.055Z"}
+{"level":"info","message":"Executing payment 0 for schedule","scheduleAddress":"FzmseqWdkGNmz2h88og4AeZKrNiiQf73Fm5PyyQkpjAF","timestamp":"2025-07-03T15:23:00.055Z"}
+{"amount":1,"level":"info","message":"Payment 0 executed","recipient":"FxfMxvBecat982M1DpeCwqWRRc4gk35UZH5bhaFqVoDX","scheduleAddress":"FzmseqWdkGNmz2h88og4AeZKrNiiQf73Fm5PyyQkpjAF","timestamp":"2025-07-03T15:23:00.191Z","txSignature":"5tfX4ukUGfUJYbEkfbPzBeXMCWKFchCncNuCLnpCVkwruxK2TeoiutdxHepqVScPuJEwn49TNHVhJJ1x6TS3mQhQ"}
+{"level":"info","message":"Payment execution complete","timestamp":"2025-07-03T15:23:01.193Z","totalExecuted":1,"totalFailed":0}
+{"level":"info","message":"Execution completed","results":[{"index":0,"schedule":"FzmseqWd...","success":true,"tx":"5tfX4ukU..."}],"timestamp":"2025-07-03T15:23:01.194Z","totalExecuted":1,"totalFailed":0}
+{"level":"info","message":"Received SIGINT, shutting down...","timestamp":"2025-07-03T15:30:36.468Z"}
+{"level":"info","message":"Loaded execution schedule","times":["0 53 20 * * *","0 0 12 * * *"],"timestamp":"2025-07-04T03:40:47.966Z"}
+{"level":"info","message":"IDL loaded successfully","timestamp":"2025-07-04T03:40:48.039Z"}
+{"executor":"8dRCBu5V2v6JHR3HxN9zjN91WoX4FfGzgdM8nXawUbqt","level":"info","message":"AutoSol Backend initialized on devnet","timestamp":"2025-07-04T03:40:48.052Z"}
+{"executionTimes":["0 53 20 * * *","0 0 12 * * *"],"level":"info","message":"Executor service started","timestamp":"2025-07-04T03:40:48.110Z"}
+{"level":"info","message":"Received SIGINT, shutting down...","timestamp":"2025-07-04T03:40:53.849Z"}
+{"level":"info","message":"Loaded execution schedule","times":["0 53 20 * * *","0 0 12 * * *"],"timestamp":"2025-07-04T03:40:58.643Z"}
+{"level":"info","message":"IDL loaded successfully","timestamp":"2025-07-04T03:40:58.712Z"}
+{"executor":"8dRCBu5V2v6JHR3HxN9zjN91WoX4FfGzgdM8nXawUbqt","level":"info","message":"AutoSol Backend initialized on devnet","timestamp":"2025-07-04T03:40:58.722Z"}
+{"executionTimes":["0 53 20 * * *","0 0 12 * * *"],"level":"info","message":"Executor service started","timestamp":"2025-07-04T03:40:58.761Z"}
+{"level":"info","message":"Received SIGINT, shutting down...","timestamp":"2025-07-04T03:42:59.997Z"}

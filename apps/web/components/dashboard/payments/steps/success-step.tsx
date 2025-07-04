@@ -2,16 +2,27 @@
 
 import { Button } from "@/components/ui/button";
 import type { PaymentScheduleFormData } from "@/components/dashboard/payments/new-payment-form";
-import { ArrowRight, Calendar, Check, ExternalLink } from "lucide-react";
+import { ArrowRight, Calendar, Check, ExternalLink, Copy } from "lucide-react";
 import confetti from "canvas-confetti";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
+import { toast } from "sonner";
 
 interface SuccessStepProps {
   data: PaymentScheduleFormData;
+  txSignature: string | null;
+  scheduleAddress: string | null;
   onDone: () => void;
 }
 
-export default function SuccessStep({ data, onDone }: SuccessStepProps) {
+export default function SuccessStep({
+  data,
+  txSignature,
+  scheduleAddress,
+  onDone,
+}: SuccessStepProps) {
+  const [copied, setCopied] = useState(false);
+
   // Trigger confetti effect on component mount
   useEffect(() => {
     const duration = 3 * 1000;
@@ -22,7 +33,6 @@ export default function SuccessStep({ data, onDone }: SuccessStepProps) {
       return Math.random() * (max - min) + min;
     }
 
-    // eslint-disable-next-line
     const interval: any = setInterval(() => {
       const timeLeft = animationEnd - Date.now();
 
@@ -55,37 +65,74 @@ export default function SuccessStep({ data, onDone }: SuccessStepProps) {
     (1 + feePercentage) *
     data.schedule.selectedDates.length;
 
-  // Generate mock transaction ID
-  const txId =
-    "5KtP9H1rbj6SrKcvzrdZ7QXgYPnLmbjxCz6aVbg9ZmzWYU8LGQJvuXNsQHbk2FrBrKFh";
+  const copyToClipboard = (text: string, type: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    toast({
+      description: `${type} has been copied to your clipboard.`,
+    });
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const explorerUrl = txSignature
+    ? `https://explorer.solana.com/tx/${txSignature}?cluster=devnet`
+    : "#";
 
   return (
     <div className="text-center py-8">
-      <div className="w-20 h-20 rounded-full bg-[#10B981]/20 flex items-center justify-center mx-auto mb-6">
+      <motion.div
+        initial={{ scale: 0, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ type: "spring", stiffness: 300, damping: 20 }}
+        className="w-20 h-20 rounded-full bg-[#10B981]/20 flex items-center justify-center mx-auto mb-6"
+      >
         <Check className="h-10 w-10 text-[#10B981]" />
-      </div>
+      </motion.div>
 
-      <h2 className="text-2xl font-bold mb-2">Payment Schedule Created!</h2>
-      <p className="text-white/70 mb-6 max-w-md mx-auto">
+      <motion.h2
+        initial={{ y: 20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ delay: 0.2 }}
+        className="text-2xl font-bold mb-2"
+      >
+        Payment Schedule Created!
+      </motion.h2>
+
+      <motion.p
+        initial={{ y: 20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ delay: 0.3 }}
+        className="text-white/70 mb-6 max-w-md mx-auto"
+      >
         Your payment schedule has been successfully created and funds have been
         securely locked in the payment vault.
-      </p>
+      </motion.p>
 
-      <div className="bg-dark-300 rounded-lg p-4 mb-6 inline-block mx-auto">
+      <motion.div
+        initial={{ y: 20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ delay: 0.4 }}
+        className="bg-dark-300 rounded-lg p-4 mb-6 inline-block mx-auto"
+      >
         <div className="text-center">
           <p className="text-white/70 text-sm mb-1">Total Amount Locked</p>
           <p className="text-2xl font-bold">
             {totalAmount.toFixed(data.payment.token === "BONK" ? 0 : 4)}{" "}
-            {data.payment.token}
+            {data.payment.symbol}
           </p>
           <p className="text-white/70 text-sm mt-1">
             For {data.schedule.selectedDates.length} payments to{" "}
             {data.recipient.name}
           </p>
         </div>
-      </div>
+      </motion.div>
 
-      <div className="flex flex-col sm:flex-row gap-3 justify-center mb-6">
+      <motion.div
+        initial={{ y: 20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ delay: 0.5 }}
+        className="flex flex-col sm:flex-row gap-3 justify-center mb-6"
+      >
         <Button
           variant="outline"
           className="border-white/10 bg-dark-300 hover:bg-white/10"
@@ -98,16 +145,60 @@ export default function SuccessStep({ data, onDone }: SuccessStepProps) {
         <Button
           variant="outline"
           className="border-white/10 bg-dark-300 hover:bg-white/10"
+          onClick={() => window.open(explorerUrl, "_blank")}
         >
           View on Explorer
           <ExternalLink className="ml-2 h-4 w-4" />
         </Button>
-      </div>
+      </motion.div>
 
-      <div className="text-xs text-white/50">
-        <p>Transaction ID</p>
-        <p className="font-mono mt-1">{txId}</p>
-      </div>
+      {scheduleAddress && (
+        <motion.div
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.6 }}
+          className="text-xs text-white/50 mb-4"
+        >
+          <p>Schedule Address</p>
+          <div className="flex items-center justify-center gap-2 mt-1">
+            <p className="font-mono">{scheduleAddress}</p>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 rounded-full hover:bg-white/10"
+              onClick={() =>
+                copyToClipboard(scheduleAddress, "Schedule address")
+              }
+            >
+              <Copy className="h-3 w-3" />
+            </Button>
+          </div>
+        </motion.div>
+      )}
+
+      {txSignature && (
+        <motion.div
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.7 }}
+          className="text-xs text-white/50"
+        >
+          <p>Transaction ID</p>
+          <div className="flex items-center justify-center gap-2 mt-1">
+            <p className="font-mono">
+              {txSignature.slice(0, 16)}...{txSignature.slice(-16)}
+            </p>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 rounded-full hover:bg-white/10"
+              onClick={() => copyToClipboard(txSignature, "Transaction ID")}
+            >
+              <Copy className="h-3 w-3" />
+            </Button>
+          </div>
+        </motion.div>
+      )}
 
       <Button
         className="mt-8 bg-gradient-to-r from-[#6E56CF] to-[#10B981] hover:from-[#5a46b0] hover:to-[#0e9d6d] text-white shadow-neon"

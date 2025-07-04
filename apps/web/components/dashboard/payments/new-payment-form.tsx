@@ -5,13 +5,24 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ArrowLeft, ArrowRight, Check, Wallet } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  Wallet,
+  AlertCircle,
+} from "lucide-react";
+import { PublicKey } from "@solana/web3.js";
+import { useProgram } from "@/hooks/use-program";
 import RecipientDetailsStep from "@/components/dashboard/payments/steps/recipient-details";
 import PaymentDetailsStep from "@/components/dashboard/payments/steps/payment-details";
 import ScheduleStep from "@/components/dashboard/payments/steps/schedule-step";
 import ReviewStep from "@/components/dashboard/payments/steps/review-step";
 import SuccessStep from "@/components/dashboard/payments/steps/success-step";
 import { cn } from "@/lib/utils";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { toast } from "sonner";
+import { useWallet } from "@solana/wallet-adapter-react";
 
 // Define the form data structure based on the Solana contract
 export interface PaymentScheduleFormData {
@@ -23,12 +34,14 @@ export interface PaymentScheduleFormData {
     amount: number;
     token: string;
     memo: string;
+    symbol: string;
   };
   schedule: {
     scheduleTimes: number[]; // Unix timestamps
     selectedDates: Date[];
     frequency: "once" | "daily" | "weekly" | "monthly" | "custom";
     endDate?: Date;
+    repeatCount?: number;
   };
 }
 
@@ -41,8 +54,15 @@ const steps = [
 
 export default function NewPaymentForm() {
   const router = useRouter();
+  const { program } = useProgram();
   const [currentStep, setCurrentStep] = useState(0);
   const [direction, setDirection] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [txSignature, setTxSignature] = useState<string | null>(null);
+  const [scheduleAddress, setScheduleAddress] = useState<string | null>(null);
+  const wallet = useWallet();
+
   const [formData, setFormData] = useState<PaymentScheduleFormData>({
     recipient: {
       address: "",
@@ -50,13 +70,15 @@ export default function NewPaymentForm() {
     },
     payment: {
       amount: 0,
-      token: "SOL",
+      token: "So11111111111111111111111111111111111111112", // Default to SOL
       memo: "",
+      symbol: "SOL",
     },
     schedule: {
       scheduleTimes: [],
       selectedDates: [],
       frequency: "once",
+      repeatCount: 12,
     },
   });
 
@@ -103,9 +125,69 @@ export default function NewPaymentForm() {
   };
 
   const handleSubmit = async () => {
-    // Here you would integrate with the Solana contract
-    // For now, we'll just simulate a successful submission
-    goToNextStep();
+    if (!program || !wallet.publicKey) {
+      setError("Program not initialized. Please connect your wallet.");
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      setError(null);
+
+      // Convert recipient address string to PublicKey
+      let recipientPublicKey: PublicKey;
+      try {
+        recipientPublicKey = new PublicKey(formData.recipient.address);
+      } catch (e) {
+        throw new Error("Invalid recipient address", { cause: e });
+      }
+
+      // Get mint address based on selected token
+      const mintAddress = new PublicKey(formData.payment.token);
+
+      // Calculate amount in smallest units based on token decimals
+      // For SOL: 1 SOL = 10^9 lamports
+      // For other tokens, we would need to get the decimals from the token metadata
+      const multiplier =
+        formData.payment.symbol === "SOL" ? 1_000_000_000 : 1_000_000;
+      const amount = Math.floor(formData.payment.amount * multiplier);
+
+      console.log("Creating payment schedule with:", {
+        amount,
+        recipient: recipientPublicKey.toString(),
+        scheduleTimes: formData.schedule.scheduleTimes,
+        memo: formData.payment.memo,
+        mintAddress: mintAddress.toString(),
+      });
+
+      // Create payment schedule on the blockchain
+      const result = await program.createPaymentSchedule({
+        paymentAmount: amount,
+        recipientAddress: recipientPublicKey,
+        scheduleTimes: formData.schedule.scheduleTimes,
+        memo: formData.payment.memo,
+      });
+
+      setTxSignature(result.txSignature);
+      setScheduleAddress(result.scheduleAddress.toString());
+
+      // Show success toast
+      toast.success(
+        `Your payment schedule has been successfully created on the blockchain.`
+      );
+
+      // Go to success step
+      goToNextStep();
+    } catch (err) {
+      console.error("Error creating payment schedule:", err);
+      setError(
+        err instanceof Error ? err.message : "Failed to create payment schedule"
+      );
+
+      toast.error(`Failed to create payment schedule: ${error}`);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const updateFormData = (
@@ -151,6 +233,8 @@ export default function NewPaymentForm() {
         return (
           <SuccessStep
             data={formData}
+            txSignature={txSignature}
+            scheduleAddress={scheduleAddress}
             onDone={() => router.push("/dashboard/payments")}
           />
         );
@@ -173,6 +257,18 @@ export default function NewPaymentForm() {
       opacity: 0,
     }),
   };
+
+  if (!program) {
+    return (
+      <Alert className="bg-dark-200 border-white/10">
+        <AlertCircle className="h-5 w-5 text-[#6E56CF]" />
+        <AlertTitle>Program not initialized</AlertTitle>
+        <AlertDescription>
+          Please connect your wallet to create a payment schedule.
+        </AlertDescription>
+      </Alert>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -221,6 +317,14 @@ export default function NewPaymentForm() {
 
       <Card className="bg-dark-200 border-white/10 text-white overflow-hidden">
         <div className="p-6">
+          {error && (
+            <Alert variant="destructive" className="mb-6">
+              <AlertCircle className="h-5 w-5" />
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
           <AnimatePresence custom={direction} mode="wait">
             <motion.div
               key={currentStep}
@@ -244,7 +348,7 @@ export default function NewPaymentForm() {
             <Button
               variant="outline"
               onClick={goToPreviousStep}
-              disabled={currentStep === 0}
+              disabled={currentStep === 0 || isSubmitting}
               className="border-white/10 bg-dark-300 hover:bg-white/10"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
@@ -254,7 +358,7 @@ export default function NewPaymentForm() {
             {currentStep < steps.length - 1 ? (
               <Button
                 onClick={goToNextStep}
-                disabled={!isFormValid}
+                disabled={!isFormValid || isSubmitting}
                 className="bg-gradient-to-r from-[#6E56CF] to-[#10B981] hover:from-[#5a46b0] hover:to-[#0e9d6d] text-white shadow-neon"
               >
                 Next
@@ -263,11 +367,20 @@ export default function NewPaymentForm() {
             ) : (
               <Button
                 onClick={handleSubmit}
-                disabled={!isFormValid}
+                disabled={!isFormValid || isSubmitting}
                 className="bg-gradient-to-r from-[#6E56CF] to-[#10B981] hover:from-[#5a46b0] hover:to-[#0e9d6d] text-white shadow-neon"
               >
-                Create Payment Schedule
-                <Wallet className="h-4 w-4 ml-2" />
+                {isSubmitting ? (
+                  <>
+                    <span className="animate-pulse mr-2">Creating...</span>
+                    <Wallet className="h-4 w-4 animate-pulse" />
+                  </>
+                ) : (
+                  <>
+                    Create Payment Schedule
+                    <Wallet className="h-4 w-4 ml-2" />
+                  </>
+                )}
               </Button>
             )}
           </div>

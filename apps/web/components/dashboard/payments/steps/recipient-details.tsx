@@ -103,7 +103,7 @@ export default function RecipientDetailsStep({
                   onChange={(e) =>
                     updateData({ ...data, address: e.target.value })
                   }
-                  className=" border-white/10 focus-visible:ring-[#6E56CF] pl-10 pr-10 py-6 transition-all duration-200 ease-in-out rounded-md"
+                  className="border-white/10 focus-visible:ring-[#6E56CF] pl-10 pr-10 py-6 transition-all duration-200 ease-in-out rounded-md"
                 />
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-white/50 group-hover:text-[#6E56CF] transition-colors duration-200" />
                 <button
@@ -144,7 +144,7 @@ export default function RecipientDetailsStep({
                   onChange={(e) =>
                     updateData({ ...data, name: e.target.value })
                   }
-                  className=" border-white/10 focus-visible:ring-[#6E56CF] pl-10 py-6 transition-all duration-200 ease-in-out rounded-md"
+                  className="border-white/10 focus-visible:ring-[#6E56CF] pl-10 py-6 transition-all duration-200 ease-in-out rounded-md"
                 />
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-white/50 group-hover:text-[#6E56CF] transition-colors duration-200" />
               </div>

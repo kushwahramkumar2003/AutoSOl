@@ -1,3 +1,5 @@
+"use client";
+
 import type { Metadata } from "next";
 import DashboardHeader from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
@@ -8,6 +10,25 @@ import {
   MoreHorizontal,
   Plus,
   Search,
+  TrendingUp,
+  Clock,
+  AlertCircle,
+  RefreshCw,
+  Eye,
+  Trash2,
+  Edit3,
+  Copy,
+  ExternalLink,
+  DollarSign,
+  Users,
+  Activity,
+  Pause,
+  Play,
+  CheckCircle,
+  XCircle,
+  Calendar,
+  ArrowUpRight,
+  ArrowDownRight,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
@@ -24,266 +45,784 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import { useProgram } from "@/hooks/use-program";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { ScheduleWithAddress, PaymentScheduleData } from "../../../lib/program";
+import { useEffect, useState, useCallback, useMemo } from "react";
+import { toast } from "sonner";
 
-export const metadata: Metadata = {
-  title: "Recurring Payments | AutoSOL",
-  description: "Manage your recurring payments on Solana",
-};
-
-const recurringPayments = [
-  {
-    id: "pay-001",
-    name: "Solana Hosting",
-    recipient: "8xDR54a...9j2K",
-    amount: 25,
-    token: "USDC",
-    frequency: "Monthly",
-    nextDate: "Apr 1, 2025",
-    status: "active",
-    createdAt: "Jan 1, 2025",
-  },
-  {
-    id: "pay-002",
-    name: "SolanaFM API",
-    recipient: "3tYV87b...5rL1",
-    amount: 0.5,
-    token: "SOL",
-    frequency: "Weekly",
-    nextDate: "Apr 2, 2025",
-    status: "active",
-    createdAt: "Feb 15, 2025",
-  },
-  {
-    id: "pay-003",
-    name: "CryptoDevs DAO",
-    recipient: "7pQR32c...8mN4",
-    amount: 5,
-    token: "SOL",
-    frequency: "Monthly",
-    nextDate: "Apr 5, 2025",
-    status: "active",
-    createdAt: "Dec 10, 2024",
-  },
-  {
-    id: "pay-004",
-    name: "Solana Staking",
-    recipient: "2zXC45d...1pT7",
-    amount: 1,
-    token: "SOL",
-    frequency: "Weekly",
-    nextDate: "Apr 3, 2025",
-    status: "active",
-    createdAt: "Mar 1, 2025",
-  },
-  {
-    id: "pay-005",
-    name: "NFT Subscription",
-    recipient: "5aSD78e...3qJ9",
-    amount: 10,
-    token: "USDC",
-    frequency: "Monthly",
-    nextDate: "Apr 15, 2025",
-    status: "active",
-    createdAt: "Jan 15, 2025",
-  },
-  {
-    id: "pay-006",
-    name: "Bonk Donation",
-    recipient: "9bVN12f...7gH3",
-    amount: 100000,
-    token: "BONK",
-    frequency: "Monthly",
-    nextDate: "Apr 10, 2025",
-    status: "paused",
-    createdAt: "Feb 1, 2025",
-  },
-  {
-    id: "pay-007",
-    name: "Solana Foundation",
-    recipient: "4cBM67g...2kL5",
-    amount: 2,
-    token: "SOL",
-    frequency: "Monthly",
-    nextDate: "N/A",
-    status: "cancelled",
-    createdAt: "Dec 5, 2024",
-  },
-];
+type FilterType = "all" | "active" | "completed" | "paused";
+type SortType =
+  | "newest"
+  | "oldest"
+  | "amount_high"
+  | "amount_low"
+  | "remaining_high"
+  | "remaining_low";
 
 export default function PaymentsPage() {
+  const { program } = useProgram();
+  const wallet = useWallet();
+  const [payments, setPayments] = useState<ScheduleWithAddress[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filter, setFilter] = useState<FilterType>("all");
+  const [sort, setSort] = useState<SortType>("newest");
+  const [selectedPayment, setSelectedPayment] =
+    useState<ScheduleWithAddress | null>(null);
+  const [showDetails, setShowDetails] = useState(false);
+
+  const fetchPayments = useCallback(async () => {
+    if (!wallet.publicKey || !program) {
+      console.log("Wallet not connected or program not available");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await program.getSchedulesForOwner(wallet.publicKey);
+      if (res) {
+        setPayments(res);
+        toast.success(`Loaded ${res.length} payment schedules`);
+      }
+    } catch (error) {
+      console.error("Error fetching payments:", error);
+      toast.error("Failed to load payment schedules");
+    } finally {
+      setLoading(false);
+    }
+  }, [program, wallet.publicKey]);
+
+  useEffect(() => {
+    fetchPayments();
+  }, [fetchPayments]);
+
+  // Helper functions
+  const formatLamports = (bn: any) => {
+    if (!bn || typeof bn.toNumber !== "function") return "0";
+    return (bn.toNumber() / 1e9).toLocaleString(undefined, {
+      maximumFractionDigits: 4,
+    });
+  };
+
+  const formatDate = (bn: any) => {
+    if (!bn || typeof bn.toNumber !== "function") return "-";
+    const date = new Date(bn.toNumber() * 1000);
+    return date.toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  };
+
+  const formatDateTime = (bn: any) => {
+    if (!bn || typeof bn.toNumber !== "function") return "-";
+    const date = new Date(bn.toNumber() * 1000);
+    return date.toLocaleString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const truncateAddress = (address: string, start = 4, end = 4) => {
+    if (address.length <= start + end) return address;
+    return `${address.slice(0, start)}...${address.slice(-end)}`;
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success("Copied to clipboard");
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case "active":
+        return "bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30";
+      case "completed":
+        return "bg-blue-500/20 text-blue-400 hover:bg-blue-500/30";
+      case "paused":
+        return "bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30";
+      case "cancelled":
+        return "bg-red-500/20 text-red-400 hover:bg-red-500/30";
+      default:
+        return "bg-gray-500/20 text-gray-400 hover:bg-gray-500/30";
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status.toLowerCase()) {
+      case "active":
+        return <Play className="h-3 w-3" />;
+      case "completed":
+        return <CheckCircle className="h-3 w-3" />;
+      case "paused":
+        return <Pause className="h-3 w-3" />;
+      case "cancelled":
+        return <XCircle className="h-3 w-3" />;
+      default:
+        return <Clock className="h-3 w-3" />;
+    }
+  };
+
+  const getProgress = (payment: PaymentScheduleData) => {
+    const total = payment.totalAmount.toNumber();
+    const remaining = payment.remainingAmount.toNumber();
+    const paid = total - remaining;
+    return total > 0 ? (paid / total) * 100 : 0;
+  };
+
+  // Filter and sort payments
+  const filteredAndSortedPayments = useMemo(() => {
+    let filtered = payments;
+
+    // Apply search filter
+    if (searchTerm) {
+      filtered = filtered.filter(
+        (payment) =>
+          payment.data.recipient
+            .toString()
+            .toLowerCase()
+            .includes(searchTerm.toLowerCase()) ||
+          payment.data.memo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          payment.address
+            .toString()
+            .toLowerCase()
+            .includes(searchTerm.toLowerCase())
+      );
+    }
+
+    // Apply status filter
+    if (filter !== "all") {
+      filtered = filtered.filter(
+        (payment) => payment.data.status.toLowerCase() === filter.toLowerCase()
+      );
+    }
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      switch (sort) {
+        case "newest":
+          return b.data.createdAt.toNumber() - a.data.createdAt.toNumber();
+        case "oldest":
+          return a.data.createdAt.toNumber() - b.data.createdAt.toNumber();
+        case "amount_high":
+          return b.data.totalAmount.toNumber() - a.data.totalAmount.toNumber();
+        case "amount_low":
+          return a.data.totalAmount.toNumber() - b.data.totalAmount.toNumber();
+        case "remaining_high":
+          return (
+            b.data.remainingAmount.toNumber() -
+            a.data.remainingAmount.toNumber()
+          );
+        case "remaining_low":
+          return (
+            a.data.remainingAmount.toNumber() -
+            b.data.remainingAmount.toNumber()
+          );
+        default:
+          return 0;
+      }
+    });
+
+    return filtered;
+  }, [payments, searchTerm, filter, sort]);
+
+  // Calculate statistics
+  const stats = useMemo(() => {
+    const activePayments = payments.filter(
+      (p) => p.data.status.toLowerCase() === "active"
+    );
+    const totalAmount = payments.reduce(
+      (sum, p) => sum + p.data.totalAmount.toNumber(),
+      0
+    );
+    const totalRemaining = payments.reduce(
+      (sum, p) => sum + p.data.remainingAmount.toNumber(),
+      0
+    );
+    const totalPaid = totalAmount - totalRemaining;
+
+    return {
+      total: payments.length,
+      active: activePayments.length,
+      completed: payments.filter(
+        (p) => p.data.status.toLowerCase() === "completed"
+      ).length,
+      totalAmount: totalAmount / 1e9,
+      totalPaid: totalPaid / 1e9,
+      totalRemaining: totalRemaining / 1e9,
+    };
+  }, [payments]);
+
   return (
     <div className="flex flex-col min-h-screen">
       <DashboardHeader />
 
-      <div className="flex-1 p-6">
-        <div className="flex justify-between items-center mb-6">
+      <div className="flex-1 p-6 space-y-6">
+        {/* Header */}
+        <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold text-white">
+            <h1 className="text-3xl font-bold text-white flex items-center gap-2">
+              <Activity className="h-8 w-8 text-[#6E56CF]" />
               Recurring Payments
             </h1>
             <p className="text-white/70 mt-1">
-              Manage your automated payment schedules
+              Manage your automated payment schedules on Solana
             </p>
           </div>
-          <Button className="bg-gradient-to-r from-[#6E56CF] to-[#10B981] hover:from-[#5a46b0] hover:to-[#0e9d6d] text-white shadow-neon">
-            <Plus className="h-4 w-4 mr-2" />
-            New Payment
-          </Button>
-        </div>
-
-        <div className="bg-dark-200 rounded-lg border border-white/10 p-6">
-          <div className="flex flex-col md:flex-row justify-between gap-4 mb-6">
-            <div className="relative w-full md:w-80">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/50" />
-              <Input
-                placeholder="Search Payments..."
-                className="pl-8 bg-white/5 border-white/10 focus-visible:ring-[#6E56CF]"
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              onClick={fetchPayments}
+              disabled={loading}
+              className="border-white/10 bg-dark-300 hover:bg-white/10"
+            >
+              <RefreshCw
+                className={cn("h-4 w-4 mr-2", loading && "animate-spin")}
               />
-            </div>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                className="border-white/10 bg-dark-300 hover:bg-white/10"
-              >
-                <Filter className="h-4 w-4 mr-2" />
-                Filter
-                <ChevronDown className="h-4 w-4 ml-2" />
-              </Button>
-              <Button
-                variant="outline"
-                className="border-white/10 bg-dark-300 hover:bg-white/10"
-              >
-                <CalendarClock className="h-4 w-4 mr-2" />
-                Frequency
-                <ChevronDown className="h-4 w-4 ml-2" />
-              </Button>
-            </div>
-          </div>
-
-          <div className="rounded-md border border-white/10 overflow-hidden">
-            <Table>
-              <TableHeader className="bg-dark-300">
-                <TableRow className="hover:bg-transparent border-white/10">
-                  <TableHead className="text-white/70">Name</TableHead>
-                  <TableHead className="text-white/70">Recipient</TableHead>
-                  <TableHead className="text-white/70">Amount</TableHead>
-                  <TableHead className="text-white/70">Frequency</TableHead>
-                  <TableHead className="text-white/70">Next Payment</TableHead>
-                  <TableHead className="text-white/70">Status</TableHead>
-                  <TableHead className="text-white/70">Created</TableHead>
-                  <TableHead className="text-white/70 text-right">
-                    Actions
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {recurringPayments.map((payment) => (
-                  <TableRow
-                    key={payment.id}
-                    className="hover:bg-dark-300 border-white/10"
-                  >
-                    <TableCell className="font-medium">
-                      {payment.name}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-[#6E56CF]/20 flex items-center justify-center">
-                          <span className="text-xs">
-                            {payment.recipient.charAt(0)}
-                          </span>
-                        </div>
-                        <span className="text-sm">{payment.recipient}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {payment.amount} {payment.token}
-                    </TableCell>
-                    <TableCell>{payment.frequency}</TableCell>
-                    <TableCell>{payment.nextDate}</TableCell>
-                    <TableCell>
-                      <Badge
-                        className={cn(
-                          "capitalize",
-                          payment.status === "active"
-                            ? "bg-[#10B981]/20 text-[#10B981] hover:bg-[#10B981]/30"
-                            : payment.status === "paused"
-                              ? "bg-yellow-500/20 text-yellow-500 hover:bg-yellow-500/30"
-                              : "bg-red-500/20 text-red-500 hover:bg-red-500/30"
-                        )}
-                      >
-                        {payment.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{payment.createdAt}</TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                          >
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent
-                          align="end"
-                          className="bg-dark-200 border-white/10 text-white"
-                        >
-                          <DropdownMenuItem className="hover:bg-white/10 focus:bg-white/10 cursor-pointer">
-                            Edit Payment
-                          </DropdownMenuItem>
-                          {payment.status === "active" ? (
-                            <DropdownMenuItem className="hover:bg-white/10 focus:bg-white/10 cursor-pointer">
-                              Pause Payment
-                            </DropdownMenuItem>
-                          ) : payment.status === "paused" ? (
-                            <DropdownMenuItem className="hover:bg-white/10 focus:bg-white/10 cursor-pointer">
-                              Resume Payment
-                            </DropdownMenuItem>
-                          ) : null}
-                          <DropdownMenuItem className="hover:bg-white/10 focus:bg-white/10 cursor-pointer">
-                            View History
-                          </DropdownMenuItem>
-                          {payment.status !== "cancelled" && (
-                            <DropdownMenuItem className="hover:bg-white/10 focus:bg-white/10 cursor-pointer text-red-500">
-                              Cancel Payment
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-
-          <div className="flex justify-between items-center mt-6">
-            <div className="text-sm text-white/70">Showing 7 of 7 payments</div>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="border-white/10 bg-dark-300 hover:bg-white/10"
-                disabled
-              >
-                Previous
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="border-white/10 bg-dark-300 hover:bg-white/10"
-                disabled
-              >
-                Next
-              </Button>
-            </div>
+              Refresh
+            </Button>
+            <Button className="bg-gradient-to-r from-[#6E56CF] to-[#10B981] hover:from-[#5a46b0] hover:to-[#0e9d6d] text-white shadow-lg shadow-[#6E56CF]/25">
+              <Plus className="h-4 w-4 mr-2" />
+              New Payment
+            </Button>
           </div>
         </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card className="bg-dark-200 border-white/10">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-white/70">
+                Total Schedules
+              </CardTitle>
+              <Users className="h-4 w-4 text-white/50" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-white">{stats.total}</div>
+              <p className="text-xs text-white/50">
+                {stats.active} active schedules
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-dark-200 border-white/10">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-white/70">
+                Total Value
+              </CardTitle>
+              <DollarSign className="h-4 w-4 text-white/50" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-white">
+                {stats.totalAmount.toFixed(2)} SOL
+              </div>
+              <p className="text-xs text-white/50">Across all schedules</p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-dark-200 border-white/10">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-white/70">
+                Paid Out
+              </CardTitle>
+              <ArrowUpRight className="h-4 w-4 text-emerald-400" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-emerald-400">
+                {stats.totalPaid.toFixed(2)} SOL
+              </div>
+              <p className="text-xs text-white/50">Successfully processed</p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-dark-200 border-white/10">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-white/70">
+                Remaining
+              </CardTitle>
+              <ArrowDownRight className="h-4 w-4 text-yellow-400" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-yellow-400">
+                {stats.totalRemaining.toFixed(2)} SOL
+              </div>
+              <p className="text-xs text-white/50">To be processed</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Main Content */}
+        <Card className="bg-dark-200 border-white/10">
+          <CardHeader>
+            <div className="flex flex-col md:flex-row justify-between gap-4">
+              <div className="relative w-full md:w-80">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/50" />
+                <Input
+                  placeholder="Search payments, recipients, or memos..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 bg-white/5 border-white/10 focus-visible:ring-[#6E56CF]"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Select
+                  value={filter}
+                  onValueChange={(value: FilterType) => setFilter(value)}
+                >
+                  <SelectTrigger className="w-[120px] bg-dark-300 border-white/10">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-dark-300 border-white/10">
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value="paused">Paused</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={sort}
+                  onValueChange={(value: SortType) => setSort(value)}
+                >
+                  <SelectTrigger className="w-[140px] bg-dark-300 border-white/10">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-dark-300 border-white/10">
+                    <SelectItem value="newest">Newest First</SelectItem>
+                    <SelectItem value="oldest">Oldest First</SelectItem>
+                    <SelectItem value="amount_high">Amount: High</SelectItem>
+                    <SelectItem value="amount_low">Amount: Low</SelectItem>
+                    <SelectItem value="remaining_high">
+                      Remaining: High
+                    </SelectItem>
+                    <SelectItem value="remaining_low">
+                      Remaining: Low
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="rounded-lg border border-white/10 overflow-hidden">
+              <Table>
+                <TableHeader className="bg-dark-300">
+                  <TableRow className="hover:bg-transparent border-white/10">
+                    <TableHead className="text-white/70">Recipient</TableHead>
+                    <TableHead className="text-white/70">Amount</TableHead>
+                    <TableHead className="text-white/70">Progress</TableHead>
+                    <TableHead className="text-white/70">Status</TableHead>
+                    <TableHead className="text-white/70">Created</TableHead>
+                    <TableHead className="text-white/70">Memo</TableHead>
+                    <TableHead className="text-white/70 text-right">
+                      Actions
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={7}
+                        className="text-center text-white/70 py-8"
+                      >
+                        <div className="flex items-center justify-center gap-2">
+                          <RefreshCw className="h-4 w-4 animate-spin" />
+                          Loading payment schedules...
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : filteredAndSortedPayments.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={7}
+                        className="text-center text-white/70 py-8"
+                      >
+                        <div className="flex flex-col items-center gap-2">
+                          <AlertCircle className="h-8 w-8 text-white/30" />
+                          <p>No payment schedules found</p>
+                          {searchTerm && (
+                            <p className="text-sm text-white/50">
+                              Try adjusting your search or filters
+                            </p>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredAndSortedPayments.map((payment) => (
+                      <TableRow
+                        key={payment.address.toString()}
+                        className="hover:bg-dark-300/50 border-white/10 transition-colors"
+                      >
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-r from-[#6E56CF] to-[#10B981] flex items-center justify-center">
+                              <span className="text-xs font-medium text-white">
+                                {payment.data.recipient
+                                  .toString()
+                                  .slice(0, 2)
+                                  .toUpperCase()}
+                              </span>
+                            </div>
+                            <div>
+                              <div className="font-medium text-white">
+                                {truncateAddress(
+                                  payment.data.recipient.toString()
+                                )}
+                              </div>
+                              <div className="text-xs text-white/50">
+                                {truncateAddress(payment.address.toString())}
+                              </div>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium text-white">
+                            {formatLamports(payment.data.totalAmount)} SOL
+                          </div>
+                          <div className="text-xs text-white/50">
+                            {formatLamports(payment.data.paymentAmount)} SOL per
+                            payment
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="w-full max-w-[120px]">
+                            <div className="flex justify-between text-xs text-white/70 mb-1">
+                              <span>Progress</span>
+                              <span>
+                                {getProgress(payment.data).toFixed(1)}%
+                              </span>
+                            </div>
+                            <Progress
+                              value={getProgress(payment.data)}
+                              className="h-2 bg-white/10"
+                            />
+                            <div className="text-xs text-white/50 mt-1">
+                              {formatLamports(payment.data.remainingAmount)} SOL
+                              remaining
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            className={cn(
+                              "capitalize flex items-center gap-1",
+                              getStatusColor(payment.data.status)
+                            )}
+                          >
+                            {getStatusIcon(payment.data.status)}
+                            {payment.data.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm text-white">
+                            {formatDate(payment.data.createdAt)}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="max-w-[150px] truncate text-sm text-white/70">
+                            {payment.data.memo || "No memo"}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 hover:bg-white/10"
+                              >
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent
+                              align="end"
+                              className="bg-dark-200 border-white/10 text-white min-w-[160px]"
+                            >
+                              <DropdownMenuItem
+                                className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+                                onClick={() => {
+                                  setSelectedPayment(payment);
+                                  setShowDetails(true);
+                                }}
+                              >
+                                <Eye className="h-4 w-4 mr-2" />
+                                View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+                                onClick={() =>
+                                  copyToClipboard(payment.address.toString())
+                                }
+                              >
+                                <Copy className="h-4 w-4 mr-2" />
+                                Copy Address
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+                                onClick={() =>
+                                  copyToClipboard(
+                                    payment.data.recipient.toString()
+                                  )
+                                }
+                              >
+                                <Copy className="h-4 w-4 mr-2" />
+                                Copy Recipient
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator className="bg-white/10" />
+                              {payment.data.status.toLowerCase() ===
+                                "active" && (
+                                <>
+                                  <DropdownMenuItem className="hover:bg-white/10 focus:bg-white/10 cursor-pointer">
+                                    <Pause className="h-4 w-4 mr-2" />
+                                    Pause Schedule
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem className="hover:bg-white/10 focus:bg-white/10 cursor-pointer">
+                                    <Edit3 className="h-4 w-4 mr-2" />
+                                    Edit Schedule
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                              {payment.data.status.toLowerCase() ===
+                                "paused" && (
+                                <DropdownMenuItem className="hover:bg-white/10 focus:bg-white/10 cursor-pointer">
+                                  <Play className="h-4 w-4 mr-2" />
+                                  Resume Schedule
+                                </DropdownMenuItem>
+                              )}
+                              {(payment.data.status.toLowerCase() ===
+                                "active" ||
+                                payment.data.status.toLowerCase() ===
+                                  "paused") && (
+                                <DropdownMenuItem className="hover:bg-red-500/10 focus:bg-red-500/10 cursor-pointer text-red-400">
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Cancel Schedule
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Pagination */}
+            <div className="flex justify-between items-center mt-6">
+              <div className="text-sm text-white/70">
+                Showing {filteredAndSortedPayments.length} of {payments.length}{" "}
+                payment schedules
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-white/10 bg-dark-300 hover:bg-white/10"
+                  disabled
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-white/10 bg-dark-300 hover:bg-white/10"
+                  disabled
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Payment Details Modal */}
+      <Dialog open={showDetails} onOpenChange={setShowDetails}>
+        <DialogContent className="bg-dark-200 border-white/10 text-white max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl">
+              Payment Schedule Details
+            </DialogTitle>
+            <DialogDescription className="text-white/70">
+              Complete information about this payment schedule
+            </DialogDescription>
+          </DialogHeader>
+          {selectedPayment && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm text-white/70">
+                    Schedule Address
+                  </label>
+                  <div className="flex items-center gap-2 mt-1">
+                    <code className="text-sm bg-white/10 px-2 py-1 rounded">
+                      {truncateAddress(
+                        selectedPayment.address.toString(),
+                        6,
+                        6
+                      )}
+                    </code>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() =>
+                        copyToClipboard(selectedPayment.address.toString())
+                      }
+                    >
+                      <Copy className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm text-white/70">Recipient</label>
+                  <div className="flex items-center gap-2 mt-1">
+                    <code className="text-sm bg-white/10 px-2 py-1 rounded">
+                      {truncateAddress(
+                        selectedPayment.data.recipient.toString(),
+                        6,
+                        6
+                      )}
+                    </code>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() =>
+                        copyToClipboard(
+                          selectedPayment.data.recipient.toString()
+                        )
+                      }
+                    >
+                      <Copy className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="text-sm text-white/70">Total Amount</label>
+                  <div className="text-lg font-semibold text-white mt-1">
+                    {formatLamports(selectedPayment.data.totalAmount)} SOL
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm text-white/70">
+                    Payment Amount
+                  </label>
+                  <div className="text-lg font-semibold text-white mt-1">
+                    {formatLamports(selectedPayment.data.paymentAmount)} SOL
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm text-white/70">Remaining</label>
+                  <div className="text-lg font-semibold text-white mt-1">
+                    {formatLamports(selectedPayment.data.remainingAmount)} SOL
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm text-white/70">Progress</label>
+                <div className="mt-2">
+                  <div className="flex justify-between text-sm text-white/70 mb-1">
+                    <span>Completion</span>
+                    <span>{getProgress(selectedPayment.data).toFixed(1)}%</span>
+                  </div>
+                  <Progress
+                    value={getProgress(selectedPayment.data)}
+                    className="h-3"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm text-white/70">Status</label>
+                  <div className="mt-1">
+                    <Badge
+                      className={cn(
+                        "capitalize",
+                        getStatusColor(selectedPayment.data.status)
+                      )}
+                    >
+                      {getStatusIcon(selectedPayment.data.status)}
+                      {selectedPayment.data.status}
+                    </Badge>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm text-white/70">Created</label>
+                  <div className="text-sm text-white mt-1">
+                    {formatDateTime(selectedPayment.data.createdAt)}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm text-white/70">Memo</label>
+                <div className="text-sm text-white mt-1 p-3 bg-white/5 rounded-lg">
+                  {selectedPayment.data.memo || "No memo provided"}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm text-white/70">Payment History</label>
+                <div className="mt-2 space-y-2 max-h-40 overflow-y-auto">
+                  {selectedPayment.data.payments &&
+                  selectedPayment.data.payments.length > 0 ? (
+                    selectedPayment.data.payments.map((payment, index) => (
+                      <div
+                        key={index}
+                        className="flex justify-between items-center text-sm p-2 bg-white/5 rounded"
+                      >
+                        <span>Payment #{index + 1}</span>
+                        <span>{formatLamports(payment.amount)} SOL</span>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-sm text-white/50 p-2 bg-white/5 rounded">
+                      No payments processed yet
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

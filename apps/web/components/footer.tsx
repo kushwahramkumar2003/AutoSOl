@@ -13,6 +13,7 @@ import {
   ArrowUpRight,
   CheckCircle,
 } from "lucide-react";
+import Image from "next/image";
 
 // Define types for social media links
 type SocialLink = {
@@ -99,9 +100,10 @@ export default function Footer(): React.ReactElement {
             className="space-y-6"
           >
             <div className="flex items-center gap-3">
-              <div className="h-12 w-12 rounded-xl bg-gradient-to-r from-[#6E56CF] to-[#10B981] flex items-center justify-center shadow-lg shadow-purple-500/20">
+              {/* <div className="h-12 w-12 rounded-xl bg-gradient-to-r from-[#6E56CF] to-[#10B981] flex items-center justify-center shadow-lg shadow-purple-500/20">
                 <span className="text-white font-bold text-lg">A</span>
-              </div>
+              </div> */}
+              <Image src={"/favicon.ico"} alt="logo" height={30} width={30} />
               <span className="font-bold text-2xl font-space tracking-tight">
                 AutoSOL
               </span>

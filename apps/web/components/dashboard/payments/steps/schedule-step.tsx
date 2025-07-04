@@ -486,23 +486,23 @@ export default function ScheduleStep({ data, updateData }: ScheduleStepProps) {
                           selected={data.selectedDates}
                           onSelect={handleDateSelect}
                           disabled={(date) => isBefore(date, new Date())}
-                          className="w-full bg-transparent text-white"
+                          className="w-full bg-transparent text-white gap-2"
                           onDayMouseEnter={(date) => setHoveredDate(date)}
                           onDayMouseLeave={() => setHoveredDate(null)}
                           classNames={{
                             day_selected:
-                              "!bg-none text-white hover:!bg-[#6E56CF]/80 transition-colors",
+                              "!bg-none text-white !bg-[#6E56CF]/80 transition-colors",
                             day_today:
                               "text-white ring-1 ring-[#6E56CF]/50 gap-2",
                             // @ts-expect-error - Tailwind classes
                             day: calendarItemClass,
-                            head_cell: "text-white/60 font-medium",
+                            head_cell: "text-white/60 font-medium ",
                             caption:
                               "flex justify-center pt-1 relative items-center",
                             caption_label: "text-base font-semibold text-white",
                             nav_button:
                               "border border-white/10 hover:bg-white/10 rounded-md p-1",
-                            table: "w-full border-collapse space-y-1",
+                            table: "w-full border-collapse space-y-1 gap-2",
                             cell: "relative p-0 text-center gap-2",
                             row: "flex w-full mt-2",
                             head_row: "flex",
