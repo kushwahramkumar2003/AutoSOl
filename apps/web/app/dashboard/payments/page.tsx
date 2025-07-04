@@ -1,16 +1,11 @@
 "use client";
 
-import type { Metadata } from "next";
 import DashboardHeader from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import {
-  CalendarClock,
-  ChevronDown,
-  Filter,
   MoreHorizontal,
   Plus,
   Search,
-  TrendingUp,
   Clock,
   AlertCircle,
   RefreshCw,
@@ -26,7 +21,6 @@ import {
   Play,
   CheckCircle,
   XCircle,
-  Calendar,
   ArrowUpRight,
   ArrowDownRight,
 } from "lucide-react";
@@ -49,8 +43,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -62,21 +58,29 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { useProgram } from "@/hooks/use-program";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { ScheduleWithAddress, PaymentScheduleData } from "../../../lib/program";
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { toast } from "sonner";
+import config from "@/config";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Label } from "@/components/ui/label";
+import {
+  AlertDialog,
+  AlertDialogTrigger,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from "@/components/ui/alert-dialog";
+import { useRouter } from "next/navigation";
 
 type FilterType = "all" | "active" | "completed" | "paused";
 type SortType =
@@ -90,6 +94,7 @@ type SortType =
 export default function PaymentsPage() {
   const { program } = useProgram();
   const wallet = useWallet();
+  const router = useRouter();
   const [payments, setPayments] = useState<ScheduleWithAddress[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -98,6 +103,9 @@ export default function PaymentsPage() {
   const [selectedPayment, setSelectedPayment] =
     useState<ScheduleWithAddress | null>(null);
   const [showDetails, setShowDetails] = useState(false);
+  const [cancelingPayment, setCancelingPayment] =
+    useState<ScheduleWithAddress | null>(null);
+  const [cancelLoading, setCancelLoading] = useState(false);
 
   const fetchPayments = useCallback(async () => {
     if (!wallet.publicKey || !program) {
@@ -284,6 +292,53 @@ export default function PaymentsPage() {
     };
   }, [payments]);
 
+  // Cancel schedule handler with robust validation and feedback
+  const onCancelSchedule = async (payment: ScheduleWithAddress) => {
+    if (cancelLoading) return;
+    if (!program) {
+      toast.error("Program not initialized. Please connect your wallet.");
+      return;
+    }
+    if (!payment || !payment.data) {
+      toast.error("Invalid payment schedule.");
+      return;
+    }
+    setCancelLoading(true);
+    try {
+      // This will throw if not owner or not active/paused
+      const tx = await program.cancelPaymentSchedule(payment.address);
+      toast.success("Payment schedule cancelled successfully!", {
+        description: tx ? (
+          <a
+            href={`https://explorer.solana.com/tx/${tx}?cluster=${config.rpcEndpoint === "http://127.0.0.1:8899" ? "custom" : "devnet"}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline text-blue-500"
+          >
+            View on Solana Explorer
+          </a>
+        ) : undefined,
+      });
+      setCancelingPayment(null);
+      fetchPayments();
+    } catch (err: any) {
+      // Try to surface the most user-friendly error message
+      let message = err?.message || String(err);
+      if (err?.code === "UNAUTHORIZED_CANCELLATION") {
+        message = "You are not the owner of this payment schedule.";
+      } else if (err?.code === "INVALID_SCHEDULE_STATUS") {
+        message = "Only active payment schedules can be cancelled.";
+      } else if (message.includes("WALLET_NOT_CONNECTED")) {
+        message = "Wallet not connected.";
+      }
+      toast.error("Failed to cancel payment schedule.", {
+        description: message,
+      });
+    } finally {
+      setCancelLoading(false);
+    }
+  };
+
   return (
     <div className="flex flex-col min-h-screen">
       <DashboardHeader />
@@ -312,7 +367,12 @@ export default function PaymentsPage() {
               />
               Refresh
             </Button>
-            <Button className="bg-gradient-to-r from-[#6E56CF] to-[#10B981] hover:from-[#5a46b0] hover:to-[#0e9d6d] text-white shadow-lg shadow-[#6E56CF]/25">
+            <Button
+              onClick={() => {
+                router.push("/dashboard/payments/new");
+              }}
+              className="bg-gradient-to-r from-[#6E56CF] to-[#10B981] hover:from-[#5a46b0] hover:to-[#0e9d6d] text-white shadow-lg shadow-[#6E56CF]/25"
+            >
               <Plus className="h-4 w-4 mr-2" />
               New Payment
             </Button>
@@ -321,65 +381,79 @@ export default function PaymentsPage() {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="bg-dark-200 border-white/10">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-white/70">
-                Total Schedules
-              </CardTitle>
-              <Users className="h-4 w-4 text-white/50" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-white">{stats.total}</div>
-              <p className="text-xs text-white/50">
-                {stats.active} active schedules
-              </p>
-            </CardContent>
-          </Card>
+          {loading ? (
+            <>
+              {[...Array(4)].map((_, i) => (
+                <Skeleton key={i} className="h-28 w-full bg-white/10" />
+              ))}
+            </>
+          ) : (
+            <>
+              <Card className="bg-dark-200 border-white/10">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-white/70">
+                    Total Schedules
+                  </CardTitle>
+                  <Users className="h-4 w-4 text-white/50" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-white">
+                    {stats.total}
+                  </div>
+                  <p className="text-xs text-white/50">
+                    {stats.active} active schedules
+                  </p>
+                </CardContent>
+              </Card>
 
-          <Card className="bg-dark-200 border-white/10">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-white/70">
-                Total Value
-              </CardTitle>
-              <DollarSign className="h-4 w-4 text-white/50" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-white">
-                {stats.totalAmount.toFixed(2)} SOL
-              </div>
-              <p className="text-xs text-white/50">Across all schedules</p>
-            </CardContent>
-          </Card>
+              <Card className="bg-dark-200 border-white/10">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-white/70">
+                    Total Value
+                  </CardTitle>
+                  <DollarSign className="h-4 w-4 text-white/50" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-white">
+                    {stats.totalAmount.toFixed(2)} SOL
+                  </div>
+                  <p className="text-xs text-white/50">Across all schedules</p>
+                </CardContent>
+              </Card>
 
-          <Card className="bg-dark-200 border-white/10">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-white/70">
-                Paid Out
-              </CardTitle>
-              <ArrowUpRight className="h-4 w-4 text-emerald-400" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-emerald-400">
-                {stats.totalPaid.toFixed(2)} SOL
-              </div>
-              <p className="text-xs text-white/50">Successfully processed</p>
-            </CardContent>
-          </Card>
+              <Card className="bg-dark-200 border-white/10">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-white/70">
+                    Paid Out
+                  </CardTitle>
+                  <ArrowUpRight className="h-4 w-4 text-emerald-400" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-emerald-400">
+                    {stats.totalPaid.toFixed(2)} SOL
+                  </div>
+                  <p className="text-xs text-white/50">
+                    Successfully processed
+                  </p>
+                </CardContent>
+              </Card>
 
-          <Card className="bg-dark-200 border-white/10">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-white/70">
-                Remaining
-              </CardTitle>
-              <ArrowDownRight className="h-4 w-4 text-yellow-400" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-yellow-400">
-                {stats.totalRemaining.toFixed(2)} SOL
-              </div>
-              <p className="text-xs text-white/50">To be processed</p>
-            </CardContent>
-          </Card>
+              <Card className="bg-dark-200 border-white/10">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-white/70">
+                    Remaining
+                  </CardTitle>
+                  <ArrowDownRight className="h-4 w-4 text-yellow-400" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-yellow-400">
+                    {stats.totalRemaining.toFixed(2)} SOL
+                  </div>
+                  <p className="text-xs text-white/50">To be processed</p>
+                </CardContent>
+              </Card>
+            </>
+          )}
         </div>
 
         {/* Main Content */}
@@ -451,17 +525,15 @@ export default function PaymentsPage() {
                 </TableHeader>
                 <TableBody>
                   {loading ? (
-                    <TableRow>
-                      <TableCell
-                        colSpan={7}
-                        className="text-center text-white/70 py-8"
-                      >
-                        <div className="flex items-center justify-center gap-2">
-                          <RefreshCw className="h-4 w-4 animate-spin" />
-                          Loading payment schedules...
-                        </div>
-                      </TableCell>
-                    </TableRow>
+                    [...Array(5)].map((_, i) => (
+                      <TableRow key={i}>
+                        {[...Array(7)].map((_, j) => (
+                          <TableCell key={j}>
+                            <Skeleton className="h-6 w-full bg-white/10" />
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    ))
                   ) : filteredAndSortedPayments.length === 0 ? (
                     <TableRow>
                       <TableCell
@@ -568,7 +640,7 @@ export default function PaymentsPage() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent
                               align="end"
-                              className="bg-dark-200 border-white/10 text-white min-w-[160px]"
+                              className=" border-white/10 text-white min-w-[160px]"
                             >
                               <DropdownMenuItem
                                 className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
@@ -625,7 +697,10 @@ export default function PaymentsPage() {
                                 "active" ||
                                 payment.data.status.toLowerCase() ===
                                   "paused") && (
-                                <DropdownMenuItem className="hover:bg-red-500/10 focus:bg-red-500/10 cursor-pointer text-red-400">
+                                <DropdownMenuItem
+                                  className="hover:bg-red-500/10 focus:bg-red-500/10 cursor-pointer text-red-400"
+                                  onClick={() => setCancelingPayment(payment)}
+                                >
                                   <Trash2 className="h-4 w-4 mr-2" />
                                   Cancel Schedule
                                 </DropdownMenuItem>
@@ -671,158 +746,327 @@ export default function PaymentsPage() {
 
       {/* Payment Details Modal */}
       <Dialog open={showDetails} onOpenChange={setShowDetails}>
-        <DialogContent className="bg-dark-200 border-white/10 text-white max-w-2xl">
-          <DialogHeader>
-            <DialogTitle className="text-xl">
-              Payment Schedule Details
-            </DialogTitle>
-            <DialogDescription className="text-white/70">
-              Complete information about this payment schedule
-            </DialogDescription>
-          </DialogHeader>
-          {selectedPayment && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm text-white/70">
-                    Schedule Address
-                  </label>
-                  <div className="flex items-center gap-2 mt-1">
-                    <code className="text-sm bg-white/10 px-2 py-1 rounded">
-                      {truncateAddress(
-                        selectedPayment.address.toString(),
-                        6,
-                        6
-                      )}
-                    </code>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() =>
-                        copyToClipboard(selectedPayment.address.toString())
-                      }
-                    >
-                      <Copy className="h-3 w-3" />
-                    </Button>
-                  </div>
+        <DialogContent
+          className="border-white/10 text-white max-w-2xl w-full p-0 md:p-0"
+          style={{
+            maxWidth: "90vw",
+            width: "100%",
+            padding: 0,
+          }}
+        >
+          <div
+            className="max-h-[80vh] md:max-h-[80vh] overflow-y-auto px-6 py-6 md:px-8 md:py-8 custom-scrollbar"
+            // style={{
+            //   scrollbarWidth: "none",
+            //   msOverflowStyle: "none",
+            // }}
+            /* Hide scrollbar for Chrome, Safari and Opera */
+            /* You can also add a custom class for this if you prefer */
+          >
+            {loading && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-2 gap-4">
+                  <Skeleton className="h-12 w-full bg-white/10" />
+                  <Skeleton className="h-12 w-full bg-white/10" />
                 </div>
-                <div>
-                  <label className="text-sm text-white/70">Recipient</label>
-                  <div className="flex items-center gap-2 mt-1">
-                    <code className="text-sm bg-white/10 px-2 py-1 rounded">
-                      {truncateAddress(
-                        selectedPayment.data.recipient.toString(),
-                        6,
-                        6
-                      )}
-                    </code>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() =>
-                        copyToClipboard(
-                          selectedPayment.data.recipient.toString()
-                        )
-                      }
-                    >
-                      <Copy className="h-3 w-3" />
-                    </Button>
-                  </div>
+                <div className="grid grid-cols-3 gap-4">
+                  <Skeleton className="h-12 w-full bg-white/10" />
+                  <Skeleton className="h-12 w-full bg-white/10" />
+                  <Skeleton className="h-12 w-full bg-white/10" />
                 </div>
+                <Skeleton className="h-8 w-full bg-white/10" />
+                <div className="grid grid-cols-2 gap-4">
+                  <Skeleton className="h-10 w-full bg-white/10" />
+                  <Skeleton className="h-10 w-full bg-white/10" />
+                </div>
+                <Skeleton className="h-16 w-full bg-white/10" />
+                <Skeleton className="h-32 w-full bg-white/10" />
               </div>
-
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="text-sm text-white/70">Total Amount</label>
-                  <div className="text-lg font-semibold text-white mt-1">
-                    {formatLamports(selectedPayment.data.totalAmount)} SOL
-                  </div>
-                </div>
-                <div>
-                  <label className="text-sm text-white/70">
-                    Payment Amount
-                  </label>
-                  <div className="text-lg font-semibold text-white mt-1">
-                    {formatLamports(selectedPayment.data.paymentAmount)} SOL
-                  </div>
-                </div>
-                <div>
-                  <label className="text-sm text-white/70">Remaining</label>
-                  <div className="text-lg font-semibold text-white mt-1">
-                    {formatLamports(selectedPayment.data.remainingAmount)} SOL
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="text-sm text-white/70">Progress</label>
-                <div className="mt-2">
-                  <div className="flex justify-between text-sm text-white/70 mb-1">
-                    <span>Completion</span>
-                    <span>{getProgress(selectedPayment.data).toFixed(1)}%</span>
-                  </div>
-                  <Progress
-                    value={getProgress(selectedPayment.data)}
-                    className="h-3"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm text-white/70">Status</label>
-                  <div className="mt-1">
-                    <Badge
-                      className={cn(
-                        "capitalize",
-                        getStatusColor(selectedPayment.data.status)
-                      )}
-                    >
-                      {getStatusIcon(selectedPayment.data.status)}
-                      {selectedPayment.data.status}
-                    </Badge>
-                  </div>
-                </div>
-                <div>
-                  <label className="text-sm text-white/70">Created</label>
-                  <div className="text-sm text-white mt-1">
-                    {formatDateTime(selectedPayment.data.createdAt)}
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="text-sm text-white/70">Memo</label>
-                <div className="text-sm text-white mt-1 p-3 bg-white/5 rounded-lg">
-                  {selectedPayment.data.memo || "No memo provided"}
-                </div>
-              </div>
-
-              <div>
-                <label className="text-sm text-white/70">Payment History</label>
-                <div className="mt-2 space-y-2 max-h-40 overflow-y-auto">
-                  {selectedPayment.data.payments &&
-                  selectedPayment.data.payments.length > 0 ? (
-                    selectedPayment.data.payments.map((payment, index) => (
-                      <div
-                        key={index}
-                        className="flex justify-between items-center text-sm p-2 bg-white/5 rounded"
+            )}
+            <DialogHeader>
+              <DialogTitle className="text-xl">
+                Payment Schedule Details
+              </DialogTitle>
+              <DialogDescription className="text-white/70">
+                Complete information about this payment schedule
+              </DialogDescription>
+            </DialogHeader>
+            {selectedPayment && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm text-white/70">
+                      Schedule Address
+                    </label>
+                    <div className="flex items-center gap-2 mt-1">
+                      <code className="text-sm bg-white/10 px-2 py-1 rounded">
+                        {truncateAddress(
+                          selectedPayment.address.toString(),
+                          6,
+                          6
+                        )}
+                      </code>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() =>
+                          copyToClipboard(selectedPayment.address.toString())
+                        }
                       >
-                        <span>Payment #{index + 1}</span>
-                        <span>{formatLamports(payment.amount)} SOL</span>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-sm text-white/50 p-2 bg-white/5 rounded">
-                      No payments processed yet
+                        <Copy className="h-3 w-3" />
+                      </Button>
                     </div>
-                  )}
+                  </div>
+                  <div>
+                    <label className="text-sm text-white/70">Recipient</label>
+                    <div className="flex items-center gap-2 mt-1">
+                      <code className="text-sm bg-white/10 px-2 py-1 rounded">
+                        {truncateAddress(
+                          selectedPayment.data.recipient.toString(),
+                          6,
+                          6
+                        )}
+                      </code>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() =>
+                          copyToClipboard(
+                            selectedPayment.data.recipient.toString()
+                          )
+                        }
+                      >
+                        <Copy className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="text-sm text-white/70">
+                      Total Amount
+                    </label>
+                    <div className="text-lg font-semibold text-white mt-1">
+                      {formatLamports(selectedPayment.data.totalAmount)} SOL
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-sm text-white/70">
+                      Payment Amount
+                    </label>
+                    <div className="text-lg font-semibold text-white mt-1">
+                      {formatLamports(selectedPayment.data.paymentAmount)} SOL
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-sm text-white/70">Remaining</label>
+                    <div className="text-lg font-semibold text-white mt-1">
+                      {formatLamports(selectedPayment.data.remainingAmount)} SOL
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-sm text-white/70">Progress</label>
+                  <div className="mt-2">
+                    <div className="flex justify-between text-sm text-white/70 mb-1">
+                      <span>Completion</span>
+                      <span>
+                        {getProgress(selectedPayment.data).toFixed(1)}%
+                      </span>
+                    </div>
+                    <Progress
+                      value={getProgress(selectedPayment.data)}
+                      className="h-3"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm text-white/70">Status</label>
+                    <div className="mt-1">
+                      <Badge
+                        className={cn(
+                          "capitalize",
+                          getStatusColor(selectedPayment.data.status)
+                        )}
+                      >
+                        {getStatusIcon(selectedPayment.data.status)}
+                        {selectedPayment.data.status}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-sm text-white/70">Created</label>
+                    <div className="text-sm text-white mt-1">
+                      {formatDateTime(selectedPayment.data.createdAt)}
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-sm text-white/70">Memo</label>
+                  <div className="text-sm text-white mt-1 p-3 bg-white/5 rounded-lg">
+                    {selectedPayment.data.memo || "No memo provided"}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-sm text-white/70">
+                    Payment History
+                  </label>
+                  <div className="mt-2 space-y-2 max-h-60 overflow-y-auto">
+                    {selectedPayment.data.payments &&
+                    selectedPayment.data.payments.length > 0 ? (
+                      <div className="grid grid-cols-1 gap-2">
+                        {selectedPayment.data.payments.map((payment, index) => {
+                          // Determine status and color
+                          const status = payment.executed
+                            ? "Completed"
+                            : "Pending";
+                          const statusColor = payment.executed
+                            ? "bg-emerald-500/20 text-emerald-400"
+                            : "bg-yellow-500/20 text-yellow-400";
+                          const statusIcon = payment.executed ? (
+                            <CheckCircle className="h-4 w-4" />
+                          ) : (
+                            <Clock className="h-4 w-4" />
+                          );
+                          return (
+                            <div
+                              key={index}
+                              className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 p-3 bg-white/5 rounded-lg border border-white/10"
+                            >
+                              <div className="flex items-center gap-3 min-w-0">
+                                <span className="text-xs text-white/50 shrink-0">
+                                  #{index + 1}
+                                </span>
+                                <span className="truncate text-sm text-white/80 font-mono">
+                                  Scheduled:{" "}
+                                  {formatDateTime(payment.scheduledTime)}
+                                </span>
+                                <span className="truncate text-sm text-white/50 font-mono">
+                                  {payment.executionTime &&
+                                  payment.executionTime.toNumber() > 0
+                                    ? `Executed: ${formatDateTime(payment.executionTime)}`
+                                    : "Not executed yet"}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span
+                                  className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${statusColor}`}
+                                >
+                                  {statusIcon}
+                                  {status}
+                                </span>
+                                <span className="text-xs text-white/70">
+                                  Amount:{" "}
+                                  <span className="font-semibold text-white">
+                                    {formatLamports(
+                                      selectedPayment.data.paymentAmount
+                                    )}{" "}
+                                    SOL
+                                  </span>
+                                </span>
+                                <span className="text-xs text-white/70">
+                                  Executer:
+                                  {payment.txSignature ? (
+                                    <span className="inline-flex items-center gap-1 ml-1">
+                                      <code className="bg-white/10 px-1 rounded text-white font-mono">
+                                        {truncateAddress(
+                                          payment.txSignature.toString(),
+                                          6,
+                                          6
+                                        )}
+                                      </code>
+
+                                      {payment.txSignature && (
+                                        <Button
+                                          size="icon"
+                                          variant="ghost"
+                                          className="h-6 w-6 p-0"
+                                          onClick={() =>
+                                            payment?.txSignature &&
+                                            copyToClipboard(
+                                              payment.txSignature.toString()
+                                            )
+                                          }
+                                        >
+                                          <Copy className="h-3 w-3" />
+                                        </Button>
+                                      )}
+                                      <a
+                                        href={`https://explorer.solana.com/address/${payment.txSignature.toString()}?cluster=${config.rpcEndpoint === "http://127.0.0.1:8899" ? "custom" : "devnet"}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-blue-400 hover:underline ml-1"
+                                      >
+                                        <ExternalLink className="h-3 w-3 inline" />
+                                      </a>
+                                    </span>
+                                  ) : (
+                                    <span className="ml-1 text-white/40">
+                                      -
+                                    </span>
+                                  )}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="text-sm text-white/50 p-2 bg-white/5 rounded">
+                        No payments processed yet
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </DialogContent>
       </Dialog>
+
+      {/* Cancel Payment AlertDialog (outside DropdownMenu) */}
+      <AlertDialog
+        open={!!cancelingPayment}
+        onOpenChange={(open) => {
+          if (!open) setCancelingPayment(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel Payment</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to cancel this payment schedule? This action
+              cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel asChild>
+              <Button type="button" variant="secondary">
+                Close
+              </Button>
+            </AlertDialogCancel>
+            <AlertDialogAction asChild>
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={cancelLoading}
+                onClick={async () => {
+                  if (cancelingPayment)
+                    await onCancelSchedule(cancelingPayment);
+                }}
+              >
+                {cancelLoading ? "Cancelling..." : "Yes, Cancel"}
+              </Button>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
