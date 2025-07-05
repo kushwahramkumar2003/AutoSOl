@@ -70,12 +70,12 @@ export class AutoSolProgram {
   private program: Program<AutoSol>;
   private connection: Connection;
   private programId: PublicKey;
-  private logger: (message: string, ...args: any[]) => void;
+  private logger: (message: string, ...args: unknown[]) => void;
 
   constructor(
     provider: anchor.AnchorProvider,
     debug: boolean = false,
-    customLogger?: (message: string, ...args: any[]) => void
+    customLogger?: (message: string, ...args: unknown[]) => void
   ) {
     if (!provider.publicKey) {
       throw new AutoSolError(
@@ -162,12 +162,19 @@ export class AutoSolProgram {
         remainingAmount: schedule.remainingAmount,
         paymentAmount: schedule.paymentAmount,
         recipient: schedule.recipient,
-        payments: schedule.payments.map((payment: any) => ({
-          scheduledTime: payment.scheduledTime,
-          executed: payment.executed,
-          executionTime: payment.executionTime,
-          txSignature: payment.txSignature,
-        })),
+        payments: schedule.payments.map(
+          (payment: {
+            scheduledTime: anchor.BN;
+            executed: boolean;
+            executionTime: anchor.BN;
+            txSignature: PublicKey | null;
+          }) => ({
+            scheduledTime: payment.scheduledTime,
+            executed: payment.executed,
+            executionTime: payment.executionTime,
+            txSignature: payment.txSignature,
+          })
+        ),
         createdAt: schedule.createdAt,
         status: this.mapScheduleStatus(schedule.status),
         memo: schedule.memo,
@@ -185,7 +192,11 @@ export class AutoSolProgram {
   /**
    * Map schedule status from program to TypeScript enum
    */
-  private mapScheduleStatus(status: any): ScheduleStatus {
+  private mapScheduleStatus(status: {
+    active?: Record<string, never>;
+    completed?: Record<string, never>;
+    cancelled?: Record<string, never>;
+  }): ScheduleStatus {
     if (status.active) return ScheduleStatus.Active;
     if (status.completed) return ScheduleStatus.Completed;
     if (status.cancelled) return ScheduleStatus.Cancelled;
@@ -384,6 +395,8 @@ export class AutoSolProgram {
         },
       ]);
 
+      console.log("schedules", schedules);
+
       const schedulesWithData: ScheduleWithAddress[] = schedules.map(
         (schedule) => ({
           address: schedule.publicKey,
@@ -393,19 +406,26 @@ export class AutoSolProgram {
             remainingAmount: schedule.account.remainingAmount,
             paymentAmount: schedule.account.paymentAmount,
             recipient: schedule.account.recipient,
-            payments: schedule.account.payments.map((payment: any) => ({
-              scheduledTime: payment.scheduledTime,
-              executed: payment.executed,
-              executionTime: payment.executionTime,
-              txSignature: payment.txSignature,
-            })),
+            payments: schedule.account.payments.map(
+              (payment: {
+                scheduledTime: anchor.BN;
+                executed: boolean;
+                executionTime: anchor.BN;
+                txSignature: PublicKey | null;
+              }) => ({
+                scheduledTime: payment.scheduledTime,
+                executed: payment.executed,
+                executionTime: payment.executionTime,
+                txSignature: payment.txSignature,
+              })
+            ),
             createdAt: schedule.account.createdAt,
             status: this.mapScheduleStatus(schedule.account.status),
             memo: schedule.account.memo,
           },
         })
       );
-
+      console.log(schedulesWithData);
       this.logger(`Found ${schedulesWithData.length} schedules for owner`);
       return schedulesWithData;
     } catch (error) {
@@ -416,6 +436,78 @@ export class AutoSolProgram {
       throw new AutoSolError(
         "Failed to fetch payment schedules",
         "FETCH_SCHEDULES_ERROR",
+        error as Error
+      );
+    }
+  }
+
+  /**
+   * Get all payment schedules where the given address is the recipient (incoming transactions)
+   */
+  public async getSchedulesForRecipient(
+    recipientAddress?: PublicKey
+  ): Promise<ScheduleWithAddress[]> {
+    try {
+      const recipient = recipientAddress || this.program.provider.publicKey;
+
+      if (!recipient) {
+        throw new AutoSolError("No recipient specified", "INVALID_RECIPIENT");
+      }
+
+      this.logger("Fetching schedules for recipient:", recipient.toString());
+
+      const schedules = await this.program.account.paymentSchedule.all([
+        {
+          memcmp: {
+            offset: 8 + 32 + 8 + 8 + 8, // Skip discriminator + owner + totalAmount + remainingAmount + paymentAmount
+            bytes: recipient.toBase58(),
+          },
+        },
+      ]);
+
+      console.log("incoming schedules", schedules);
+
+      const schedulesWithData: ScheduleWithAddress[] = schedules.map(
+        (schedule) => ({
+          address: schedule.publicKey,
+          data: {
+            owner: schedule.account.owner,
+            totalAmount: schedule.account.totalAmount,
+            remainingAmount: schedule.account.remainingAmount,
+            paymentAmount: schedule.account.paymentAmount,
+            recipient: schedule.account.recipient,
+            payments: schedule.account.payments.map(
+              (payment: {
+                scheduledTime: anchor.BN;
+                executed: boolean;
+                executionTime: anchor.BN;
+                txSignature: PublicKey | null;
+              }) => ({
+                scheduledTime: payment.scheduledTime,
+                executed: payment.executed,
+                executionTime: payment.executionTime,
+                txSignature: payment.txSignature,
+              })
+            ),
+            createdAt: schedule.account.createdAt,
+            status: this.mapScheduleStatus(schedule.account.status),
+            memo: schedule.account.memo,
+          },
+        })
+      );
+      console.log("incoming schedulesWithData", schedulesWithData);
+      this.logger(
+        `Found ${schedulesWithData.length} incoming schedules for recipient`
+      );
+      return schedulesWithData;
+    } catch (error) {
+      this.logger("Error fetching recipient schedules:", error);
+      if (error instanceof AutoSolError) {
+        throw error;
+      }
+      throw new AutoSolError(
+        "Failed to fetch incoming payment schedules",
+        "FETCH_INCOMING_SCHEDULES_ERROR",
         error as Error
       );
     }

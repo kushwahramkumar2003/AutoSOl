@@ -39,34 +39,84 @@ import { toast } from "sonner";
 import config from "@/config";
 import { Skeleton } from "@/components/ui/skeleton";
 import * as XLSX from "xlsx";
+import { PublicKey } from "@solana/web3.js";
+import * as anchor from "@coral-xyz/anchor";
+
+// Define proper types for transactions
+interface TransactionData {
+  schedule: {
+    address: PublicKey;
+    data: {
+      owner: PublicKey;
+      totalAmount: anchor.BN;
+      remainingAmount: anchor.BN;
+      paymentAmount: anchor.BN;
+      recipient: PublicKey;
+      payments: Array<{
+        scheduledTime: anchor.BN;
+        executed: boolean;
+        executionTime: anchor.BN;
+        txSignature: PublicKey | null;
+      }>;
+      createdAt: anchor.BN;
+      status: string;
+      memo: string;
+    };
+  };
+  payment: {
+    scheduledTime: anchor.BN;
+    executed: boolean;
+    executionTime: anchor.BN;
+    txSignature: PublicKey | null;
+  };
+  index: number;
+  scheduleAddress: PublicKey;
+  recipient: PublicKey;
+  amount: anchor.BN;
+  memo: string;
+  status: string;
+  txSignature: PublicKey | null;
+  scheduledTime: anchor.BN;
+  executionTime: anchor.BN;
+  isIncoming: boolean;
+}
 
 export default function TransactionsPage() {
   const { program } = useProgram();
   const wallet = useWallet();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [transactions, setTransactions] = useState<any[]>([]);
+  const [transactions, setTransactions] = useState<TransactionData[]>([]);
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
-  const [copiedTx, setCopiedTx] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   // Pagination (simple client-side for now)
   const [page, setPage] = useState(1);
   const pageSize = 10;
 
-  // Fetch transactions for the connected wallet
+  // Fetch transactions for the connected wallet (both outgoing and incoming)
   useEffect(() => {
     const fetchTxs = async () => {
       if (!wallet.publicKey || !program) return;
       setLoading(true);
       setError(null);
       try {
-        // For demo, use getSchedulesForOwner and flatten payments
-        const schedules = await program.getSchedulesForOwner(wallet.publicKey);
+        // Fetch outgoing transactions (where user is owner)
+        const outgoingSchedules = await program.getSchedulesForOwner(
+          wallet.publicKey
+        );
+
+        // Fetch incoming transactions (where user is recipient)
+        const incomingSchedules = await program.getSchedulesForRecipient(
+          wallet.publicKey
+        );
+
         // Flatten all payments from all schedules
-        const txs: any[] = [];
-        schedules.forEach((schedule) => {
+        const txs: TransactionData[] = [];
+
+        // Process outgoing transactions
+        outgoingSchedules.forEach((schedule) => {
           schedule.data.payments.forEach((p, idx) => {
             txs.push({
               schedule,
@@ -80,16 +130,40 @@ export default function TransactionsPage() {
               txSignature: p.txSignature,
               scheduledTime: p.scheduledTime,
               executionTime: p.executionTime,
+              isIncoming: false,
             });
           });
         });
+
+        // Process incoming transactions
+        incomingSchedules.forEach((schedule) => {
+          schedule.data.payments.forEach((p, idx) => {
+            txs.push({
+              schedule,
+              payment: p,
+              index: idx,
+              scheduleAddress: schedule.address,
+              recipient: schedule.data.recipient,
+              amount: schedule.data.paymentAmount,
+              memo: schedule.data.memo,
+              status: p.executed ? "completed" : "pending",
+              txSignature: p.txSignature,
+              scheduledTime: p.scheduledTime,
+              executionTime: p.executionTime,
+              isIncoming: true,
+            });
+          });
+        });
+
         // Sort by scheduledTime desc
         txs.sort(
           (a, b) => b.scheduledTime.toNumber() - a.scheduledTime.toNumber()
         );
         setTransactions(txs);
-      } catch (err: any) {
-        setError(err?.message || "Failed to fetch transactions");
+      } catch (err: unknown) {
+        const errorMessage =
+          err instanceof Error ? err.message : "Failed to fetch transactions";
+        setError(errorMessage);
       } finally {
         setLoading(false);
       }
@@ -116,17 +190,14 @@ export default function TransactionsPage() {
     }
     if (filterType !== "all") {
       txs = txs.filter((tx) => {
-        // For demo, incoming if recipient is wallet, outgoing otherwise
-        const isIncoming =
-          tx.recipient?.toString() === wallet.publicKey?.toString();
-        return filterType === "incoming" ? isIncoming : !isIncoming;
+        return filterType === "incoming" ? tx.isIncoming : !tx.isIncoming;
       });
     }
     if (filterStatus !== "all") {
       txs = txs.filter((tx) => tx.status === filterStatus);
     }
     return txs;
-  }, [transactions, search, filterType, filterStatus, wallet.publicKey]);
+  }, [transactions, search, filterType, filterStatus]);
 
   // Pagination
   const pagedTxs = useMemo(() => {
@@ -135,13 +206,13 @@ export default function TransactionsPage() {
   }, [filteredTxs, page]);
 
   // Helper for formatting
-  const formatLamports = (bn: any) => {
+  const formatLamports = (bn: anchor.BN) => {
     if (!bn || typeof bn.toNumber !== "function") return "0";
     return (bn.toNumber() / 1e9).toLocaleString(undefined, {
       maximumFractionDigits: 4,
     });
   };
-  const formatDateTime = (bn: any) => {
+  const formatDateTime = (bn: anchor.BN) => {
     if (!bn || typeof bn.toNumber !== "function") return "-";
     const date = new Date(bn.toNumber() * 1000);
     return date.toLocaleString(undefined, {
@@ -164,16 +235,14 @@ export default function TransactionsPage() {
     try {
       // Prepare data for Excel export
       const exportData = filteredTxs.map((tx) => {
-        const isIncoming =
-          tx.recipient?.toString() === wallet.publicKey?.toString();
         let status = tx.status;
         if (tx.schedule?.data?.status?.toLowerCase() === "cancelled") {
           status = "cancelled";
         }
 
         return {
-          Type: isIncoming ? "Incoming" : "Outgoing",
-          Amount: `${isIncoming ? "+" : "-"}${formatLamports(tx.amount)} SOL`,
+          Type: tx.isIncoming ? "Incoming" : "Outgoing",
+          Amount: `${tx.isIncoming ? "+" : "-"}${formatLamports(tx.amount)} SOL`,
           "Amount (SOL)": parseFloat(formatLamports(tx.amount)),
           Recipient: tx.recipient?.toString() || "",
           "Schedule Address": tx.scheduleAddress?.toString() || "",
@@ -270,9 +339,14 @@ export default function TransactionsPage() {
             <div className="flex gap-2">
               <Button
                 variant={filterType === "all" ? "default" : "outline"}
-                className="border-white/10 bg-dark-300 hover:bg-white/10"
                 onClick={() =>
-                  setFilterType(filterType === "all" ? "outgoing" : "all")
+                  setFilterType(
+                    filterType === "all"
+                      ? "outgoing"
+                      : filterType === "outgoing"
+                        ? "incoming"
+                        : "all"
+                  )
                 }
               >
                 <Filter className="h-4 w-4 mr-2" />
@@ -283,9 +357,14 @@ export default function TransactionsPage() {
               </Button>
               <Button
                 variant={filterStatus === "all" ? "default" : "outline"}
-                className="border-white/10 bg-dark-300 hover:bg-white/10"
                 onClick={() =>
-                  setFilterStatus(filterStatus === "all" ? "completed" : "all")
+                  setFilterStatus(
+                    filterStatus === "all"
+                      ? "completed"
+                      : filterStatus === "completed"
+                        ? "pending"
+                        : "all"
+                  )
                 }
               >
                 <Calendar className="h-4 w-4 mr-2" />
@@ -313,9 +392,9 @@ export default function TransactionsPage() {
                   <TableHead className="text-white/70">Recipient</TableHead>
                   <TableHead className="text-white/70">Date & Time</TableHead>
                   <TableHead className="text-white/70">Status</TableHead>
-                  <TableHead className="text-white/70">Tx</TableHead>
+                  <TableHead className="text-white/70">Actions</TableHead>
                   <TableHead className="text-white/70 text-right">
-                    Actions
+                    More
                   </TableHead>
                 </TableRow>
               </TableHeader>
@@ -341,8 +420,6 @@ export default function TransactionsPage() {
                   </TableRow>
                 ) : (
                   pagedTxs.map((tx, idx) => {
-                    const isIncoming =
-                      tx.recipient?.toString() === wallet.publicKey?.toString();
                     // Handle cancelled status
                     let status = tx.status;
                     if (
@@ -364,25 +441,25 @@ export default function TransactionsPage() {
                             <div
                               className={cn(
                                 "w-8 h-8 rounded-full flex items-center justify-center",
-                                isIncoming
+                                tx.isIncoming
                                   ? "bg-[#10B981]/20"
                                   : "bg-[#6E56CF]/20"
                               )}
                             >
-                              {isIncoming ? (
+                              {tx.isIncoming ? (
                                 <ArrowDownRight className="h-4 w-4 text-[#10B981]" />
                               ) : (
                                 <ArrowUpRight className="h-4 w-4 text-[#6E56CF]" />
                               )}
                             </div>
                             <span className="capitalize">
-                              {isIncoming ? "incoming" : "outgoing"}
+                              {tx.isIncoming ? "incoming" : "outgoing"}
                             </span>
                           </div>
                         </TableCell>
                         <TableCell>
                           <div className="font-medium">
-                            {isIncoming ? "+" : "-"}
+                            {tx.isIncoming ? "+" : "-"}
                             {formatLamports(tx.amount)} SOL
                           </div>
                         </TableCell>
@@ -432,32 +509,28 @@ export default function TransactionsPage() {
                           <div className="flex items-center gap-2">
                             {tx.txSignature ? (
                               <>
-                                <code className="bg-white/10 px-1 rounded text-white font-mono truncate max-w-[90px] md:max-w-[160px]">
-                                  {tx.txSignature.toString().slice(0, 6)}...
-                                  {tx.txSignature.toString().slice(-6)}
-                                </code>
                                 <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="h-6 w-6 p-0"
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-8 px-2 text-xs border-white/10 bg-dark-300 hover:bg-white/10"
                                   onClick={() => {
                                     navigator.clipboard.writeText(
-                                      tx.txSignature.toString()
+                                      tx.txSignature!.toString()
                                     );
-                                    setCopiedTx(tx.txSignature.toString());
                                     toast.success("Copied to clipboard");
-                                    setTimeout(() => setCopiedTx(null), 1200);
                                   }}
                                 >
-                                  <Copy className="h-3 w-3" />
+                                  <Copy className="h-3 w-3 mr-1" />
+                                  Copy
                                 </Button>
                                 <a
                                   href={`https://explorer.solana.com/tx/${tx.txSignature.toString()}?cluster=${config.rpcEndpoint === "http://127.0.0.1:8899" ? "custom" : "devnet"}`}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="text-blue-400 hover:underline ml-1"
+                                  className="inline-flex items-center justify-center h-8 px-2 text-xs bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 rounded border border-blue-500/30"
                                 >
-                                  <ExternalLink className="h-3 w-3 inline" />
+                                  <ExternalLink className="h-3 w-3 mr-1" />
+                                  View
                                 </a>
                               </>
                             ) : (
@@ -488,11 +561,9 @@ export default function TransactionsPage() {
                                   className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
                                   onClick={() => {
                                     navigator.clipboard.writeText(
-                                      tx.txSignature.toString()
+                                      tx.txSignature!.toString()
                                     );
-                                    setCopiedTx(tx.txSignature.toString());
                                     toast.success("Copied to clipboard");
-                                    setTimeout(() => setCopiedTx(null), 1200);
                                   }}
                                 >
                                   Copy Transaction ID

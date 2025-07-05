@@ -13,7 +13,6 @@ const FEE_WITHDRAWAL_ALLOWED_KEYS: [&str; 6] = [
     "8dRCBu5V2v6JHR3HxN9zjN91WoX4FfGzgdM8nXawUbqt",
 ];
 
-
 const GLOBAL_FEE_SETTINGS_SEED: &[u8] = b"global_fee_settings";
 const GLOBAL_FEE_VAULT_SEED: &[u8] = b"global_fee_vault";
 
@@ -26,8 +25,7 @@ pub mod auto_sol {
             ctx.accounts.authority.key() == Pubkey::from_str(HTTP_BACKEND_WALLET).unwrap(),
             ErrorCode::Unauthorized
         );
-     
-       
+
         let fee_settings = &mut ctx.accounts.fee_settings;
         fee_settings.authority = ctx.accounts.authority.key();
         fee_settings.fee_percentage = 100; // 1% in basis points (100 = 1.00%)
@@ -96,7 +94,8 @@ pub mod auto_sol {
                 executed: false,
                 execution_time: 0,
                 tx_signature: None,
-            }).collect();
+            })
+            .collect();
 
         // Transfer SOL to payment vault
         let cpi_context = CpiContext::new(
