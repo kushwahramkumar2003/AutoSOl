@@ -2,7 +2,7 @@ import { idl } from "@/program/idl";
 import { AutoSol } from "@/program/types";
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
-import { PublicKey, Connection, Keypair, SystemProgram } from "@solana/web3.js";
+import { PublicKey, Connection, Keypair } from "@solana/web3.js";
 
 // Constants - Update these with your actual deployed addresses
 const GLOBAL_FEE_SETTINGS_SEED = "global_fee_settings";

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import type { PaymentScheduleFormData } from "@/components/dashboard/payments/new-payment-form";
 import { ArrowRight, Calendar, Check, ExternalLink, Copy } from "lucide-react";
 import confetti from "canvas-confetti";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 
@@ -21,8 +21,6 @@ export default function SuccessStep({
   scheduleAddress,
   onDone,
 }: SuccessStepProps) {
-  const [copied, setCopied] = useState(false);
-
   // Trigger confetti effect on component mount
   useEffect(() => {
     const duration = 3 * 1000;
@@ -33,7 +31,7 @@ export default function SuccessStep({
       return Math.random() * (max - min) + min;
     }
 
-    const interval: any = setInterval(() => {
+    const interval: NodeJS.Timeout = setInterval(() => {
       const timeLeft = animationEnd - Date.now();
 
       if (timeLeft <= 0) {
@@ -67,11 +65,7 @@ export default function SuccessStep({
 
   const copyToClipboard = (text: string, type: string) => {
     navigator.clipboard.writeText(text);
-    setCopied(true);
-    toast({
-      description: `${type} has been copied to your clipboard.`,
-    });
-    setTimeout(() => setCopied(false), 2000);
+    toast.success(`${type} has been copied to your clipboard.`);
   };
 
   const explorerUrl = txSignature
@@ -83,7 +77,11 @@ export default function SuccessStep({
       <motion.div
         initial={{ scale: 0, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        transition={{ type: "spring", stiffness: 300, damping: 20 }}
+        transition={{
+          type: "spring" as const,
+          stiffness: 300,
+          damping: 20,
+        }}
         className="w-20 h-20 rounded-full bg-[#10B981]/20 flex items-center justify-center mx-auto mb-6"
       >
         <Check className="h-10 w-10 text-[#10B981]" />

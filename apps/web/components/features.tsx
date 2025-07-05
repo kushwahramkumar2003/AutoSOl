@@ -98,17 +98,17 @@ export default function Features() {
   };
 
   const featureVariants = {
-    hidden: { opacity: 0, y: 30 },
+    hidden: { opacity: 0, y: 20 },
     visible: {
       opacity: 1,
       y: 0,
       transition: {
-        type: "spring",
-        damping: 15,
+        type: "spring" as const,
+        damping: 20,
         stiffness: 100,
       },
     },
-  };
+  } as const;
 
   const handleMouseMove = (e: React.MouseEvent, index: number) => {
     if (hoveredIndex === index) {

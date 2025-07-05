@@ -43,13 +43,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   Dialog,
-  DialogClose,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -68,10 +65,8 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { toast } from "sonner";
 import config from "@/config";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Label } from "@/components/ui/label";
 import {
   AlertDialog,
-  AlertDialogTrigger,
   AlertDialogContent,
   AlertDialogHeader,
   AlertDialogTitle,
@@ -81,6 +76,7 @@ import {
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
 import { useRouter } from "next/navigation";
+import * as anchor from "@coral-xyz/anchor";
 
 type FilterType = "all" | "active" | "completed" | "paused";
 type SortType =
@@ -90,6 +86,10 @@ type SortType =
   | "amount_low"
   | "remaining_high"
   | "remaining_low";
+
+interface CustomError extends Error {
+  code?: string;
+}
 
 export default function PaymentsPage() {
   const { program } = useProgram();
@@ -133,14 +133,14 @@ export default function PaymentsPage() {
   }, [fetchPayments]);
 
   // Helper functions
-  const formatLamports = (bn: any) => {
+  const formatLamports = (bn: anchor.BN) => {
     if (!bn || typeof bn.toNumber !== "function") return "0";
     return (bn.toNumber() / 1e9).toLocaleString(undefined, {
       maximumFractionDigits: 4,
     });
   };
 
-  const formatDate = (bn: any) => {
+  const formatDate = (bn: anchor.BN) => {
     if (!bn || typeof bn.toNumber !== "function") return "-";
     const date = new Date(bn.toNumber() * 1000);
     return date.toLocaleDateString(undefined, {
@@ -150,7 +150,7 @@ export default function PaymentsPage() {
     });
   };
 
-  const formatDateTime = (bn: any) => {
+  const formatDateTime = (bn: anchor.BN) => {
     if (!bn || typeof bn.toNumber !== "function") return "-";
     const date = new Date(bn.toNumber() * 1000);
     return date.toLocaleString(undefined, {
@@ -321,12 +321,13 @@ export default function PaymentsPage() {
       });
       setCancelingPayment(null);
       fetchPayments();
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Try to surface the most user-friendly error message
-      let message = err?.message || String(err);
-      if (err?.code === "UNAUTHORIZED_CANCELLATION") {
+      const error = err as CustomError;
+      let message = error?.message || String(err);
+      if (error?.code === "UNAUTHORIZED_CANCELLATION") {
         message = "You are not the owner of this payment schedule.";
-      } else if (err?.code === "INVALID_SCHEDULE_STATUS") {
+      } else if (error?.code === "INVALID_SCHEDULE_STATUS") {
         message = "Only active payment schedules can be cancelled.";
       } else if (message.includes("WALLET_NOT_CONNECTED")) {
         message = "Wallet not connected.";

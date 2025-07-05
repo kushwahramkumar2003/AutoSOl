@@ -327,9 +327,12 @@ export default function ScheduleStep({ data, updateData }: ScheduleStepProps) {
     animate: {
       scale: 1,
       opacity: 1,
-      transition: { type: "spring", stiffness: 500 },
+      transition: {
+        type: "spring" as const,
+        stiffness: 300,
+      },
     },
-  };
+  } as const;
 
   const tooltipVariants = {
     hidden: { opacity: 0, y: 10 },
@@ -393,7 +396,11 @@ export default function ScheduleStep({ data, updateData }: ScheduleStepProps) {
                 <motion.div
                   layoutId="tab-indicator"
                   className="absolute inset-0 bg-gradient-to-r from-[#6E56CF] to-[#9333ea] rounded-lg"
-                  transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                  transition={{
+                    type: "spring" as const,
+                    stiffness: 300,
+                    damping: 30,
+                  }}
                 />
               )}
             </TabsTrigger>
@@ -412,7 +419,11 @@ export default function ScheduleStep({ data, updateData }: ScheduleStepProps) {
                 <motion.div
                   layoutId="tab-indicator"
                   className="absolute inset-0 bg-gradient-to-r from-[#6E56CF] to-[#9333ea] rounded-lg"
-                  transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                  transition={{
+                    type: "spring" as const,
+                    stiffness: 300,
+                    damping: 30,
+                  }}
                 />
               )}
             </TabsTrigger>

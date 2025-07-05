@@ -429,7 +429,7 @@ export default function TransactionsPage() {
                     }
                     return (
                       <TableRow
-                        key={tx.txSignature?.toString() + idx}
+                        key={`${tx.scheduleAddress.toString()}-${idx}`}
                         className={cn(
                           "border-white/10 transition-colors",
                           "hover:bg-dark-300/80",
@@ -574,7 +574,7 @@ export default function TransactionsPage() {
                                   className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
                                   onClick={() => {
                                     window.open(
-                                      `https://explorer.solana.com/tx/${tx.txSignature.toString()}?cluster=${config.rpcEndpoint === "http://127.0.0.1:8899" ? "custom" : "devnet"}`,
+                                      `https://explorer.solana.com/tx/${tx.txSignature!.toString()}?cluster=${config.rpcEndpoint === "http://127.0.0.1:8899" ? "custom" : "devnet"}`,
                                       "_blank"
                                     );
                                   }}

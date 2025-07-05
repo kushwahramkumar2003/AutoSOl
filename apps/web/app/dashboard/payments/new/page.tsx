@@ -1,9 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { PublicKey } from "@solana/web3.js";
 import DashboardHeader from "@/components/dashboard/header";
 import NewPaymentForm from "@/components/dashboard/payments/new-payment-form";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
@@ -11,12 +8,7 @@ import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function NewPaymentPage() {
-  const router = useRouter();
-  const { publicKey, connected } = useWallet();
-  const [isLoading, setIsLoading] = useState(false);
-  
-
-
+  const { connected } = useWallet();
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -49,9 +41,7 @@ export default function NewPaymentPage() {
             </div>
           </div>
         ) : (
-          <NewPaymentForm
-           
-          />
+          <NewPaymentForm />
         )}
       </div>
     </div>
