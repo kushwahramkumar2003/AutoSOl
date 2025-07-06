@@ -3,6 +3,7 @@ import { AutoSol } from "@/program/types";
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { PublicKey, Connection, Keypair } from "@solana/web3.js";
+import { BN } from "@coral-xyz/anchor";
 
 // Constants - Update these with your actual deployed addresses
 const GLOBAL_FEE_SETTINGS_SEED = "global_fee_settings";
@@ -372,142 +373,104 @@ export class AutoSolProgram {
   }
 
   /**
-   * Get all payment schedules for a given owner
+   * Get all payment schedules for a specific owner
    */
   public async getSchedulesForOwner(
-    ownerAddress?: PublicKey
+    ownerAddress: PublicKey
   ): Promise<ScheduleWithAddress[]> {
     try {
-      const owner = ownerAddress || this.program.provider.publicKey;
-
-      if (!owner) {
-        throw new AutoSolError("No owner specified", "INVALID_OWNER");
-      }
-
-      this.logger("Fetching schedules for owner:", owner.toString());
-
       const schedules = await this.program.account.paymentSchedule.all([
         {
           memcmp: {
             offset: 8, // Skip discriminator
-            bytes: owner.toBase58(),
+            bytes: ownerAddress.toBase58(),
           },
         },
       ]);
 
-      console.log("schedules", schedules);
-
-      const schedulesWithData: ScheduleWithAddress[] = schedules.map(
-        (schedule) => ({
-          address: schedule.publicKey,
-          data: {
-            owner: schedule.account.owner,
-            totalAmount: schedule.account.totalAmount,
-            remainingAmount: schedule.account.remainingAmount,
-            paymentAmount: schedule.account.paymentAmount,
-            recipient: schedule.account.recipient,
-            payments: schedule.account.payments.map(
-              (payment: {
-                scheduledTime: anchor.BN;
-                executed: boolean;
-                executionTime: anchor.BN;
-                txSignature: PublicKey | null;
-              }) => ({
-                scheduledTime: payment.scheduledTime,
-                executed: payment.executed,
-                executionTime: payment.executionTime,
-                txSignature: payment.txSignature,
-              })
-            ),
-            createdAt: schedule.account.createdAt,
-            status: this.mapScheduleStatus(schedule.account.status),
-            memo: schedule.account.memo,
-          },
-        })
-      );
-      console.log(schedulesWithData);
-      this.logger(`Found ${schedulesWithData.length} schedules for owner`);
-      return schedulesWithData;
+      return schedules.map((schedule) => ({
+        address: schedule.publicKey,
+        data: {
+          owner: schedule.account.owner,
+          totalAmount: schedule.account.totalAmount,
+          remainingAmount: schedule.account.remainingAmount,
+          paymentAmount: schedule.account.paymentAmount,
+          recipient: schedule.account.recipient,
+          payments: schedule.account.payments.map(
+            (payment: {
+              scheduledTime: BN;
+              executed: boolean;
+              executionTime: BN;
+              txSignature: PublicKey | null;
+            }) => ({
+              scheduledTime: payment.scheduledTime,
+              executed: payment.executed,
+              executionTime: payment.executionTime,
+              txSignature: payment.txSignature,
+            })
+          ),
+          createdAt: schedule.account.createdAt,
+          status: schedule.account.status as unknown as ScheduleStatus,
+          memo: schedule.account.memo,
+        },
+      }));
     } catch (error) {
-      this.logger("Error fetching owner schedules:", error);
-      if (error instanceof AutoSolError) {
-        throw error;
-      }
+      this.logger("Error fetching schedules for owner:", error);
       throw new AutoSolError(
         "Failed to fetch payment schedules",
-        "FETCH_SCHEDULES_ERROR",
+        "SCHEDULES_FETCH_ERROR",
         error as Error
       );
     }
   }
 
   /**
-   * Get all payment schedules where the given address is the recipient (incoming transactions)
+   * Get all payment schedules where the given address is the recipient (incoming payments)
    */
   public async getSchedulesForRecipient(
-    recipientAddress?: PublicKey
+    recipientAddress: PublicKey
   ): Promise<ScheduleWithAddress[]> {
     try {
-      const recipient = recipientAddress || this.program.provider.publicKey;
-
-      if (!recipient) {
-        throw new AutoSolError("No recipient specified", "INVALID_RECIPIENT");
-      }
-
-      this.logger("Fetching schedules for recipient:", recipient.toString());
-
       const schedules = await this.program.account.paymentSchedule.all([
         {
           memcmp: {
             offset: 8 + 32 + 8 + 8 + 8, // Skip discriminator + owner + totalAmount + remainingAmount + paymentAmount
-            bytes: recipient.toBase58(),
+            bytes: recipientAddress.toBase58(),
           },
         },
       ]);
 
-      console.log("incoming schedules", schedules);
-
-      const schedulesWithData: ScheduleWithAddress[] = schedules.map(
-        (schedule) => ({
-          address: schedule.publicKey,
-          data: {
-            owner: schedule.account.owner,
-            totalAmount: schedule.account.totalAmount,
-            remainingAmount: schedule.account.remainingAmount,
-            paymentAmount: schedule.account.paymentAmount,
-            recipient: schedule.account.recipient,
-            payments: schedule.account.payments.map(
-              (payment: {
-                scheduledTime: anchor.BN;
-                executed: boolean;
-                executionTime: anchor.BN;
-                txSignature: PublicKey | null;
-              }) => ({
-                scheduledTime: payment.scheduledTime,
-                executed: payment.executed,
-                executionTime: payment.executionTime,
-                txSignature: payment.txSignature,
-              })
-            ),
-            createdAt: schedule.account.createdAt,
-            status: this.mapScheduleStatus(schedule.account.status),
-            memo: schedule.account.memo,
-          },
-        })
-      );
-      console.log("incoming schedulesWithData", schedulesWithData);
-      this.logger(
-        `Found ${schedulesWithData.length} incoming schedules for recipient`
-      );
-      return schedulesWithData;
+      return schedules.map((schedule) => ({
+        address: schedule.publicKey,
+        data: {
+          owner: schedule.account.owner,
+          totalAmount: schedule.account.totalAmount,
+          remainingAmount: schedule.account.remainingAmount,
+          paymentAmount: schedule.account.paymentAmount,
+          recipient: schedule.account.recipient,
+          payments: schedule.account.payments.map(
+            (payment: {
+              scheduledTime: BN;
+              executed: boolean;
+              executionTime: BN;
+              txSignature: PublicKey | null;
+            }) => ({
+              scheduledTime: payment.scheduledTime,
+              executed: payment.executed,
+              executionTime: payment.executionTime,
+              txSignature: payment.txSignature,
+            })
+          ),
+          createdAt: schedule.account.createdAt,
+          status: schedule.account.status as unknown as ScheduleStatus,
+          memo: schedule.account.memo,
+        },
+      }));
     } catch (error) {
-      this.logger("Error fetching recipient schedules:", error);
-      if (error instanceof AutoSolError) {
-        throw error;
-      }
+      this.logger("Error fetching schedules for recipient:", error);
       throw new AutoSolError(
         "Failed to fetch incoming payment schedules",
-        "FETCH_INCOMING_SCHEDULES_ERROR",
+        "INCOMING_SCHEDULES_FETCH_ERROR",
         error as Error
       );
     }
@@ -518,7 +481,13 @@ export class AutoSolProgram {
    */
   public async getActiveSchedules(): Promise<ScheduleWithAddress[]> {
     try {
-      const allSchedules = await this.getSchedulesForOwner();
+      if (!this.program.provider.publicKey) {
+        throw new AutoSolError("Wallet not connected", "WALLET_NOT_CONNECTED");
+      }
+
+      const allSchedules = await this.getSchedulesForOwner(
+        this.program.provider.publicKey
+      );
       return allSchedules.filter(
         (schedule) => schedule.data.status === ScheduleStatus.Active
       );
@@ -544,7 +513,13 @@ export class AutoSolProgram {
     totalAmountRemaining: number;
   }> {
     try {
-      const allSchedules = await this.getSchedulesForOwner();
+      if (!this.program.provider.publicKey) {
+        throw new AutoSolError("Wallet not connected", "WALLET_NOT_CONNECTED");
+      }
+
+      const allSchedules = await this.getSchedulesForOwner(
+        this.program.provider.publicKey
+      );
 
       const stats = {
         totalSchedules: allSchedules.length,
