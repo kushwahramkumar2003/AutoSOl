@@ -3,7 +3,7 @@ use std::str::FromStr;
 
 declare_id!("98g9uR7WZqinAnSeUgB5nUw3pbR6sNwFuYWW78yPHtva");
 
-const HTTP_BACKEND_WALLET: &str = "8dRCBu5V2v6JHR3HxN9zjN91WoX4FfGzgdM8nXawUbqt";
+const HTTP_BACKEND_WALLET: &str = "G8UmesEhavARgE6xTWbDq6iHvdp8W2yo4pbrW4jLsHxh";
 const FEE_WITHDRAWAL_ALLOWED_KEYS: [&str; 6] = [
     "FxfMxvBecat982M1DpeCwqWRRc4gk35UZH5bhaFqVoDX",
     "9KP44gv69EoXN2aB71u1HoYy5ZSZjXTpyYXygJ9phwCN",

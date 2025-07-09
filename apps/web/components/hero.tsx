@@ -14,8 +14,10 @@ import {
 } from "lucide-react";
 import NetworkBackground from "@/components/network-background";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 
 export default function Hero() {
+  const router = useRouter();
   const statsRef = useRef<HTMLDivElement>(null);
   const isInView = useInView(statsRef, { once: true, amount: 0.3 });
   const [hoverWallet, setHoverWallet] = useState<number | null>(null);
@@ -115,7 +117,13 @@ export default function Hero() {
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4">
-              <Button className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white  py-3 h-auto text-lg group shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 transition-all duration-300">
+              <Button
+              onClick={
+                  ()=>{
+                    router.push("/auth")
+                  }
+              }
+              className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white  py-3 h-auto text-lg group shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 transition-all duration-300">
                 Get Started
                 <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
               </Button>
@@ -184,9 +192,9 @@ export default function Hero() {
                         <Image
                           src={wallet.logo}
                           alt={wallet.name}
-                          width={32}
-                          height={32}
-                          className="h-8 object-contain"
+                          width={130}
+                          height={50}
+                          className="h-6 object-contain"
                         />
                       </motion.div>
                     ))}

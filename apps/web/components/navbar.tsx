@@ -82,31 +82,8 @@ export default function Navbar({
   const publicLinks: NavLink[] = [
     { href: "/#features", label: "Features" },
     { href: "/#how-it-works", label: "How It Works" },
-    {
-      href: "#",
-      label: "Resources",
-      children: [
-        {
-          href: "/docs",
-          label: "Documentation",
-          icon: <FileText className="w-4 h-4 mr-2" />,
-        },
-        {
-          href: "/guides",
-          label: "Guides",
-          icon: <BookOpen className="w-4 h-4 mr-2" />,
-        },
-        {
-          href: "/help",
-          label: "FAQs",
-          icon: <HelpCircle className="w-4 h-4 mr-2" />,
-        },
-      ],
-    },
-    { href: "/#pricing", label: "Pricing" },
   ];
 
-  // Authenticated navigation links
   const authLinks: NavLink[] = [
     {
       href: "/dashboard",
@@ -117,28 +94,6 @@ export default function Navbar({
       href: "/analytics",
       label: "Analytics",
       icon: <BarChart3 className="w-4 h-4 mr-2" />,
-    },
-    {
-      href: "#",
-      label: "Resources",
-      icon: <FileText className="w-4 h-4 mr-2" />,
-      children: [
-        {
-          href: "/docs",
-          label: "Documentation",
-          icon: <FileText className="w-4 h-4 mr-2" />,
-        },
-        {
-          href: "/guides",
-          label: "Guides",
-          icon: <BookOpen className="w-4 h-4 mr-2" />,
-        },
-        {
-          href: "/help",
-          label: "Help Center",
-          icon: <HelpCircle className="w-4 h-4 mr-2" />,
-        },
-      ],
     },
   ];
 
@@ -309,17 +264,6 @@ export default function Navbar({
             </>
           ) : (
             <>
-              <Button
-                variant="outline"
-                className="border-border/60 text-foreground hover:bg-muted hover:text-foreground hover:border-blue-500/30 transition-all focus-visible:ring-2 focus-visible:ring-blue-500/40 rounded-lg"
-                asChild
-              >
-                <Link href="/docs">
-                  <BookOpen className="mr-2 h-4 w-4 text-blue-400" />
-                  Documentation
-                </Link>
-              </Button>
-
               <WalletConnect />
             </>
           )}
