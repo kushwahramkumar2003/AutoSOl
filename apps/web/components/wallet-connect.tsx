@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { PublicKey, Connection } from "@solana/web3.js";
@@ -37,6 +37,8 @@ import {
   Coins,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import config from "@/config";
+import { useProgram } from "@/hooks/use-program";
 
 export type NetworkType = "mainnet-beta" | "devnet" | "testnet" | "localnet";
 
@@ -56,11 +58,15 @@ export interface WalletConnectProps {
   maxHistoryItems?: number;
 }
 
-interface Transaction {
+// Define a Transaction type for local use
+interface WalletTransaction {
+  type: "incoming" | "outgoing";
+  status: "confirmed" | "pending";
   signature: string;
   timestamp: number;
-  status: "confirmed" | "pending" | "failed";
-  type: string;
+  amount: number;
+  recipient: string;
+  memo: string;
 }
 
 const truncateAddress = (
@@ -123,46 +129,97 @@ export function WalletConnect({
   maxHistoryItems = 5,
 }: WalletConnectProps) {
   const { publicKey, disconnect, connected, wallet, connecting } = useWallet();
+  const { program } = useProgram();
   const [isWalletDialogOpen, setIsWalletDialogOpen] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [currentNetwork, setCurrentNetwork] = useState<NetworkType>(network);
   const [balance, setBalance] = useState<number | null>(null);
   const [isBalanceLoading, setIsBalanceLoading] = useState(false);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [txLoading, setTxLoading] = useState(false);
+  const [txError, setTxError] = useState<string | null>(null);
+
+  // Use a single Connection instance from config
+  const connection = useMemo(
+    () => new Connection(config.rpcEndpoint, "confirmed"),
+    []
+  );
 
   // Fetch balance when connected
   useEffect(() => {
     const fetchBalance = async () => {
       if (!publicKey || !showBalance) return;
-
       try {
         setIsBalanceLoading(true);
-        const endpoint = getEndpointForNetwork(currentNetwork);
-        const connection = new Connection(endpoint, "confirmed");
         const balance = await connection.getBalance(publicKey);
-        setBalance(balance / 1000000000); // Convert lamports to SOL
-      } catch (error) {
-        console.error("Failed to fetch balance:", error);
+        setBalance(balance / 1e9); // Convert lamports to SOL
+      } catch {
+        setBalance(null);
         toast.error("Failed to fetch wallet balance");
       } finally {
         setIsBalanceLoading(false);
       }
     };
-
     fetchBalance();
-    // Fetch mock transaction history for demo purposes
-    if (connected && showTransactionHistory) {
-      fetchMockTransactionHistory();
-    }
-  }, [
-    publicKey,
-    connected,
-    currentNetwork,
-    showBalance,
-    showTransactionHistory,
-  ]);
+  }, [publicKey, showBalance, connection]);
+
+  // Fetch real transaction history
+  useEffect(() => {
+    const fetchTransactions = async () => {
+      if (!publicKey || !program || !showTransactionHistory) {
+        setTransactions([]);
+        return;
+      }
+      setTxLoading(true);
+      setTxError(null);
+      try {
+        // Outgoing (owner) and incoming (recipient)
+        const [outgoing, incoming] = await Promise.all([
+          program.getSchedulesForOwner(publicKey),
+          program.getSchedulesForRecipient(publicKey),
+        ]);
+        const txs: WalletTransaction[] = [];
+        outgoing.forEach((schedule) => {
+          schedule.data.payments.forEach((p) => {
+            txs.push({
+              type: "outgoing",
+              status: p.executed ? "confirmed" : "pending",
+              signature: p.txSignature ? p.txSignature.toString() : "-",
+              timestamp:
+                p.executionTime?.toNumber() || p.scheduledTime?.toNumber() || 0,
+              amount: schedule.data.paymentAmount.toNumber() / 1e9,
+              recipient: schedule.data.recipient.toString(),
+              memo: schedule.data.memo,
+            });
+          });
+        });
+        incoming.forEach((schedule) => {
+          schedule.data.payments.forEach((p) => {
+            txs.push({
+              type: "incoming",
+              status: p.executed ? "confirmed" : "pending",
+              signature: p.txSignature ? p.txSignature.toString() : "-",
+              timestamp:
+                p.executionTime?.toNumber() || p.scheduledTime?.toNumber() || 0,
+              amount: schedule.data.paymentAmount.toNumber() / 1e9,
+              recipient: schedule.data.owner.toString(),
+              memo: schedule.data.memo,
+            });
+          });
+        });
+        // Sort by timestamp desc, limit
+        txs.sort((a, b) => b.timestamp - a.timestamp);
+        setTransactions(txs.slice(0, maxHistoryItems));
+      } catch {
+        setTxError("Failed to fetch transactions");
+        setTransactions([]);
+      } finally {
+        setTxLoading(false);
+      }
+    };
+    fetchTransactions();
+  }, [publicKey, program, showTransactionHistory, maxHistoryItems]);
 
   // Handle connection status changes
   useEffect(() => {
@@ -170,46 +227,6 @@ export function WalletConnect({
       onConnect(publicKey);
     }
   }, [connected, publicKey, onConnect]);
-
-  const getEndpointForNetwork = (net: NetworkType): string => {
-    switch (net) {
-      case "mainnet-beta":
-        return "https://api.mainnet-beta.solana.com";
-      case "devnet":
-        return "https://api.devnet.solana.com";
-      case "testnet":
-        return "https://api.testnet.solana.com";
-      case "localnet":
-        return "http://localhost:8899";
-      default:
-        return "https://api.devnet.solana.com";
-    }
-  };
-
-  const fetchMockTransactionHistory = () => {
-    // This is a mock function - in a real app, you'd fetch real transaction history
-    const mockTypes = [
-      "Transfer",
-      "Swap",
-      "Stake",
-      "NFT Purchase",
-      "Token Mint",
-    ];
-    const mockStatuses = ["confirmed", "pending", "failed"] as const;
-
-    const mockTransactions: Transaction[] = Array(maxHistoryItems)
-      .fill(0)
-      // eslint-disable-next-line
-      .map((_, i) => ({
-        signature: `${Math.random().toString(36).substring(2, 10)}...${Math.random().toString(36).substring(2, 6)}`,
-        timestamp:
-          Date.now() - Math.floor(Math.random() * 7 * 24 * 60 * 60 * 1000),
-        status: mockStatuses[Math.floor(Math.random() * mockStatuses.length)],
-        type: mockTypes[Math.floor(Math.random() * mockTypes.length)],
-      }));
-
-    setTransactions(mockTransactions.sort((a, b) => b.timestamp - a.timestamp));
-  };
 
   const handleCopyAddress = useCallback(async () => {
     if (publicKey) {
@@ -249,15 +266,11 @@ export function WalletConnect({
 
   const handleExplorerLink = useCallback(() => {
     if (publicKey) {
-      window.open(
-        getExplorerUrl(publicKey.toBase58(), currentNetwork),
-        "_blank"
-      );
+      window.open(getExplorerUrl(publicKey.toBase58(), network), "_blank");
     }
-  }, [publicKey, currentNetwork]);
+  }, [publicKey, network]);
 
   const switchNetwork = (newNetwork: NetworkType) => {
-    setCurrentNetwork(newNetwork);
     toast.success(`Network switched to ${newNetwork}`, {
       description: `You are now connected to ${newNetwork}`,
       icon: <Network className="h-4 w-4" />,
@@ -266,19 +279,14 @@ export function WalletConnect({
 
   const refreshBalance = async () => {
     if (!publicKey || !showBalance) return;
-
     try {
       setIsRefreshing(true);
-      const endpoint = getEndpointForNetwork(currentNetwork);
-      const connection = new Connection(endpoint, "confirmed");
       const balance = await connection.getBalance(publicKey);
-      setBalance(balance / 1000000000); // Convert lamports to SOL
-
+      setBalance(balance / 1e9);
       toast.success("Balance refreshed", {
         description: "Your wallet balance has been updated",
       });
-    } catch (error) {
-      console.log(error);
+    } catch {
       toast.error("Failed to refresh balance", {
         description: "Please try again later",
       });
@@ -287,8 +295,11 @@ export function WalletConnect({
     }
   };
 
+  // Fix: formatTransactionDate to use correct timestamp (seconds to ms)
   const formatTransactionDate = (timestamp: number): string => {
-    const date = new Date(timestamp);
+    if (!timestamp) return "-";
+    // If timestamp is in seconds, convert to ms
+    const date = new Date(timestamp < 1e12 ? timestamp * 1000 : timestamp);
     return (
       date.toLocaleDateString() +
       " " +
@@ -301,13 +312,10 @@ export function WalletConnect({
       {connected && showNetworkBadge && (
         <Badge
           variant="outline"
-          className={cn(
-            "h-6 px-2 font-medium",
-            getNetworkColor(currentNetwork)
-          )}
+          className={cn("h-6 px-2 font-medium", getNetworkColor(network))}
           onClick={() => allowNetworkChange && setIsWalletDialogOpen(true)}
         >
-          {currentNetwork}
+          {network}
         </Badge>
       )}
 
@@ -448,12 +456,12 @@ export function WalletConnect({
               </DropdownMenuItem>
             </DropdownMenuGroup>
 
-            {showTransactionHistory && transactions.length > 0 && (
+            {showTransactionHistory && (
               <>
                 <DropdownMenuSeparator className="bg-primary/10" />
 
                 <DropdownMenuLabel className="px-3 pt-2 pb-1">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between custom-scrollbar">
                     <p className="text-xs text-muted-foreground">
                       Recent Transactions
                     </p>
@@ -462,7 +470,7 @@ export function WalletConnect({
                       size="icon"
                       className="h-5 w-5"
                       onClick={() => {
-                        fetchMockTransactionHistory();
+                        refreshBalance(); // Re-fetch balance and transactions
                         toast.success("Transactions refreshed", {
                           description:
                             "Your transaction history has been updated",
@@ -474,45 +482,69 @@ export function WalletConnect({
                   </div>
                 </DropdownMenuLabel>
 
-                <div className="max-h-40 overflow-y-auto scrollbar-thin px-1">
-                  {transactions.map((tx, index) => (
-                    <div
-                      key={index}
-                      className="text-xs p-2 hover:bg-primary/5 rounded-md cursor-pointer mb-1"
-                      onClick={() => {
-                        toast.info(`Transaction details for ${tx.signature}`, {
-                          description: `${tx.type} transaction (${tx.status}) on ${formatTransactionDate(tx.timestamp)}`,
-                          icon: <History className="h-4 w-4" />,
-                        });
-                      }}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="font-medium">{tx.type}</div>
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            "px-1.5 py-0 text-[10px] font-normal",
-                            tx.status === "confirmed"
-                              ? "bg-green-500/10 text-green-600 border-green-500/20"
-                              : tx.status === "pending"
-                                ? "bg-yellow-500/10 text-yellow-600 border-yellow-500/20"
-                                : "bg-red-500/10 text-red-600 border-red-500/20"
-                          )}
-                        >
-                          {tx.status}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center justify-between mt-1">
-                        <div className="text-muted-foreground">
-                          {formatTransactionDate(tx.timestamp)}
+                {txLoading && (
+                  <div className="text-center py-4">
+                    <RefreshCw className="h-6 w-6 animate-spin text-primary" />
+                    <p className="text-sm text-muted-foreground">
+                      Loading transactions...
+                    </p>
+                  </div>
+                )}
+                {txError && (
+                  <div className="text-center py-4 text-red-500">
+                    <AlertTriangle className="h-6 w-6" />
+                    <p className="text-sm">{txError}</p>
+                  </div>
+                )}
+                {!txLoading && transactions.length === 0 && (
+                  <div className="text-center py-4 text-muted-foreground">
+                    No transactions found.
+                  </div>
+                )}
+                {!txLoading && transactions.length > 0 && (
+                  <div className="max-h-40 overflow-y-auto scrollbar-thin px-1 custom-scrollbar">
+                    {transactions.map((tx, index) => (
+                      <div
+                        key={index}
+                        className="text-xs p-2 hover:bg-primary/5 rounded-md cursor-pointer mb-1"
+                        onClick={() => {
+                          toast.info(
+                            `Transaction details for ${tx.signature}`,
+                            {
+                              description: `${tx.type} transaction (${tx.status}) on ${formatTransactionDate(tx.timestamp)}`,
+                              icon: <History className="h-4 w-4" />,
+                            }
+                          );
+                        }}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="font-medium">{tx.type}</div>
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "px-1.5 py-0 text-[10px] font-normal",
+                              tx.status === "confirmed"
+                                ? "bg-green-500/10 text-green-600 border-green-500/20"
+                                : tx.status === "pending"
+                                  ? "bg-yellow-500/10 text-yellow-600 border-yellow-500/20"
+                                  : "bg-red-500/10 text-red-600 border-red-500/20"
+                            )}
+                          >
+                            {tx.status}
+                          </Badge>
                         </div>
-                        <div className="text-muted-foreground">
-                          {tx.signature}
+                        <div className="flex items-center justify-between mt-1">
+                          <div className="text-muted-foreground">
+                            {formatTransactionDate(tx.timestamp)}
+                          </div>
+                          <div className="text-muted-foreground">
+                            {tx.signature}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </>
             )}
 
@@ -555,11 +587,11 @@ export function WalletConnect({
                     (net) => (
                       <Button
                         key={net}
-                        variant={currentNetwork === net ? "default" : "outline"}
+                        variant={network === net ? "default" : "outline"}
                         size="sm"
                         className={cn(
                           "font-medium",
-                          currentNetwork !== net && "hover:bg-primary/10"
+                          network !== net && "hover:bg-primary/10"
                         )}
                         onClick={() => {
                           switchNetwork(net as NetworkType);
