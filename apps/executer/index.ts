@@ -18,7 +18,7 @@ import type { AutoSol } from "./types";
 const PROGRAM_ID = new PublicKey(
   "98g9uR7WZqinAnSeUgB5nUw3pbR6sNwFuYWW78yPHtva"
 );
-const HTTP_BACKEND_WALLET = "8dRCBu5V2v6JHR3HxN9zjN91WoX4FfGzgdM8nXawUbqt";
+const HTTP_BACKEND_WALLET = "G8UmesEhavARgE6xTWbDq6iHvdp8W2yo4pbrW4jLsHxh";
 const DEFAULT_EXECUTION_TIMES = ["0 0 0 * * *", "0 0 12 * * *"]; // 12:00 AM and 12:00 PM daily
 const CONFIG_FILE = path.join(process.cwd(), "executor-config.json");
 const LOG_FILE = path.join(process.cwd(), "executor.log");
@@ -321,7 +321,7 @@ class ExecutorService {
       if (process.env.SOLANA_PRIVATE_KEY) {
         const privateKeyArray = JSON.parse(process.env.SOLANA_PRIVATE_KEY);
         return new anchor.Wallet(
-          Keypair.fromSecretKey(new Uint8Array(privateKeyArray))
+          Keypair.fromSecretKey(Uint8Array.from(privateKeyArray))
         );
       }
       const walletPath = path.join(

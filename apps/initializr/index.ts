@@ -35,7 +35,7 @@ const FEE_WITHDRAWAL_ALLOWED_KEYS = [
 ];
 
 // HTTP backend wallet (executor wallet)
-const HTTP_BACKEND_WALLET = "8dRCBu5V2v6JHR3HxN9zjN91WoX4FfGzgdM8nXawUbqt";
+const HTTP_BACKEND_WALLET = "G8UmesEhavARgE6xTWbDq6iHvdp8W2yo4pbrW4jLsHxh";
 
 // Derived PDA addresses
 const [FEE_SETTINGS_ADDRESS] = PublicKey.findProgramAddressSync(
@@ -754,11 +754,14 @@ class AutoSolBackend {
 // Load wallet function
 function loadWallet(): anchor.Wallet {
   try {
-    // Try to load from SOLANA_PRIVATE_KEY environment variable first
-    if (process.env.SOLANA_PRIVATE_KEY) {
+    if (
+      process.env.SOLANA_PRIVATE_KEY &&
+      process.env.SOLANA_PRIVATE_KEY.trim() !== ""
+    ) {
+      // Parse the stringified array and convert to Uint8Array
       const privateKeyArray = JSON.parse(process.env.SOLANA_PRIVATE_KEY);
       return new anchor.Wallet(
-        Keypair.fromSecretKey(new Uint8Array(privateKeyArray))
+        Keypair.fromSecretKey(Uint8Array.from(privateKeyArray))
       );
     }
 
@@ -816,7 +819,8 @@ async function main() {
     if (options.rpc) {
       connection = new Connection(options.rpc, "confirmed");
     } else {
-      connection = new Connection("http://127.0.0.1:8899", "confirmed");
+      // connection = new Connection("http://127.0.0.1:8899", "confirmed");
+      connection = new Connection("https://api.devnet.solana.com", "confirmed");
     }
 
     const wallet = loadWallet();
