@@ -52,6 +52,7 @@ import {
   Legend,
 } from "chart.js";
 import { cn } from "@/lib/utils";
+import { useRouter } from "next/navigation";
 
 // Register Chart.js components
 ChartJS.register(
@@ -94,6 +95,7 @@ interface Token {
 }
 
 export default function DashboardPage() {
+  const router = useRouter();
   const {
     stats,
     paymentActivity,
@@ -223,7 +225,11 @@ export default function DashboardPage() {
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
-          <Button>
+          <Button
+            onClick={() => {
+              router.push("/payments/new");
+            }}
+          >
             <Plus className="h-4 w-4 mr-2" />
             New Payment
           </Button>
