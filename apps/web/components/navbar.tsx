@@ -39,8 +39,6 @@ import {
   Bell,
   Home,
   BarChart3,
-  FileText,
-  HelpCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { WalletConnect } from "./wallet-connect";
