@@ -81,6 +81,16 @@ interface TransactionData {
   isIncoming: boolean;
 }
 
+// Utility to extract status string from object
+function getStatusString(statusObj: unknown): string {
+  if (typeof statusObj === "string") return statusObj;
+  if (typeof statusObj === "object" && statusObj !== null) {
+    const keys = Object.keys(statusObj);
+    if (keys.length > 0) return keys[0];
+  }
+  return "unknown";
+}
+
 export default function TransactionsPage() {
   const { program } = useProgram();
   const wallet = useWallet();
@@ -111,6 +121,8 @@ export default function TransactionsPage() {
         const incomingSchedules = await program.getSchedulesForRecipient(
           wallet.publicKey
         );
+
+        console.log("Outgoing payments --> ", outgoingSchedules);
 
         // Flatten all payments from all schedules
         const txs: TransactionData[] = [];
@@ -236,7 +248,10 @@ export default function TransactionsPage() {
       // Prepare data for Excel export
       const exportData = filteredTxs.map((tx) => {
         let status = tx.status;
-        if (tx.schedule?.data?.status?.toLowerCase() === "cancelled") {
+        if (
+          getStatusString(tx.schedule?.data?.status).toLowerCase() ===
+          "cancelled"
+        ) {
           status = "cancelled";
         }
 
@@ -423,7 +438,9 @@ export default function TransactionsPage() {
                     // Handle cancelled status
                     let status = tx.status;
                     if (
-                      tx.schedule?.data?.status?.toLowerCase() === "cancelled"
+                      getStatusString(
+                        tx.schedule?.data?.status
+                      ).toLowerCase() === "cancelled"
                     ) {
                       status = "cancelled";
                     }

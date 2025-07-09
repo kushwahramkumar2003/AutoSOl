@@ -13,6 +13,7 @@ import {
   Users,
 } from "lucide-react";
 import NetworkBackground from "@/components/network-background";
+import Image from "next/image";
 
 export default function Hero() {
   const statsRef = useRef<HTMLDivElement>(null);
@@ -180,9 +181,11 @@ export default function Hero() {
                             />
                           )}
                         </AnimatePresence>
-                        <img
+                        <Image
                           src={wallet.logo}
                           alt={wallet.name}
+                          width={32}
+                          height={32}
                           className="h-8 object-contain"
                         />
                       </motion.div>
@@ -296,10 +299,11 @@ export default function Hero() {
 
       {/* Add a decorative Solana logo in the background */}
       <div className="absolute bottom-[10.5rem] right-10 opacity-10 pointer-events-none">
-        <img
+        <Image
           src="https://cryptologos.cc/logos/solana-sol-logo.png"
           alt="Solana Logo"
-          className="w-32 h-32 object-contain"
+          width={128}
+          height={128}
         />
       </div>
     </section>

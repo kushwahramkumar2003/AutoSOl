@@ -91,6 +91,16 @@ interface CustomError extends Error {
   code?: string;
 }
 
+// Utility to extract status string from object
+function getStatusString(statusObj: unknown): string {
+  if (typeof statusObj === "string") return statusObj;
+  if (typeof statusObj === "object" && statusObj !== null) {
+    const keys = Object.keys(statusObj);
+    if (keys.length > 0) return keys[0];
+  }
+  return "unknown";
+}
+
 export default function PaymentsPage() {
   const { program } = useProgram();
   const wallet = useWallet();
@@ -118,6 +128,7 @@ export default function PaymentsPage() {
       const res = await program.getSchedulesForOwner(wallet.publicKey);
       if (res) {
         setPayments(res);
+        console.log("Paymets", res);
         toast.success(`Loaded ${res.length} payment schedules`);
       }
     } catch (error) {
@@ -172,8 +183,8 @@ export default function PaymentsPage() {
     toast.success("Copied to clipboard");
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
+  const getStatusColor = (status: unknown) => {
+    switch (getStatusString(status).toLowerCase()) {
       case "active":
         return "bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30";
       case "completed":
@@ -187,8 +198,8 @@ export default function PaymentsPage() {
     }
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status.toLowerCase()) {
+  const getStatusIcon = (status: unknown) => {
+    switch (getStatusString(status).toLowerCase()) {
       case "active":
         return <Play className="h-3 w-3" />;
       case "completed":
@@ -232,7 +243,9 @@ export default function PaymentsPage() {
     // Apply status filter
     if (filter !== "all") {
       filtered = filtered.filter(
-        (payment) => payment.data.status.toLowerCase() === filter.toLowerCase()
+        (payment) =>
+          getStatusString(payment.data.status).toLowerCase() ===
+          filter.toLowerCase()
       );
     }
 
@@ -268,7 +281,7 @@ export default function PaymentsPage() {
   // Calculate statistics
   const stats = useMemo(() => {
     const activePayments = payments.filter(
-      (p) => p.data.status.toLowerCase() === "active"
+      (p) => getStatusString(p.data.status).toLowerCase() === "active"
     );
     const totalAmount = payments.reduce(
       (sum, p) => sum + p.data.totalAmount.toNumber(),
@@ -284,7 +297,7 @@ export default function PaymentsPage() {
       total: payments.length,
       active: activePayments.length,
       completed: payments.filter(
-        (p) => p.data.status.toLowerCase() === "completed"
+        (p) => getStatusString(p.data.status).toLowerCase() === "completed"
       ).length,
       totalAmount: totalAmount / 1e9,
       totalPaid: totalPaid / 1e9,
@@ -615,7 +628,7 @@ export default function PaymentsPage() {
                             )}
                           >
                             {getStatusIcon(payment.data.status)}
-                            {payment.data.status}
+                            {getStatusString(payment.data.status)}
                           </Badge>
                         </TableCell>
                         <TableCell>
@@ -674,8 +687,9 @@ export default function PaymentsPage() {
                                 Copy Recipient
                               </DropdownMenuItem>
                               <DropdownMenuSeparator className="bg-white/10" />
-                              {payment.data.status.toLowerCase() ===
-                                "active" && (
+                              {getStatusString(
+                                payment.data.status
+                              ).toLowerCase() === "active" && (
                                 <>
                                   <DropdownMenuItem className="hover:bg-white/10 focus:bg-white/10 cursor-pointer">
                                     <Pause className="h-4 w-4 mr-2" />
@@ -687,17 +701,20 @@ export default function PaymentsPage() {
                                   </DropdownMenuItem>
                                 </>
                               )}
-                              {payment.data.status.toLowerCase() ===
-                                "paused" && (
+                              {getStatusString(
+                                payment.data.status
+                              ).toLowerCase() === "paused" && (
                                 <DropdownMenuItem className="hover:bg-white/10 focus:bg-white/10 cursor-pointer">
                                   <Play className="h-4 w-4 mr-2" />
                                   Resume Schedule
                                 </DropdownMenuItem>
                               )}
-                              {(payment.data.status.toLowerCase() ===
-                                "active" ||
-                                payment.data.status.toLowerCase() ===
-                                  "paused") && (
+                              {(getStatusString(
+                                payment.data.status
+                              ).toLowerCase() === "active" ||
+                                getStatusString(
+                                  payment.data.status
+                                ).toLowerCase() === "paused") && (
                                 <DropdownMenuItem
                                   className="hover:bg-red-500/10 focus:bg-red-500/10 cursor-pointer text-red-400"
                                   onClick={() => setCancelingPayment(payment)}
@@ -895,7 +912,7 @@ export default function PaymentsPage() {
                         )}
                       >
                         {getStatusIcon(selectedPayment.data.status)}
-                        {selectedPayment.data.status}
+                        {getStatusString(selectedPayment.data.status)}
                       </Badge>
                     </div>
                   </div>

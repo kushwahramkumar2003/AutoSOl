@@ -7,6 +7,8 @@ import confetti from "canvas-confetti";
 import { useEffect } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
+import { useFeeSettings } from "@/hooks/use-fee-settings";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface SuccessStepProps {
   data: PaymentScheduleFormData;
@@ -21,6 +23,12 @@ export default function SuccessStep({
   scheduleAddress,
   onDone,
 }: SuccessStepProps) {
+  const {
+    getFeePercentage,
+    calculateFee,
+    loading: feeLoading,
+  } = useFeeSettings();
+
   // Trigger confetti effect on component mount
   useEffect(() => {
     const duration = 3 * 1000;
@@ -56,12 +64,11 @@ export default function SuccessStep({
     return () => clearInterval(interval);
   }, []);
 
-  // Calculate total amount
-  const feePercentage = 0.01; // 1%
-  const totalAmount =
-    data.payment.amount *
-    (1 + feePercentage) *
-    data.schedule.selectedDates.length;
+  // Calculate total amount including fee
+  const feePercentage = getFeePercentage();
+  const feeAmount = calculateFee(data.payment.amount);
+  const totalAmount = data.payment.amount + feeAmount;
+  const totalForAllPayments = totalAmount * data.schedule.selectedDates.length;
 
   const copyToClipboard = (text: string, type: string) => {
     navigator.clipboard.writeText(text);
@@ -115,13 +122,21 @@ export default function SuccessStep({
         <div className="text-center">
           <p className="text-white/70 text-sm mb-1">Total Amount Locked</p>
           <p className="text-2xl font-bold">
-            {totalAmount.toFixed(data.payment.token === "BONK" ? 0 : 4)}{" "}
-            {data.payment.symbol}
+            {feeLoading ? (
+              <Skeleton className="h-8 w-32 bg-white/10" />
+            ) : (
+              `${totalForAllPayments.toFixed(data.payment.symbol === "BONK" ? 0 : 4)} ${data.payment.symbol}`
+            )}
           </p>
           <p className="text-white/70 text-sm mt-1">
             For {data.schedule.selectedDates.length} payments to{" "}
             {data.recipient.name}
           </p>
+          {!feeLoading && (
+            <p className="text-xs text-white/50 mt-1">
+              Including {feePercentage}% platform fee
+            </p>
+          )}
         </div>
       </motion.div>
 

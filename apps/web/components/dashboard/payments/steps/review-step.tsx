@@ -5,15 +5,23 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, Check, Coins, User } from "lucide-react";
 import type { PaymentScheduleFormData } from "@/components/dashboard/payments/new-payment-form";
+import { useFeeSettings } from "@/hooks/use-fee-settings";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface ReviewStepProps {
   data: PaymentScheduleFormData;
 }
 
 export default function ReviewStep({ data }: ReviewStepProps) {
+  const {
+    getFeePercentage,
+    calculateFee,
+    loading: feeLoading,
+  } = useFeeSettings();
+
   // Calculate total amount including fee
-  const feePercentage = 0.01; // 1%
-  const feeAmount = data.payment.amount * feePercentage;
+  const feePercentage = getFeePercentage();
+  const feeAmount = calculateFee(data.payment.amount);
   const totalAmount = data.payment.amount + feeAmount;
   const totalForAllPayments = totalAmount * data.schedule.selectedDates.length;
 
@@ -80,10 +88,21 @@ export default function ReviewStep({ data }: ReviewStepProps) {
               </div>
 
               <div>
-                <h4 className="text-sm text-white/70 mb-1">Fee (1%)</h4>
+                <h4 className="text-sm text-white/70 mb-1">
+                  Fee (
+                  {feeLoading ? (
+                    <Skeleton className="h-4 w-8 inline-block bg-white/10" />
+                  ) : (
+                    `${feePercentage}%`
+                  )}
+                  )
+                </h4>
                 <p className="font-medium">
-                  {feeAmount.toFixed(data.payment.symbol === "BONK" ? 0 : 4)}{" "}
-                  {data.payment.symbol}
+                  {feeLoading ? (
+                    <Skeleton className="h-4 w-20 bg-white/10" />
+                  ) : (
+                    `${feeAmount.toFixed(data.payment.symbol === "BONK" ? 0 : 4)} ${data.payment.symbol}`
+                  )}
                 </p>
               </div>
 
@@ -92,8 +111,11 @@ export default function ReviewStep({ data }: ReviewStepProps) {
                   Total per Payment
                 </h4>
                 <p className="font-medium">
-                  {totalAmount.toFixed(data.payment.symbol === "BONK" ? 0 : 4)}{" "}
-                  {data.payment.symbol}
+                  {feeLoading ? (
+                    <Skeleton className="h-4 w-20 bg-white/10" />
+                  ) : (
+                    `${totalAmount.toFixed(data.payment.symbol === "BONK" ? 0 : 4)} ${data.payment.symbol}`
+                  )}
                 </p>
               </div>
 
@@ -187,10 +209,13 @@ export default function ReviewStep({ data }: ReviewStepProps) {
                 <h4 className="font-medium">Total Amount</h4>
                 <div className="text-right">
                   <p className="font-bold text-lg">
-                    {totalForAllPayments.toFixed(
-                      data.payment.symbol === "BONK" ? 0 : 4
-                    )}{" "}
-                    {data.payment.symbol}
+                    {feeLoading ? (
+                      <Skeleton className="h-6 w-24 bg-white/10" />
+                    ) : (
+                      `${totalForAllPayments.toFixed(
+                        data.payment.symbol === "BONK" ? 0 : 4
+                      )} ${data.payment.symbol}`
+                    )}
                   </p>
                   <p className="text-sm text-white/70">
                     For all {data.schedule.selectedDates.length} payments
@@ -214,10 +239,13 @@ export default function ReviewStep({ data }: ReviewStepProps) {
             <p className="text-sm text-white/70">
               By confirming, you authorize AutoSOL to create this payment
               schedule on the Solana blockchain. The total amount of{" "}
-              {totalForAllPayments.toFixed(
-                data.payment.symbol === "BONK" ? 0 : 4
-              )}{" "}
-              {data.payment.symbol}
+              {feeLoading ? (
+                <Skeleton className="h-4 w-20 inline-block bg-white/10" />
+              ) : (
+                `${totalForAllPayments.toFixed(
+                  data.payment.symbol === "BONK" ? 0 : 4
+                )} ${data.payment.symbol}`
+              )}
               (including fees) will be transferred to a secure payment vault.
             </p>
           </div>

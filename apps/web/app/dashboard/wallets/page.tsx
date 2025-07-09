@@ -23,7 +23,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import TokenDistribution from "@/components/dashboard/token-distribution";
+import { TokenDistributionCard } from "@/components/dashboard/token-distribution";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
@@ -314,7 +314,7 @@ export default function WalletsPage() {
           </div>
 
           <div className="space-y-6">
-            <TokenDistribution tokens={tokens} />
+            <TokenDistributionCard tokens={tokens} />
 
             <Card className="bg-dark-200 border-white/10 text-white">
               <CardHeader>

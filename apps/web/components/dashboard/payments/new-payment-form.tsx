@@ -12,8 +12,9 @@ import {
   Wallet,
   AlertCircle,
 } from "lucide-react";
-import { PublicKey } from "@solana/web3.js";
+import { LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import { useProgram } from "@/hooks/use-program";
+import { useFeeSettings } from "@/hooks/use-fee-settings";
 import RecipientDetailsStep from "@/components/dashboard/payments/steps/recipient-details";
 import PaymentDetailsStep from "@/components/dashboard/payments/steps/payment-details";
 import ScheduleStep from "@/components/dashboard/payments/steps/schedule-step";
@@ -55,6 +56,7 @@ const steps = [
 export default function NewPaymentForm() {
   const router = useRouter();
   const { program } = useProgram();
+  const { calculateFee } = useFeeSettings();
   const [currentStep, setCurrentStep] = useState(0);
   const [direction, setDirection] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -149,7 +151,10 @@ export default function NewPaymentForm() {
       // For SOL: 1 SOL = 10^9 lamports
       // For other tokens, we would need to get the decimals from the token metadata
       const multiplier =
-        formData.payment.symbol === "SOL" ? 1_000_000_000 : 1_000_000;
+        formData.payment.symbol === "SOL" ? LAMPORTS_PER_SOL : 1_000_000;
+
+      // Calculate the total amount including fee for all payments
+      const feeAmount = calculateFee(formData.payment.amount);
       const amount = Math.floor(formData.payment.amount * multiplier);
 
       console.log("Creating payment schedule with:", {
@@ -158,6 +163,9 @@ export default function NewPaymentForm() {
         scheduleTimes: formData.schedule.scheduleTimes,
         memo: formData.payment.memo,
         mintAddress: mintAddress.toString(),
+        feeAmount,
+
+        numberOfPayments: formData.schedule.selectedDates.length,
       });
 
       // Create payment schedule on the blockchain

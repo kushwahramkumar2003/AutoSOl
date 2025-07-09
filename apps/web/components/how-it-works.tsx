@@ -17,6 +17,7 @@ import {
   ChevronRight,
   ChevronLeft,
 } from "lucide-react";
+import Image from "next/image";
 
 export default function HowItWorks() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -314,10 +315,11 @@ export default function HowItWorks() {
                           background: `linear-gradient(to right, ${step.color}, ${index === steps.length - 1 ? "#10B981" : steps[index + 1].color})`,
                         }}
                       ></div>
-                      <img
+                      <Image
                         src={step.illustration}
                         alt={`${step.title} illustration`}
-                        className="w-full h-64 object-cover"
+                        width={600}
+                        height={400}
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-dark-400/80 to-transparent"></div>
                       <div className="absolute bottom-0 left-0 right-0 p-4">
@@ -383,10 +385,11 @@ export default function HowItWorks() {
                   </p>
 
                   <div className="rounded-xl overflow-hidden mb-6">
-                    <img
+                    <Image
                       src={steps[activeStep].illustration}
                       alt={`${steps[activeStep].title} illustration`}
-                      className="w-full h-48 object-cover"
+                      width={600}
+                      height={400}
                     />
                   </div>
 
