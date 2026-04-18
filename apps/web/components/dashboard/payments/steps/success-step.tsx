@@ -1,14 +1,21 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import type { PaymentScheduleFormData } from "@/components/dashboard/payments/new-payment-form";
-import { ArrowRight, Calendar, Check, ExternalLink, Copy } from "lucide-react";
-import confetti from "canvas-confetti";
-import { useEffect } from "react";
-import { motion } from "framer-motion";
-import { toast } from "sonner";
+import { useState } from "react";
 import { useFeeSettings } from "@/hooks/use-fee-settings";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import type { PaymentScheduleFormData } from "@/components/dashboard/payments/new-payment-form";
+import { TokenAvatar } from "@/components/shared/token-avatar";
+import {
+  ArrowRight,
+  CalendarDays,
+  Check,
+  CheckCircle,
+  Copy,
+  ExternalLink,
+  Receipt,
+} from "lucide-react";
+import { toast } from "sonner";
 
 interface SuccessStepProps {
   data: PaymentScheduleFormData;
@@ -29,197 +36,161 @@ export default function SuccessStep({
     loading: feeLoading,
   } = useFeeSettings();
 
-  // Trigger confetti effect on component mount
-  useEffect(() => {
-    const duration = 3 * 1000;
-    const animationEnd = Date.now() + duration;
-    const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
+  const [copiedField, setCopiedField] = useState<string | null>(null);
 
-    function randomInRange(min: number, max: number) {
-      return Math.random() * (max - min) + min;
-    }
-
-    const interval: NodeJS.Timeout = setInterval(() => {
-      const timeLeft = animationEnd - Date.now();
-
-      if (timeLeft <= 0) {
-        return clearInterval(interval);
-      }
-
-      const particleCount = 50 * (timeLeft / duration);
-
-      // since particles fall down, start a bit higher than random
-      confetti({
-        ...defaults,
-        particleCount,
-        origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 },
-      });
-      confetti({
-        ...defaults,
-        particleCount,
-        origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 },
-      });
-    }, 250);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  // Calculate total amount including fee
   const feePercentage = getFeePercentage();
   const feeAmount = calculateFee(data.payment.amount);
   const totalAmount = data.payment.amount + feeAmount;
   const totalForAllPayments = totalAmount * data.schedule.selectedDates.length;
 
-  const copyToClipboard = (text: string, type: string) => {
-    navigator.clipboard.writeText(text);
-    toast.success(`${type} has been copied to your clipboard.`);
-  };
-
   const explorerUrl = txSignature
     ? `https://explorer.solana.com/tx/${txSignature}?cluster=devnet`
     : "#";
 
+  const copyValue = async (value: string, label: string) => {
+    await navigator.clipboard.writeText(value);
+    setCopiedField(label);
+    toast.success(`${label} copied.`);
+    setTimeout(() => setCopiedField(null), 2000);
+  };
+
   return (
-    <div className="text-center py-8">
-      <motion.div
-        initial={{ scale: 0, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{
-          type: "spring" as const,
-          stiffness: 300,
-          damping: 20,
-        }}
-        className="w-20 h-20 rounded-full bg-[#10B981]/20 flex items-center justify-center mx-auto mb-6"
-      >
-        <Check className="h-10 w-10 text-[#10B981]" />
-      </motion.div>
-
-      <motion.h2
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.2 }}
-        className="text-2xl font-bold mb-2"
-      >
-        Payment Schedule Created!
-      </motion.h2>
-
-      <motion.p
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.3 }}
-        className="text-white/70 mb-6 max-w-md mx-auto"
-      >
-        Your payment schedule has been successfully created and funds have been
-        securely locked in the payment vault.
-      </motion.p>
-
-      <motion.div
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.4 }}
-        className="bg-dark-300 rounded-lg p-4 mb-6 inline-block mx-auto"
-      >
-        <div className="text-center">
-          <p className="text-white/70 text-sm mb-1">Total Amount Locked</p>
-          <p className="text-2xl font-bold">
-            {feeLoading ? (
-              <Skeleton className="h-8 w-32 bg-white/10" />
-            ) : (
-              `${totalForAllPayments.toFixed(data.payment.symbol === "BONK" ? 0 : 4)} ${data.payment.symbol}`
-            )}
-          </p>
-          <p className="text-white/70 text-sm mt-1">
-            For {data.schedule.selectedDates.length} payments to{" "}
-            {data.recipient.name}
-          </p>
-          {!feeLoading && (
-            <p className="text-xs text-white/50 mt-1">
-              Including {feePercentage}% platform fee
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div className="flex items-start gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-400">
+            <CheckCircle className="h-5 w-5" />
+          </div>
+          <div>
+            <h2 className="text-xl font-semibold text-white">
+              Schedule Created
+            </h2>
+            <p className="mt-1 max-w-lg text-sm text-slate-400">
+              Funds have been locked on-chain and payments will execute on schedule.
             </p>
-          )}
+          </div>
         </div>
-      </motion.div>
-
-      <motion.div
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.5 }}
-        className="flex flex-col sm:flex-row gap-3 justify-center mb-6"
-      >
         <Button
-          variant="outline"
-          className="border-white/10 bg-dark-300 hover:bg-white/10"
           onClick={onDone}
+          className="rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
         >
-          View All Payments
-          <Calendar className="ml-2 h-4 w-4" />
+          Go to Payments
+          <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
+      </div>
 
-        <Button
-          variant="outline"
-          className="border-white/10 bg-dark-300 hover:bg-white/10"
-          onClick={() => window.open(explorerUrl, "_blank")}
-        >
-          View on Explorer
-          <ExternalLink className="ml-2 h-4 w-4" />
-        </Button>
-      </motion.div>
+      {/* Summary cards */}
+      <div className="grid gap-4 xl:grid-cols-3">
+        <div className="space-y-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
+          <div className="flex items-center gap-2">
+            <Receipt className="h-4 w-4 text-primary" />
+            <span className="text-xs font-medium text-slate-400">Locked Amount</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <TokenAvatar
+              symbol={data.payment.symbol}
+              mint={data.payment.token}
+              isSol={data.payment.symbol.toUpperCase() === "SOL"}
+              size={20}
+              className="h-5 w-5"
+            />
+            <span className="text-xl font-semibold text-white">
+              {feeLoading ? (
+                <Skeleton className="h-7 w-28 bg-white/10" />
+              ) : (
+                `${totalForAllPayments.toFixed(4)} ${data.payment.symbol}`
+              )}
+            </span>
+          </div>
+          <span className="text-[11px] text-slate-500">
+            {feeLoading ? null : `Includes ${feePercentage}% fee`}
+          </span>
+        </div>
 
-      {scheduleAddress && (
-        <motion.div
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.6 }}
-          className="text-xs text-white/50 mb-4"
-        >
-          <p>Schedule Address</p>
-          <div className="flex items-center justify-center gap-2 mt-1">
-            <p className="font-mono">{scheduleAddress}</p>
+        <div className="space-y-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
+          <div className="flex items-center gap-2">
+            <CalendarDays className="h-4 w-4 text-primary" />
+            <span className="text-xs font-medium text-slate-400">Schedule</span>
+          </div>
+          <div className="text-white">
+            <div className="font-medium">{data.recipient.name}</div>
+            <div className="mt-1 text-sm text-slate-400">
+              {data.schedule.selectedDates.length} payment{data.schedule.selectedDates.length === 1 ? "" : "s"} planned
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
+          <span className="text-xs font-medium text-slate-400">Actions</span>
+          <div className="flex flex-col gap-2">
             <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6 rounded-full hover:bg-white/10"
-              onClick={() =>
-                copyToClipboard(scheduleAddress, "Schedule address")
-              }
+              variant="outline"
+              size="sm"
+              className="justify-between rounded-xl border-white/[0.08] bg-white/[0.03] text-xs hover:bg-white/[0.06]"
+              onClick={() => window.open(explorerUrl, "_blank")}
+              disabled={!txSignature}
             >
-              <Copy className="h-3 w-3" />
+              View Transaction
+              <ExternalLink className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="justify-between rounded-xl border-white/[0.08] bg-white/[0.03] text-xs hover:bg-white/[0.06]"
+              onClick={onDone}
+            >
+              Open Payments
+              <ArrowRight className="h-3.5 w-3.5" />
             </Button>
           </div>
-        </motion.div>
+        </div>
+      </div>
+
+      {/* Addresses */}
+      {scheduleAddress && (
+        <div className="flex flex-col gap-2 rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <div className="text-[11px] uppercase tracking-wider text-slate-500">Schedule Address</div>
+            <div className="mt-1 break-all font-mono text-xs text-slate-400">{scheduleAddress}</div>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="shrink-0 self-start rounded-lg text-xs text-slate-400 hover:bg-white/[0.05] hover:text-white"
+            onClick={() => copyValue(scheduleAddress, "Schedule address")}
+          >
+            {copiedField === "Schedule address" ? (
+              <Check className="mr-1.5 h-3.5 w-3.5 text-emerald-400" />
+            ) : (
+              <Copy className="mr-1.5 h-3.5 w-3.5" />
+            )}
+            Copy
+          </Button>
+        </div>
       )}
 
       {txSignature && (
-        <motion.div
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.7 }}
-          className="text-xs text-white/50"
-        >
-          <p>Transaction ID</p>
-          <div className="flex items-center justify-center gap-2 mt-1">
-            <p className="font-mono">
-              {txSignature.slice(0, 16)}...{txSignature.slice(-16)}
-            </p>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6 rounded-full hover:bg-white/10"
-              onClick={() => copyToClipboard(txSignature, "Transaction ID")}
-            >
-              <Copy className="h-3 w-3" />
-            </Button>
+        <div className="flex flex-col gap-2 rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <div className="text-[11px] uppercase tracking-wider text-slate-500">Transaction Signature</div>
+            <div className="mt-1 break-all font-mono text-xs text-slate-400">{txSignature}</div>
           </div>
-        </motion.div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="shrink-0 self-start rounded-lg text-xs text-slate-400 hover:bg-white/[0.05] hover:text-white"
+            onClick={() => copyValue(txSignature, "Transaction signature")}
+          >
+            {copiedField === "Transaction signature" ? (
+              <Check className="mr-1.5 h-3.5 w-3.5 text-emerald-400" />
+            ) : (
+              <Copy className="mr-1.5 h-3.5 w-3.5" />
+            )}
+            Copy
+          </Button>
+        </div>
       )}
-
-      <Button
-        className="mt-8 bg-gradient-to-r from-[#6E56CF] to-[#10B981] hover:from-[#5a46b0] hover:to-[#0e9d6d] text-white shadow-neon"
-        onClick={onDone}
-      >
-        Done
-        <ArrowRight className="ml-2 h-4 w-4" />
-      </Button>
     </div>
   );
 }

@@ -1,8 +1,68 @@
 /*eslint no-unused-vars: "error"*/
 
-import { AutoSolProgram } from "./program";
+import { AutoSolProgram, PaymentType } from "./program";
 import { PublicKey } from "@solana/web3.js";
 import { ScheduleStatus } from "./program";
+import { getTokenDecimals, getTokenLabel } from "./token-registry";
+
+/** Resolve a human-readable token label from on-chain schedule data. */
+function getTokenLabelFromSchedule(schedule: Schedule): string {
+  const data = schedule.data as any;
+  const paymentType = data.paymentType;
+  const mint = data.mint?.toString?.() || "";
+  return getTokenLabel(
+    mint,
+    paymentType === PaymentType.Sol || !paymentType || paymentType === "Sol"
+  );
+}
+
+function getScheduleDecimals(schedule: Schedule): number {
+  const data = schedule.data as any;
+  const paymentType = data.paymentType;
+  const mint = data.mint?.toString?.() || "";
+  return getTokenDecimals(
+    mint,
+    paymentType === PaymentType.Sol || !paymentType || paymentType === "Sol"
+  );
+}
+
+function amountToUi(schedule: Schedule, rawAmount: number): number {
+  return rawAmount / Math.pow(10, getScheduleDecimals(schedule));
+}
+
+export interface TokenAmountBreakdown {
+  token: string;
+  mint?: string;
+  isSol?: boolean;
+  amount: number;
+}
+
+function addBreakdownAmount(
+  map: Map<string, TokenAmountBreakdown>,
+  schedule: Schedule,
+  rawAmount: number
+) {
+  const token = getTokenLabelFromSchedule(schedule);
+  const current = map.get(token);
+  const amount = amountToUi(schedule, rawAmount);
+
+  if (current) {
+    current.amount += amount;
+    return;
+  }
+
+  const data = schedule.data as any;
+  const paymentType = data.paymentType;
+  const mint = data.mint?.toString?.() || "";
+
+  map.set(token, {
+    token,
+    mint,
+    isSol:
+      paymentType === PaymentType.Sol || !paymentType || paymentType === "Sol",
+    amount,
+  });
+}
 
 interface Schedule {
   address: { toString(): string };
@@ -22,7 +82,7 @@ interface Payment {
   executed: boolean;
   executionTime: { toNumber(): number };
   scheduledTime: { toNumber(): number };
-  txSignature?: { toString(): string };
+  executedBy?: { toString(): string };
 }
 
 export interface DashboardStats {
@@ -33,6 +93,9 @@ export interface DashboardStats {
   totalScheduled: number;
   totalCompleted: number;
   totalCancelled: number;
+  monthlySpendingBreakdown?: TokenAmountBreakdown[];
+  activeCommitmentBreakdown?: TokenAmountBreakdown[];
+  upcomingCommitmentBreakdown?: TokenAmountBreakdown[];
 }
 
 export interface PaymentActivity {
@@ -52,7 +115,7 @@ export interface Transaction {
   recipient: string;
   date: string;
   status: "completed" | "pending" | "failed";
-  txSignature?: string;
+  executorAddress?: string;
 }
 
 export interface UpcomingPayment {
@@ -91,8 +154,8 @@ function toLocalSchedule(swa: any): Schedule {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       payments: swa.data.payments.map((p: any) => ({
         ...p,
-        txSignature: p.txSignature
-          ? { toString: () => p.txSignature.toString() }
+        executedBy: p.executedBy
+          ? { toString: () => p.executedBy.toString() }
           : undefined,
       })),
       recipient: { toString: () => swa.data.recipient.toString() },
@@ -114,11 +177,22 @@ export class DashboardService {
    */
   async fetchDashboardData(userAddress: PublicKey): Promise<DashboardData> {
     try {
-      // Fetch all schedules for the current user
-      const [outgoingSchedules, incomingSchedules] = await Promise.all([
+      const [outgoingResult, incomingResult] = await Promise.allSettled([
         this.program.getSchedulesForOwner(userAddress),
         this.program.getSchedulesForRecipient(userAddress),
       ]);
+
+      const outgoingSchedules =
+        outgoingResult.status === "fulfilled" ? outgoingResult.value : [];
+      const incomingSchedules =
+        incomingResult.status === "fulfilled" ? incomingResult.value : [];
+
+      if (
+        outgoingResult.status === "rejected" &&
+        incomingResult.status === "rejected"
+      ) {
+        throw outgoingResult.reason || incomingResult.reason;
+      }
 
       const localOutgoing = outgoingSchedules.map(toLocalSchedule);
       const localIncoming = incomingSchedules.map(toLocalSchedule);
@@ -158,7 +232,7 @@ export class DashboardService {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private calculateStats(
     outgoingSchedules: Schedule[],
-    _incomingSchedules: Schedule[]
+    incomingSchedules: Schedule[]
   ): DashboardStats {
     const now = new Date();
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -170,55 +244,64 @@ export class DashboardService {
     let monthlySpending = 0;
     let successfulPayments = 0;
     let totalPayments = 0;
-
-    console.log(_incomingSchedules);
+    const monthlySpendingMap = new Map<string, TokenAmountBreakdown>();
+    const activeCommitmentMap = new Map<string, TokenAmountBreakdown>();
+    const upcomingCommitmentMap = new Map<string, TokenAmountBreakdown>();
 
     // Process outgoing schedules
     outgoingSchedules.forEach((schedule) => {
       const status = (
         schedule as {
-          data: { status: unknown; createdAt: { toNumber: () => number } };
+          data: { status: unknown };
         }
       ).data.status;
-      const createdAt = new Date(
-        (
-          schedule as { data: { createdAt: { toNumber: () => number } } }
-        ).data.createdAt.toNumber() * 1000
-      );
+      const totalAmount = (
+        schedule as { data: { totalAmount: { toNumber: () => number } } }
+      ).data.totalAmount.toNumber();
+      const paymentAmount = (
+        schedule as { data: { paymentAmount: { toNumber: () => number } } }
+      ).data.paymentAmount.toNumber();
+      const payments = (
+        schedule as { data: { payments: Payment[] } }
+      ).data.payments;
 
       if (status === ScheduleStatus.Active) {
         activePayments++;
-        totalScheduled +=
-          (
-            schedule as { data: { totalAmount: { toNumber: () => number } } }
-          ).data.totalAmount.toNumber() / 1e9; // Convert lamports to SOL
+        totalScheduled += amountToUi(schedule, totalAmount);
+        addBreakdownAmount(activeCommitmentMap, schedule, totalAmount);
       } else if (status === ScheduleStatus.Completed) {
-        totalCompleted +=
-          (
-            schedule as { data: { totalAmount: { toNumber: () => number } } }
-          ).data.totalAmount.toNumber() / 1e9;
+        totalCompleted += amountToUi(schedule, totalAmount);
       } else if (status === ScheduleStatus.Cancelled) {
-        totalCancelled +=
-          (
-            schedule as { data: { totalAmount: { toNumber: () => number } } }
-          ).data.totalAmount.toNumber() / 1e9;
-      }
-
-      // Calculate monthly spending
-      if (createdAt >= thirtyDaysAgo) {
-        monthlySpending +=
-          (
-            schedule as { data: { totalAmount: { toNumber: () => number } } }
-          ).data.totalAmount.toNumber() / 1e9;
+        totalCancelled += amountToUi(schedule, totalAmount);
       }
 
       // Calculate success rate
       const executedPayments = (
         schedule as { data: { payments: { executed: boolean }[] } }
       ).data.payments.filter((p: { executed: boolean }) => p.executed).length;
-      const totalScheduledPayments = (
-        schedule as { data: { payments: unknown[] } }
-      ).data.payments.length;
+      const totalScheduledPayments = payments.length;
+
+      payments.forEach((payment: Payment) => {
+        if (payment.executed) {
+          const paymentDate = new Date(payment.executionTime.toNumber() * 1000);
+          if (paymentDate >= thirtyDaysAgo) {
+            monthlySpending += amountToUi(schedule, paymentAmount);
+            addBreakdownAmount(monthlySpendingMap, schedule, paymentAmount);
+          }
+        }
+      });
+
+      if (status === ScheduleStatus.Active) {
+        const nextPendingPayment = payments.find(
+          (payment: Payment) =>
+            !payment.executed &&
+            new Date(payment.scheduledTime.toNumber() * 1000) > now
+        );
+
+        if (nextPendingPayment) {
+          addBreakdownAmount(upcomingCommitmentMap, schedule, paymentAmount);
+        }
+      }
 
       successfulPayments += executedPayments;
       totalPayments += totalScheduledPayments;
@@ -226,15 +309,27 @@ export class DashboardService {
 
     const successRate =
       totalPayments > 0 ? (successfulPayments / totalPayments) * 100 : 0;
+    const incomingCommitted = incomingSchedules.reduce((sum, schedule) => {
+      return sum + amountToUi(schedule, schedule.data.totalAmount.toNumber());
+    }, 0);
 
     return {
-      totalBalance: totalScheduled + totalCompleted, // This would need to be fetched from wallet balance
+      totalBalance: totalScheduled + totalCompleted + incomingCommitted,
       activePayments,
       monthlySpending,
       successRate: Math.round(successRate * 100) / 100,
       totalScheduled,
       totalCompleted,
       totalCancelled,
+      monthlySpendingBreakdown: Array.from(monthlySpendingMap.values()).sort(
+        (left, right) => right.amount - left.amount
+      ),
+      activeCommitmentBreakdown: Array.from(activeCommitmentMap.values()).sort(
+        (left, right) => right.amount - left.amount
+      ),
+      upcomingCommitmentBreakdown: Array.from(upcomingCommitmentMap.values()).sort(
+        (left, right) => right.amount - left.amount
+      ),
     };
   }
 
@@ -323,9 +418,11 @@ export class DashboardService {
             transactions.push({
               id: `${(schedule as Schedule).address.toString()}-${index}`,
               type: "outgoing",
-              amount:
-                (schedule as Schedule).data.paymentAmount.toNumber() / 1e9,
-              token: "SOL", // This would need to be fetched from the actual token data
+              amount: amountToUi(
+                schedule,
+                (schedule as Schedule).data.paymentAmount.toNumber()
+              ),
+              token: getTokenLabelFromSchedule(schedule),
               recipient:
                 (schedule as Schedule).data.memo ||
                 `Recipient ${(schedule as Schedule).data.recipient.toString().slice(0, 4)}...`,
@@ -333,7 +430,7 @@ export class DashboardService {
                 payment.executionTime.toNumber() * 1000
               ).toLocaleString(),
               status: "completed",
-              txSignature: payment.txSignature?.toString(),
+              executorAddress: payment.executedBy?.toString(),
             });
           }
         }
@@ -348,9 +445,11 @@ export class DashboardService {
             transactions.push({
               id: `${(schedule as Schedule).address.toString()}-${index}`,
               type: "incoming",
-              amount:
-                (schedule as Schedule).data.paymentAmount.toNumber() / 1e9,
-              token: "SOL",
+              amount: amountToUi(
+                schedule,
+                (schedule as Schedule).data.paymentAmount.toNumber()
+              ),
+              token: getTokenLabelFromSchedule(schedule),
               recipient:
                 (schedule as Schedule).data.memo ||
                 `From ${(schedule as Schedule).data.owner.toString().slice(0, 4)}...`,
@@ -358,7 +457,7 @@ export class DashboardService {
                 payment.executionTime.toNumber() * 1000
               ).toLocaleString(),
               status: "completed",
-              txSignature: payment.txSignature?.toString(),
+              executorAddress: payment.executedBy?.toString(),
             });
           }
         }
@@ -395,8 +494,11 @@ export class DashboardService {
             recipient:
               (schedule as Schedule).data.memo ||
               `Recipient ${(schedule as Schedule).data.recipient.toString().slice(0, 4)}...`,
-            amount: (schedule as Schedule).data.paymentAmount.toNumber() / 1e9,
-            token: "SOL",
+            amount: amountToUi(
+              schedule,
+              (schedule as Schedule).data.paymentAmount.toNumber()
+            ),
+            token: getTokenLabelFromSchedule(schedule),
             nextDate: new Date(
               nextPayment.scheduledTime.toNumber() * 1000
             ).toLocaleDateString(),
@@ -423,31 +525,56 @@ export class DashboardService {
     outgoingSchedules: Schedule[],
     incomingSchedules: Schedule[]
   ): TokenDistribution[] {
-    // For now, we'll assume all payments are in SOL
-    // In the future, this would need to be calculated based on actual token data
-    let totalOutgoing = 0;
-    let totalIncoming = 0;
+    // Group by token type using actual mint data
+    const tokenMap = new Map<string, { label: string; outgoing: number; incoming: number }>();
 
     outgoingSchedules.forEach((schedule) => {
-      totalOutgoing += (schedule as Schedule).data.totalAmount.toNumber() / 1e9;
+      const label = getTokenLabelFromSchedule(schedule);
+      const amount = amountToUi(
+        schedule,
+        (schedule as Schedule).data.totalAmount.toNumber()
+      );
+      const existing = tokenMap.get(label);
+      if (existing) {
+        existing.outgoing += amount;
+      } else {
+        tokenMap.set(label, { label, outgoing: amount, incoming: 0 });
+      }
     });
 
     incomingSchedules.forEach((schedule) => {
-      totalIncoming += (schedule as Schedule).data.totalAmount.toNumber() / 1e9;
+      const label = getTokenLabelFromSchedule(schedule);
+      const amount = amountToUi(
+        schedule,
+        (schedule as Schedule).data.totalAmount.toNumber()
+      );
+      const existing = tokenMap.get(label);
+      if (existing) {
+        existing.incoming += amount;
+      } else {
+        tokenMap.set(label, { label, outgoing: 0, incoming: amount });
+      }
     });
 
-    const total = totalOutgoing + totalIncoming;
+    const colors = ["#2563eb", "#94a3b8", "#f59e0b", "#10b981", "#8b5cf6", "#ef4444"];
+    const totalAll = Array.from(tokenMap.values()).reduce(
+      (sum, v) => sum + v.outgoing + v.incoming,
+      0
+    );
 
-    return [
-      {
-        name: "Solana",
-        symbol: "SOL",
-        amount: total,
-        value: total * 100, // Assuming SOL price of $100
-        color: "#9945FF",
-        percentage: 100,
-      },
-    ];
+    if (totalAll === 0) return [];
+
+    return Array.from(tokenMap.entries()).map(([symbol, info], idx) => {
+      const amount = info.outgoing + info.incoming;
+      return {
+        name: info.label,
+        symbol,
+        amount,
+        value: amount,
+        color: colors[idx % colors.length] || "#2563eb",
+        percentage: (amount / totalAll) * 100,
+      };
+    }).filter((token) => token.amount > 0);
   }
 
   /**

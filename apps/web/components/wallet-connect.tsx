@@ -62,7 +62,7 @@ export interface WalletConnectProps {
 interface WalletTransaction {
   type: "incoming" | "outgoing";
   status: "confirmed" | "pending";
-  signature: string;
+  executorAddress: string;
   timestamp: number;
   amount: number;
   recipient: string;
@@ -99,7 +99,12 @@ const getNetworkColor = (network: NetworkType): string => {
 
 const getExplorerUrl = (address: string, network: NetworkType): string => {
   const baseUrl = "https://explorer.solana.com";
-  const clusterParam = network === "mainnet-beta" ? "" : `?cluster=${network}`;
+  const clusterParam =
+    network === "mainnet-beta"
+      ? ""
+      : network === "localnet"
+        ? "?cluster=custom&customUrl=http%3A%2F%2F127.0.0.1%3A8899"
+        : `?cluster=${network}`;
   return `${baseUrl}/address/${address}${clusterParam}`;
 };
 
@@ -114,7 +119,7 @@ const formatBalance = (balance: number): string => {
 };
 
 export function WalletConnect({
-  network = "devnet",
+  network = config.rpcEndpoint === "http://127.0.0.1:8899" ? "localnet" : "devnet",
   allowNetworkChange = true,
   showBalance = true,
   buttonSize = "sm",
@@ -174,18 +179,30 @@ export function WalletConnect({
       setTxLoading(true);
       setTxError(null);
       try {
-        // Outgoing (owner) and incoming (recipient)
-        const [outgoing, incoming] = await Promise.all([
+        const [outgoingResult, incomingResult] = await Promise.allSettled([
           program.getSchedulesForOwner(publicKey),
           program.getSchedulesForRecipient(publicKey),
         ]);
+
+        const outgoing =
+          outgoingResult.status === "fulfilled" ? outgoingResult.value : [];
+        const incoming =
+          incomingResult.status === "fulfilled" ? incomingResult.value : [];
+
+        if (
+          outgoingResult.status === "rejected" &&
+          incomingResult.status === "rejected"
+        ) {
+          throw outgoingResult.reason || incomingResult.reason;
+        }
+
         const txs: WalletTransaction[] = [];
         outgoing.forEach((schedule) => {
           schedule.data.payments.forEach((p) => {
             txs.push({
               type: "outgoing",
               status: p.executed ? "confirmed" : "pending",
-              signature: p.txSignature ? p.txSignature.toString() : "-",
+              executorAddress: p.executedBy ? p.executedBy.toString() : "-",
               timestamp:
                 p.executionTime?.toNumber() || p.scheduledTime?.toNumber() || 0,
               amount: schedule.data.paymentAmount.toNumber() / 1e9,
@@ -199,7 +216,7 @@ export function WalletConnect({
             txs.push({
               type: "incoming",
               status: p.executed ? "confirmed" : "pending",
-              signature: p.txSignature ? p.txSignature.toString() : "-",
+              executorAddress: p.executedBy ? p.executedBy.toString() : "-",
               timestamp:
                 p.executionTime?.toNumber() || p.scheduledTime?.toNumber() || 0,
               amount: schedule.data.paymentAmount.toNumber() / 1e9,
@@ -211,6 +228,12 @@ export function WalletConnect({
         // Sort by timestamp desc, limit
         txs.sort((a, b) => b.timestamp - a.timestamp);
         setTransactions(txs.slice(0, maxHistoryItems));
+        if (
+          outgoingResult.status === "rejected" ||
+          incomingResult.status === "rejected"
+        ) {
+          setTxError("Showing partial transaction history");
+        }
       } catch {
         setTxError("Failed to fetch transactions");
         setTransactions([]);
@@ -461,7 +484,7 @@ export function WalletConnect({
                 <DropdownMenuSeparator className="bg-primary/10" />
 
                 <DropdownMenuLabel className="px-3 pt-2 pb-1">
-                  <div className="flex items-center justify-between custom-scrollbar">
+                  <div className="flex items-center justify-between">
                     <p className="text-xs text-muted-foreground">
                       Recent Transactions
                     </p>
@@ -509,7 +532,7 @@ export function WalletConnect({
                         className="text-xs p-2 hover:bg-primary/5 rounded-md cursor-pointer mb-1"
                         onClick={() => {
                           toast.info(
-                            `Transaction details for ${tx.signature}`,
+                            `Execution details for ${tx.executorAddress}`,
                             {
                               description: `${tx.type} transaction (${tx.status}) on ${formatTransactionDate(tx.timestamp)}`,
                               icon: <History className="h-4 w-4" />,
@@ -538,7 +561,7 @@ export function WalletConnect({
                             {formatTransactionDate(tx.timestamp)}
                           </div>
                           <div className="text-muted-foreground">
-                            {tx.signature}
+                            {tx.executorAddress}
                           </div>
                         </div>
                       </div>

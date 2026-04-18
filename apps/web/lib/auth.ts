@@ -1,15 +1,18 @@
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import z from "zod";
-
 import nacl from "tweetnacl";
 import { PublicKey } from "@solana/web3.js";
 import bs58 from "bs58";
 import config from "@/config";
+// Import the nonce store shared with the challenge endpoint.
+// The nonce is consumed (deleted) after a single successful verify,
+// preventing replay attacks (SEC-001).
+import { nonceStore } from "@/lib/nonce-store";
 
 const SigninSchema = z.object({
   publicKey: z.string(),
-  signature: z.any(),
+  signature: z.string(),
   nonce: z.string(),
 });
 
@@ -34,8 +37,32 @@ export const authOptions: NextAuthOptions = {
 
           const { publicKey, signature, nonce } = parsedData.data;
 
-          const message = new TextEncoder().encode(`${nonce}`);
+          // ── Nonce validation (SEC-001) ─────────────────────────────────
+          // Verify the nonce was server-issued for this wallet, is not
+          // expired, and has not already been used.
+          const stored = nonceStore.get(publicKey);
 
+          if (!stored) {
+            console.error("No pending challenge found for wallet:", publicKey);
+            return null;
+          }
+
+          if (Date.now() > stored.expiresAt) {
+            nonceStore.delete(publicKey);
+            console.error("Challenge nonce expired for wallet:", publicKey);
+            return null;
+          }
+
+          if (stored.nonce !== nonce) {
+            console.error("Challenge nonce mismatch for wallet:", publicKey);
+            return null;
+          }
+
+          // Consume the nonce — single-use guarantee.
+          nonceStore.delete(publicKey);
+          // ──────────────────────────────────────────────────────────────
+
+          const message = new TextEncoder().encode(nonce);
           const signatureUint8 = bs58.decode(signature);
           const publicKeyBytes = new PublicKey(publicKey).toBytes();
 
@@ -46,10 +73,10 @@ export const authOptions: NextAuthOptions = {
           );
 
           if (!verified) {
-            console.error("Invalid signature");
+            console.error("Invalid signature for wallet:", publicKey);
             return null;
           }
-          console.log("Signature verified");
+
           return {
             id: publicKey,
             name: "User",
@@ -65,7 +92,7 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     jwt({ token, user }) {
-      console.log("JWT Callback", token, user);
+      // SEC-004: Do NOT log JWT/session payloads — they contain auth material.
       if (user) {
         token.id = user.id;
         token.name = user.name;
@@ -75,7 +102,6 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
     session({ session, token }) {
-      // console.log("Session Callback", session, token);
       if (token && session.user) {
         session.user.id = token.id;
         session.user.name = token.name;

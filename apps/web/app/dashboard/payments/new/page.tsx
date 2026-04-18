@@ -4,41 +4,30 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import DashboardHeader from "@/components/dashboard/header";
 import NewPaymentForm from "@/components/dashboard/payments/new-payment-form";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
-import { AlertCircle } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Wallet } from "lucide-react";
 
 export default function NewPaymentPage() {
   const { connected } = useWallet();
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="app-shell flex min-h-screen flex-col">
       <DashboardHeader />
 
-      <div className="flex-1 p-6">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-white">
-            Create Payment Schedule
-          </h1>
-          <p className="text-white/70 mt-1">
-            Set up automated recurring payments on Solana
-          </p>
-        </div>
-
+      <div className="app-page flex-1 py-4 sm:py-6">
         {!connected ? (
-          <div className="max-w-4xl mx-auto">
-            <Alert className="bg-dark-200 border-white/10 mb-6">
-              <AlertCircle className="h-5 w-5 text-[#6E56CF]" />
-              <AlertTitle>Wallet connection required</AlertTitle>
-              <AlertDescription>
-                Please connect your wallet to create a payment schedule.
-              </AlertDescription>
-            </Alert>
-
-            <div className="flex justify-center p-12 bg-dark-200 border border-white/10 rounded-lg">
-              <WalletMultiButton className="bg-gradient-to-r from-[#6E56CF] to-[#10B981] hover:from-[#5a46b0] hover:to-[#0e9d6d] text-white px-6 py-6 h-auto text-lg rounded-lg">
-                Connect Wallet
-              </WalletMultiButton>
+          <div className="mx-auto flex max-w-lg flex-col items-center gap-6 py-20">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
+              <Wallet className="h-7 w-7 text-primary" />
             </div>
+            <div className="text-center">
+              <h2 className="text-lg font-semibold text-white">Connect Wallet</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Connect your Solana wallet to create payment schedules.
+              </p>
+            </div>
+            <WalletMultiButton className="h-auto rounded-xl bg-primary px-6 py-3 text-sm text-white hover:bg-primary/90">
+              Connect Wallet
+            </WalletMultiButton>
           </div>
         ) : (
           <NewPaymentForm />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   Card,
   CardContent,
@@ -18,13 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Doughnut } from "react-chartjs-2";
-import {
-  TrendingUp,
-  TrendingDown,
-  Download,
-  Eye,
-  PieChart,
-} from "lucide-react";
+import { Download, Eye, PieChart } from "lucide-react";
 import type { TokenDistribution } from "@/hooks/use-dashboard-data";
 import { cn } from "@/lib/utils";
 
@@ -48,277 +42,253 @@ export function TokenDistributionCard({
   const [sortBy, setSortBy] = useState<string>("value");
   const [viewMode, setViewMode] = useState<"chart" | "list">("chart");
 
+  const normalizedTokens = useMemo(
+    () =>
+      tokens.map((token, index) => ({
+        ...token,
+        name: token.name ?? token.symbol ?? `Token ${index + 1}`,
+        symbol: token.symbol ?? token.name ?? "TOKEN",
+        amount: Number(token.amount ?? 0),
+        value: Number(token.value ?? token.amount ?? 0),
+        percentage: Number(token.percentage ?? 0),
+        color: token.color ?? "#2563eb",
+      })),
+    [tokens]
+  );
+
   const sortedTokens = useMemo(() => {
-    return [...tokens].sort((a, b) => {
+    return [...normalizedTokens].sort((a, b) => {
       switch (sortBy) {
-        case "value":
-          return b.value - a.value;
         case "amount":
           return b.amount - a.amount;
         case "percentage":
           return b.percentage - a.percentage;
         case "name":
           return a.name.localeCompare(b.name);
+        case "value":
         default:
-          return 0;
+          return b.value - a.value;
       }
     });
-  }, [tokens, sortBy]);
+  }, [normalizedTokens, sortBy]);
 
   const chartData = {
-    labels: sortedTokens.map((token) => token.symbol),
+    labels: sortedTokens.map((token) => token.name),
     datasets: [
       {
-        data: sortedTokens.map((token) => token.amount),
+        data: sortedTokens.map((token) => token.value),
         backgroundColor: sortedTokens.map((token) => token.color),
-        borderWidth: 2,
-        borderColor: "#ffffff",
+        borderWidth: 0,
       },
     ],
   };
 
-  const chartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        display: false,
-      },
-      tooltip: {
-        callbacks: {
-          label: (context: unknown) => {
-            const dataIndex = (context as { dataIndex: number }).dataIndex;
-            const token = sortedTokens[dataIndex];
-            return [
-              `${token.name} (${token.symbol})`,
-              `Amount: ${token.amount.toFixed(4)}`,
-              `Value: $${token.value.toFixed(2)}`,
-              `Percentage: ${token.percentage.toFixed(1)}%`,
-            ];
-          },
-        },
-      },
-    },
-  };
-
-  const totalValue = tokens.reduce((sum, token) => sum + token.value, 0);
-  const totalAmount = tokens.reduce((sum, token) => sum + token.amount, 0);
-
-  const getValueChange = (token: TokenDistribution) => {
-    // Mock data - in real app, this would come from historical data
-    // Use token symbol to generate consistent random value
-    const seed = token.symbol.charCodeAt(0) + token.symbol.charCodeAt(1);
-    const change = (seed % 20) - 10; // Random change between -10% and +10%
-    return {
-      value: Math.abs(change),
-      isPositive: change > 0,
-    };
-  };
+  const totalValue = normalizedTokens.reduce((sum, token) => sum + token.value, 0);
+  const totalAmount = normalizedTokens.reduce((sum, token) => sum + token.amount, 0);
 
   return (
     <Card
-      className={cn("transition-all duration-200 hover:shadow-md", className)}
+      className={cn(
+        "glass-panel rounded-[28px] border-white/[0.06] text-white shadow-[0_18px_50px_rgba(0,0,0,0.24)]",
+        className
+      )}
     >
-      <CardHeader>
-        <div className="flex items-center justify-between">
+      <CardHeader className="pb-4">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <CardTitle className="text-lg font-semibold">
-              Token Distribution
+            <CardTitle className="text-lg font-semibold text-white">
+              Capital Allocation
             </CardTitle>
-            <CardDescription>
-              Distribution of your scheduled payments
+            <CardDescription className="mt-1 text-slate-400">
+              How your scheduled capital is currently distributed.
             </CardDescription>
           </div>
-          <div className="flex items-center space-x-2">
-            {showControls && (
-              <>
-                <Select
-                  value={viewMode}
-                  onValueChange={(value: "chart" | "list") =>
-                    setViewMode(value)
-                  }
+          {showControls ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <Select
+                value={viewMode}
+                onValueChange={(value: "chart" | "list") => setViewMode(value)}
+              >
+                <SelectTrigger className="w-32 border-white/10 bg-white/[0.04] text-slate-100">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="border-white/10 bg-black text-slate-100">
+                  <SelectItem value="chart">Chart view</SelectItem>
+                  <SelectItem value="list">List view</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={sortBy} onValueChange={setSortBy}>
+                <SelectTrigger className="w-36 border-white/10 bg-white/[0.04] text-slate-100">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="border-white/10 bg-black text-slate-100">
+                  <SelectItem value="value">Sort by value</SelectItem>
+                  <SelectItem value="amount">Sort by amount</SelectItem>
+                  <SelectItem value="percentage">Sort by share</SelectItem>
+                  <SelectItem value="name">Sort by name</SelectItem>
+                </SelectContent>
+              </Select>
+              {onExport ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onExport}
+                  className="border-white/10 bg-white/[0.04] text-slate-100 hover:bg-white/[0.08] hover:text-white"
                 >
-                  <SelectTrigger className="w-32">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="chart">Chart View</SelectItem>
-                    <SelectItem value="list">List View</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={sortBy} onValueChange={setSortBy}>
-                  <SelectTrigger className="w-32">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="value">Sort by Value</SelectItem>
-                    <SelectItem value="amount">Sort by Amount</SelectItem>
-                    <SelectItem value="percentage">Sort by %</SelectItem>
-                    <SelectItem value="name">Sort by Name</SelectItem>
-                  </SelectContent>
-                </Select>
-                {onExport && (
-                  <Button variant="outline" size="sm" onClick={onExport}>
-                    <Download className="h-4 w-4" />
-                  </Button>
-                )}
-              </>
-            )}
-          </div>
+                  <Download className="h-4 w-4" />
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </CardHeader>
 
       <CardContent>
-        {tokens.length === 0 ? (
-          <div className="text-center py-8">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center">
-              <PieChart className="h-8 w-8 text-muted-foreground" />
+        {normalizedTokens.length === 0 ? (
+          <div className="rounded-[24px] border border-dashed border-white/10 bg-white/[0.02] px-6 py-12 text-center">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/[0.05]">
+              <PieChart className="h-7 w-7 text-slate-400" />
             </div>
-            <p className="text-muted-foreground mb-2">No tokens found</p>
-            <p className="text-sm text-muted-foreground">
-              No scheduled payments to display
+            <p className="text-base font-medium text-slate-200">
+              No allocation data yet
+            </p>
+            <p className="mt-1 text-sm text-slate-500">
+              Scheduled payments will appear here when your dashboard has active flow.
             </p>
           </div>
         ) : (
-          <div className="space-y-4">
-            {/* Summary Stats */}
-            <div className="grid grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg">
-              <div className="text-center">
-                <div className="text-2xl font-bold">
-                  ${totalValue.toFixed(2)}
+          <div className="space-y-5">
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="rounded-[24px] border border-white/[0.08] bg-white/[0.02] px-5 py-4">
+                <div className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                  Total value
                 </div>
-                <div className="text-sm text-muted-foreground">Total Value</div>
+                <div className="mt-2 text-3xl font-semibold text-white">
+                  {totalValue.toFixed(2)}
+                  {normalizedTokens.length === 1
+                    ? ` ${normalizedTokens[0]!.symbol}`
+                    : " total"}
+                </div>
               </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold">
-                  {totalAmount.toFixed(4)}
+              <div className="rounded-[24px] border border-white/[0.08] bg-white/[0.02] px-5 py-4">
+                <div className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                  Total amount
                 </div>
-                <div className="text-sm text-muted-foreground">
-                  Total Amount
+                <div className="mt-2 text-3xl font-semibold text-white">
+                  {totalAmount.toFixed(2)}
+                  {normalizedTokens.length === 1
+                    ? ` ${normalizedTokens[0]!.symbol}`
+                    : " total"}
                 </div>
               </div>
             </div>
 
-            {/* Chart View */}
-            {showChart && viewMode === "chart" && (
-              <div className="relative">
-                <div className="h-64">
-                  <Doughnut data={chartData} options={chartOptions} />
-                </div>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold">{tokens.length}</div>
-                    <div className="text-sm text-muted-foreground">Tokens</div>
+            {showChart && viewMode === "chart" ? (
+              <div className="grid gap-4 lg:grid-cols-[280px,1fr]">
+                <div className="relative mx-auto h-[260px] w-[260px]">
+                  <Doughnut
+                    data={chartData}
+                    options={{
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      cutout: "68%",
+                      plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                          backgroundColor: "#020617",
+                          borderColor: "rgba(148, 163, 184, 0.16)",
+                          borderWidth: 1,
+                          titleColor: "#f8fafc",
+                          bodyColor: "#cbd5e1",
+                        },
+                      },
+                    }}
+                  />
+                  <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="text-3xl font-semibold text-white">
+                        {normalizedTokens.length}
+                      </div>
+                      <div className="text-sm text-slate-500">segments</div>
+                    </div>
                   </div>
                 </div>
+                <div className="space-y-3">
+                  {sortedTokens.map((token) => (
+                    <div
+                      key={token.name}
+                      className={cn(
+                        "flex items-center justify-between rounded-[22px] border border-white/[0.08] bg-white/[0.02] px-4 py-3 transition-colors",
+                        onTokenClick && "cursor-pointer hover:border-white/[0.12] hover:bg-white/[0.04]"
+                      )}
+                      onClick={() => onTokenClick?.(token)}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="h-3 w-3 rounded-full"
+                          style={{ backgroundColor: token.color }}
+                        />
+                        <div>
+                          <div className="font-medium text-white">{token.name}</div>
+                          <div className="text-sm text-slate-500">
+                            {token.amount.toFixed(2)} {token.symbol}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-medium text-white">
+                          {token.percentage.toFixed(1)}%
+                        </div>
+                        <div className="text-sm text-slate-500">
+                          {token.value.toFixed(2)} {token.symbol}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
-            )}
+            ) : null}
 
-            {/* Token List */}
-            <div className="space-y-3">
-              {sortedTokens.map((token) => {
-                const change = getValueChange(token);
-
-                return (
+            {viewMode === "list" ? (
+              <div className="space-y-3">
+                {sortedTokens.map((token) => (
                   <div
-                    key={token.symbol}
-                    className={cn(
-                      "flex items-center justify-between p-4 border rounded-lg transition-all duration-200 hover:bg-muted/50",
-                      onTokenClick && "cursor-pointer"
-                    )}
-                    onClick={() => onTokenClick?.(token)}
+                    key={token.name}
+                    className="flex items-center justify-between rounded-[22px] border border-white/[0.08] bg-white/[0.02] px-4 py-3"
                   >
-                    <div className="flex items-center space-x-4 flex-1">
+                    <div className="flex items-center gap-3">
                       <div
-                        className="w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold"
+                        className="flex h-10 w-10 items-center justify-center rounded-2xl text-xs font-semibold text-white"
                         style={{ backgroundColor: token.color }}
                       >
                         {token.symbol.slice(0, 2)}
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center space-x-2">
-                          <p className="font-medium">{token.name}</p>
-                          <Badge variant="outline" className="text-xs">
-                            {token.symbol}
-                          </Badge>
-                          <Badge className="text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
-                            {token.percentage.toFixed(1)}%
-                          </Badge>
-                        </div>
-                        <div className="flex items-center space-x-2 mt-1">
-                          <p className="text-sm text-muted-foreground">
-                            {token.amount.toFixed(4)} {token.symbol}
-                          </p>
-                          <span className="text-xs text-muted-foreground">
-                            •
-                          </span>
-                          <p className="text-sm text-muted-foreground">
-                            ${token.value.toFixed(2)}
-                          </p>
+                      <div>
+                        <div className="font-medium text-white">{token.name}</div>
+                        <div className="text-sm text-slate-500">
+                          {token.amount.toFixed(2)} {token.symbol}
                         </div>
                       </div>
                     </div>
-
-                    <div className="flex items-center space-x-3">
-                      <div className="text-right">
-                        <div className="font-medium">
-                          ${token.value.toFixed(2)}
-                        </div>
-                        <div className="flex items-center space-x-1 text-xs">
-                          {change.isPositive ? (
-                            <TrendingUp className="h-3 w-3 text-green-600" />
-                          ) : (
-                            <TrendingDown className="h-3 w-3 text-red-600" />
-                          )}
-                          <span
-                            className={cn(
-                              change.isPositive
-                                ? "text-green-600"
-                                : "text-red-600"
-                            )}
-                          >
-                            {change.isPositive ? "+" : "-"}
-                            {change.value.toFixed(1)}%
-                          </span>
-                        </div>
-                      </div>
-
-                      {onTokenClick && (
+                    <div className="flex items-center gap-3">
+                      <Badge className="border-white/10 bg-white/[0.05] text-slate-200">
+                        {token.percentage.toFixed(1)}%
+                      </Badge>
+                      {onTokenClick ? (
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onTokenClick(token);
-                          }}
-                          className="h-8 w-8 p-0"
+                          className="h-9 w-9 rounded-xl text-slate-300 hover:bg-white/[0.05] hover:text-white"
+                          onClick={() => onTokenClick(token)}
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
-                      )}
+                      ) : null}
                     </div>
                   </div>
-                );
-              })}
-            </div>
-
-            {/* Footer Stats */}
-            <div className="pt-4 border-t">
-              <div className="grid grid-cols-3 gap-4 text-center text-sm">
-                <div>
-                  <div className="font-medium">{tokens.length}</div>
-                  <div className="text-muted-foreground">Total Tokens</div>
-                </div>
-                <div>
-                  <div className="font-medium">${totalValue.toFixed(2)}</div>
-                  <div className="text-muted-foreground">Total Value</div>
-                </div>
-                <div>
-                  <div className="font-medium">{totalAmount.toFixed(4)}</div>
-                  <div className="text-muted-foreground">Total Amount</div>
-                </div>
+                ))}
               </div>
-            </div>
+            ) : null}
           </div>
         )}
       </CardContent>

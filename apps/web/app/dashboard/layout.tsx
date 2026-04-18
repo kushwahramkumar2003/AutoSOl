@@ -15,9 +15,9 @@ export default function DashboardLayout({
 }) {
   return (
     <SidebarProvider defaultOpen={true}>
-      <div className="flex min-h-screen w-full">
+      <div className="app-shell flex min-h-screen w-full">
         <DashboardSidebar />
-        <main className="flex justify-center items-center bg-dark-300 w-full">
+        <main className="flex-1 min-w-0">
           {children}
         </main>
       </div>

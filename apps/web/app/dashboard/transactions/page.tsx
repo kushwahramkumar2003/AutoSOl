@@ -3,604 +3,257 @@
 import DashboardHeader from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import {
-  ArrowDownRight,
-  ArrowUpRight,
-  Calendar,
-  ChevronDown,
-  Clock,
-  Download,
-  Filter,
-  MoreHorizontal,
-  Search,
-  Copy,
-  ExternalLink,
+  ArrowDownRight, ArrowUpRight, Clock, Download, MoreHorizontal,
+  Search, Copy, ExternalLink, Filter, ChevronDown,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { useProgram } from "@/hooks/use-program";
 import { toast } from "sonner";
 import config from "@/config";
 import { Skeleton } from "@/components/ui/skeleton";
 import * as XLSX from "xlsx";
-import { PublicKey } from "@solana/web3.js";
-import * as anchor from "@coral-xyz/anchor";
+import { useProgram } from "@/hooks/use-program";
+import { fetchTransactionsResilient } from "@/lib/resilient-data";
+import { formatRawTokenAmount } from "@/lib/token-registry";
 
-// Define proper types for transactions
-interface TransactionData {
-  schedule: {
-    address: PublicKey;
-    data: {
-      owner: PublicKey;
-      totalAmount: anchor.BN;
-      remainingAmount: anchor.BN;
-      paymentAmount: anchor.BN;
-      recipient: PublicKey;
-      payments: Array<{
-        scheduledTime: anchor.BN;
-        executed: boolean;
-        executionTime: anchor.BN;
-        txSignature: PublicKey | null;
-      }>;
-      createdAt: anchor.BN;
-      status: string;
-      memo: string;
-    };
-  };
-  payment: {
-    scheduledTime: anchor.BN;
-    executed: boolean;
-    executionTime: anchor.BN;
-    txSignature: PublicKey | null;
-  };
-  index: number;
-  scheduleAddress: PublicKey;
-  recipient: PublicKey;
-  amount: anchor.BN;
-  memo: string;
-  status: string;
-  txSignature: PublicKey | null;
-  scheduledTime: anchor.BN;
-  executionTime: anchor.BN;
+interface Transaction {
+  id: string;
+  scheduleId: string;
+  paymentIndex: number;
+  amount: number;
+  token: string;
+  mint: string;
+  isSol: boolean;
+  recipient: string;
+  executedAt: string;
+  executedBy: string;
+  signature: string;
   isIncoming: boolean;
-}
-
-// Utility to extract status string from object
-function getStatusString(statusObj: unknown): string {
-  if (typeof statusObj === "string") return statusObj;
-  if (typeof statusObj === "object" && statusObj !== null) {
-    const keys = Object.keys(statusObj);
-    if (keys.length > 0) return keys[0];
-  }
-  return "unknown";
+  scheduleOwner: string;
+  scheduleStatus: string;
+  memo: string;
 }
 
 export default function TransactionsPage() {
-  const { program } = useProgram();
   const wallet = useWallet();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [transactions, setTransactions] = useState<TransactionData[]>([]);
+  const { program } = useProgram();
+  const [loading, setLoading] = useState(true);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [dataNotice, setDataNotice] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [isExporting, setIsExporting] = useState(false);
-  // Pagination (simple client-side for now)
   const [page, setPage] = useState(1);
   const pageSize = 10;
 
-  // Fetch transactions for the connected wallet (both outgoing and incoming)
-  useEffect(() => {
-    const fetchTxs = async () => {
-      if (!wallet.publicKey || !program) return;
-      setLoading(true);
-      setError(null);
-      try {
-        // Fetch outgoing transactions (where user is owner)
-        const outgoingSchedules = await program.getSchedulesForOwner(
-          wallet.publicKey
-        );
+  const fetchTxs = useCallback(async () => {
+    if (!wallet.publicKey) return;
+    setLoading(true);
+    try {
+      const result = await fetchTransactionsResilient(
+        wallet.publicKey,
+        program
+      );
+      setTransactions(result.data);
+      setDataNotice(result.notice);
+    } catch (err) {
+      console.error("Error fetching transactions:", err);
+      toast.error("Failed to load transactions");
+    } finally {
+      setLoading(false);
+    }
+  }, [program, wallet.publicKey]);
 
-        // Fetch incoming transactions (where user is recipient)
-        const incomingSchedules = await program.getSchedulesForRecipient(
-          wallet.publicKey
-        );
+  useEffect(() => { fetchTxs(); }, [fetchTxs]);
 
-        console.log("Outgoing payments --> ", outgoingSchedules);
-
-        // Flatten all payments from all schedules
-        const txs: TransactionData[] = [];
-
-        // Process outgoing transactions
-        outgoingSchedules.forEach((schedule) => {
-          schedule.data.payments.forEach((p, idx) => {
-            txs.push({
-              schedule,
-              payment: p,
-              index: idx,
-              scheduleAddress: schedule.address,
-              recipient: schedule.data.recipient,
-              amount: schedule.data.paymentAmount,
-              memo: schedule.data.memo,
-              status: p.executed ? "completed" : "pending",
-              txSignature: p.txSignature,
-              scheduledTime: p.scheduledTime,
-              executionTime: p.executionTime,
-              isIncoming: false,
-            });
-          });
-        });
-
-        // Process incoming transactions
-        incomingSchedules.forEach((schedule) => {
-          schedule.data.payments.forEach((p, idx) => {
-            txs.push({
-              schedule,
-              payment: p,
-              index: idx,
-              scheduleAddress: schedule.address,
-              recipient: schedule.data.recipient,
-              amount: schedule.data.paymentAmount,
-              memo: schedule.data.memo,
-              status: p.executed ? "completed" : "pending",
-              txSignature: p.txSignature,
-              scheduledTime: p.scheduledTime,
-              executionTime: p.executionTime,
-              isIncoming: true,
-            });
-          });
-        });
-
-        // Sort by scheduledTime desc
-        txs.sort(
-          (a, b) => b.scheduledTime.toNumber() - a.scheduledTime.toNumber()
-        );
-        setTransactions(txs);
-      } catch (err: unknown) {
-        const errorMessage =
-          err instanceof Error ? err.message : "Failed to fetch transactions";
-        setError(errorMessage);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchTxs();
-  }, [wallet.publicKey, program]);
-
-  // Filtering and searching
+  // Filter + search
   const filteredTxs = useMemo(() => {
     let txs = transactions;
     if (search) {
-      txs = txs.filter(
-        (tx) =>
-          tx.txSignature
-            ?.toString()
-            .toLowerCase()
-            .includes(search.toLowerCase()) ||
-          tx.recipient
-            ?.toString()
-            .toLowerCase()
-            .includes(search.toLowerCase()) ||
-          tx.memo?.toLowerCase().includes(search.toLowerCase())
+      const q = search.toLowerCase();
+      txs = txs.filter((t) =>
+        t.recipient.toLowerCase().includes(q) ||
+        t.executedBy.toLowerCase().includes(q) ||
+        t.memo?.toLowerCase().includes(q)
       );
     }
-    if (filterType !== "all") {
-      txs = txs.filter((tx) => {
-        return filterType === "incoming" ? tx.isIncoming : !tx.isIncoming;
-      });
-    }
+    if (filterType !== "all") txs = txs.filter((t) => filterType === "incoming" ? t.isIncoming : !t.isIncoming);
     if (filterStatus !== "all") {
-      txs = txs.filter((tx) => tx.status === filterStatus);
+      txs = txs.filter((t) => {
+        if (filterStatus === "cancelled") return t.scheduleStatus === "cancelled";
+        return filterStatus === "completed";
+      });
     }
     return txs;
   }, [transactions, search, filterType, filterStatus]);
 
-  // Pagination
-  const pagedTxs = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return filteredTxs.slice(start, start + pageSize);
-  }, [filteredTxs, page]);
+  const pagedTxs = useMemo(() => filteredTxs.slice((page - 1) * pageSize, page * pageSize), [filteredTxs, page]);
 
-  // Helper for formatting
-  const formatLamports = (bn: anchor.BN) => {
-    if (!bn || typeof bn.toNumber !== "function") return "0";
-    return (bn.toNumber() / 1e9).toLocaleString(undefined, {
-      maximumFractionDigits: 4,
-    });
-  };
-  const formatDateTime = (bn: anchor.BN) => {
-    if (!bn || typeof bn.toNumber !== "function") return "-";
-    const date = new Date(bn.toNumber() * 1000);
-    return date.toLocaleString(undefined, {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
+  const formatAmount = (tx: Transaction) =>
+    formatRawTokenAmount(tx.amount, tx.mint, tx.isSol);
+  const fmtDate = (iso: string) => new Date(iso).toLocaleString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  const truncAddr = (a: string) => a.length > 8 ? `${a.slice(0, 4)}…${a.slice(-4)}` : a;
 
-  // Excel export function
   const exportToExcel = async () => {
-    if (filteredTxs.length === 0) {
-      toast.error("No transactions to export");
-      return;
-    }
-
+    if (filteredTxs.length === 0) { toast.error("No data"); return; }
     setIsExporting(true);
     try {
-      // Prepare data for Excel export
-      const exportData = filteredTxs.map((tx) => {
-        let status = tx.status;
-        if (
-          getStatusString(tx.schedule?.data?.status).toLowerCase() ===
-          "cancelled"
-        ) {
-          status = "cancelled";
-        }
-
-        return {
-          Type: tx.isIncoming ? "Incoming" : "Outgoing",
-          Amount: `${tx.isIncoming ? "+" : "-"}${formatLamports(tx.amount)} SOL`,
-          "Amount (SOL)": parseFloat(formatLamports(tx.amount)),
-          Recipient: tx.recipient?.toString() || "",
-          "Schedule Address": tx.scheduleAddress?.toString() || "",
-          "Scheduled Date": formatDateTime(tx.scheduledTime),
-          "Execution Date":
-            tx.executionTime && tx.executionTime.toNumber() > 0
-              ? formatDateTime(tx.executionTime)
-              : "Not executed yet",
-          Status: status.charAt(0).toUpperCase() + status.slice(1),
-          "Transaction Signature": tx.txSignature?.toString() || "",
-          Memo: tx.memo || "",
-          "Explorer Link": tx.txSignature
-            ? `https://explorer.solana.com/tx/${tx.txSignature.toString()}?cluster=${config.rpcEndpoint === "http://127.0.0.1:8899" ? "custom" : "devnet"}`
-            : "",
-        };
-      });
-
-      // Create workbook and worksheet
+      const rows = filteredTxs.map((t) => ({
+        Type: t.isIncoming ? "Incoming" : "Outgoing",
+        Amount: `${t.isIncoming ? "+" : "-"}${formatAmount(t)} ${t.token}`,
+        Recipient: t.recipient,
+        Schedule: t.scheduleId,
+        Date: fmtDate(t.executedAt),
+        Status: t.scheduleStatus,
+        Executor: t.executedBy,
+        Signature: t.signature,
+      }));
       const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.json_to_sheet(exportData);
-
-      // Set column widths
-      const colWidths = [
-        { wch: 12 }, // Type
-        { wch: 18 }, // Amount
-        { wch: 15 }, // Amount (SOL)
-        { wch: 45 }, // Recipient
-        { wch: 45 }, // Schedule Address
-        { wch: 20 }, // Scheduled Date
-        { wch: 20 }, // Execution Date
-        { wch: 12 }, // Status
-        { wch: 45 }, // Transaction Signature
-        { wch: 20 }, // Memo
-        { wch: 60 }, // Explorer Link
-      ];
-      ws["!cols"] = colWidths;
-
-      // Add worksheet to workbook
-      XLSX.utils.book_append_sheet(wb, ws, "Transactions");
-
-      // Generate filename with current date
-      const now = new Date();
-      const dateStr = now.toISOString().split("T")[0];
-      const filename = `transactions_${dateStr}.xlsx`;
-
-      // Save the file
-      XLSX.writeFile(wb, filename);
-
-      toast.success(
-        `Exported ${filteredTxs.length} transactions to ${filename}`
-      );
-    } catch (error) {
-      console.error("Export error:", error);
-      toast.error("Failed to export transactions");
-    } finally {
-      setIsExporting(false);
-    }
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), "Transactions");
+      XLSX.writeFile(wb, `transactions_${new Date().toISOString().split("T")[0]}.xlsx`);
+      toast.success(`Exported ${filteredTxs.length} transactions`);
+    } catch { toast.error("Export failed"); }
+    finally { setIsExporting(false); }
   };
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="app-shell flex min-h-screen flex-col">
       <DashboardHeader />
 
-      <div className="flex-1 p-6">
-        <div className="flex justify-between items-center mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-white">Transactions</h1>
-            <p className="text-white/70 mt-1">
-              View and manage your transaction history
-            </p>
-          </div>
-          <Button
-            variant="outline"
-            className="border-white/10 bg-dark-300 hover:bg-white/10"
-            onClick={exportToExcel}
-            disabled={isExporting || filteredTxs.length === 0}
-          >
-            <Download className="h-4 w-4 mr-2" />
-            {isExporting ? "Exporting..." : "Export"}
+      <div className="app-page page-stack flex-1">
+        {/* Toolbar */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <span className="rounded-md bg-white/[0.04] px-2 py-0.5 text-xs text-white">{filteredTxs.length} transactions</span>
+          <Button variant="outline" size="sm" className="rounded-xl border-white/10 bg-white/[0.03] text-xs hover:bg-white/[0.06]"
+            onClick={exportToExcel} disabled={isExporting || filteredTxs.length === 0}>
+            <Download className="h-3.5 w-3.5 mr-1" />
+            {isExporting ? "Exporting…" : "Export"}
           </Button>
         </div>
 
-        <div className="bg-dark-200 rounded-lg border border-white/10 p-6">
-          <div className="flex flex-col md:flex-row justify-between gap-4 mb-6">
-            <div className="relative w-full md:w-80">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/50" />
-              <Input
-                placeholder="Search Transactions ..."
-                className="pl-8 bg-white/5 border-white/10 focus-visible:ring-[#6E56CF]"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
+        {/* Table */}
+        <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] overflow-hidden">
+          {dataNotice && (
+            <div className="border-b border-white/[0.06] bg-white/[0.02] px-4 py-2 text-xs text-slate-400">
+              {dataNotice}
+            </div>
+          )}
+          {/* Filters */}
+          <div className="flex flex-col gap-3 border-b border-white/[0.06] p-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="relative w-full lg:max-w-sm">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+              <Input placeholder="Search…" className="field-surface h-9 pl-9 text-sm" value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
             <div className="flex gap-2">
               <Button
-                variant={filterType === "all" ? "default" : "outline"}
-                onClick={() =>
-                  setFilterType(
-                    filterType === "all"
-                      ? "outgoing"
-                      : filterType === "outgoing"
-                        ? "incoming"
-                        : "all"
-                  )
-                }
+                variant={filterType === "all" ? "default" : "outline"} size="sm"
+                className={cn("rounded-xl text-xs", filterType === "all" ? "bg-primary hover:bg-primary/90" : "border-white/10 bg-white/[0.03] hover:bg-white/[0.06]")}
+                onClick={() => setFilterType(filterType === "all" ? "outgoing" : filterType === "outgoing" ? "incoming" : "all")}
               >
-                <Filter className="h-4 w-4 mr-2" />
-                {filterType === "all"
-                  ? "All"
-                  : filterType.charAt(0).toUpperCase() + filterType.slice(1)}
-                <ChevronDown className="h-4 w-4 ml-2" />
+                <Filter className="h-3 w-3 mr-1" />
+                {filterType === "all" ? "All" : filterType === "outgoing" ? "Outgoing" : "Incoming"}
               </Button>
               <Button
-                variant={filterStatus === "all" ? "default" : "outline"}
-                onClick={() =>
-                  setFilterStatus(
-                    filterStatus === "all"
-                      ? "completed"
-                      : filterStatus === "completed"
-                        ? "pending"
-                        : "all"
-                  )
-                }
+                variant={filterStatus === "all" ? "default" : "outline"} size="sm"
+                className={cn("rounded-xl text-xs", filterStatus === "all" ? "bg-primary hover:bg-primary/90" : "border-white/10 bg-white/[0.03] hover:bg-white/[0.06]")}
+                onClick={() => setFilterStatus(filterStatus === "all" ? "completed" : filterStatus === "completed" ? "cancelled" : "all")}
               >
-                <Calendar className="h-4 w-4 mr-2" />
-                {filterStatus === "all"
-                  ? "All Status"
-                  : filterStatus.charAt(0).toUpperCase() +
-                    filterStatus.slice(1)}
-                <ChevronDown className="h-4 w-4 ml-2" />
+                <Clock className="h-3 w-3 mr-1" />
+                {filterStatus === "all" ? "All Status" : filterStatus === "completed" ? "Completed" : "Cancelled"}
               </Button>
             </div>
           </div>
 
-          {error && (
-            <div className="mb-4 text-red-400 bg-red-500/10 border border-red-500/20 rounded p-3">
-              {error}
-            </div>
-          )}
-
-          <div className="rounded-md border border-white/10 overflow-hidden">
-            <Table>
-              <TableHeader className="bg-dark-300">
-                <TableRow className="hover:bg-transparent border-white/10">
-                  <TableHead className="text-white/70">Type</TableHead>
-                  <TableHead className="text-white/70">Amount</TableHead>
-                  <TableHead className="text-white/70">Recipient</TableHead>
-                  <TableHead className="text-white/70">Date & Time</TableHead>
-                  <TableHead className="text-white/70">Status</TableHead>
-                  <TableHead className="text-white/70">Actions</TableHead>
-                  <TableHead className="text-white/70 text-right">
-                    More
-                  </TableHead>
+          {/* Data */}
+          <div className="mobile-scroll">
+            <Table className="min-w-[700px]">
+              <TableHeader className="bg-white/[0.02]">
+                <TableRow className="hover:bg-transparent border-white/[0.06]">
+                  <TableHead className="text-slate-500 text-xs">Type</TableHead>
+                  <TableHead className="text-slate-500 text-xs">Amount</TableHead>
+                  <TableHead className="text-slate-500 text-xs">Recipient</TableHead>
+                  <TableHead className="text-slate-500 text-xs">Date</TableHead>
+                  <TableHead className="text-slate-500 text-xs">Status</TableHead>
+                  <TableHead className="text-slate-500 text-xs text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
-                  [...Array(pageSize)].map((_, i) => (
+                  Array.from({ length: pageSize }).map((_, i) => (
                     <TableRow key={i}>
-                      {[...Array(7)].map((_, j) => (
-                        <TableCell key={j}>
-                          <Skeleton className="h-6 w-full bg-white/10" />
-                        </TableCell>
+                      {Array.from({ length: 6 }).map((_, j) => (
+                        <TableCell key={j}><Skeleton className="h-5 w-full bg-white/[0.04]" /></TableCell>
                       ))}
                     </TableRow>
                   ))
                 ) : pagedTxs.length === 0 ? (
                   <TableRow>
-                    <TableCell
-                      colSpan={7}
-                      className="text-center text-white/70 py-8"
-                    >
+                    <TableCell colSpan={6} className="py-10 text-center text-sm text-slate-500">
                       No transactions found
                     </TableCell>
                   </TableRow>
                 ) : (
-                  pagedTxs.map((tx, idx) => {
-                    // Handle cancelled status
-                    let status = tx.status;
-                    if (
-                      getStatusString(
-                        tx.schedule?.data?.status
-                      ).toLowerCase() === "cancelled"
-                    ) {
-                      status = "cancelled";
-                    }
+                  pagedTxs.map((tx) => {
+                    const cancelled = tx.scheduleStatus === "cancelled";
                     return (
-                      <TableRow
-                        key={`${tx.scheduleAddress.toString()}-${idx}`}
-                        className={cn(
-                          "border-white/10 transition-colors",
-                          "hover:bg-dark-300/80",
-                          status === "cancelled" && "opacity-60 bg-red-900/10"
-                        )}
-                      >
+                      <TableRow key={tx.id} className={cn("border-white/[0.04] transition-colors hover:bg-white/[0.02]", cancelled && "opacity-50")}>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <div
-                              className={cn(
-                                "w-8 h-8 rounded-full flex items-center justify-center",
-                                tx.isIncoming
-                                  ? "bg-[#10B981]/20"
-                                  : "bg-[#6E56CF]/20"
-                              )}
-                            >
-                              {tx.isIncoming ? (
-                                <ArrowDownRight className="h-4 w-4 text-[#10B981]" />
-                              ) : (
-                                <ArrowUpRight className="h-4 w-4 text-[#6E56CF]" />
-                              )}
+                            <div className={cn(
+                              "flex h-7 w-7 items-center justify-center rounded-lg border",
+                              tx.isIncoming
+                                ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+                                : "bg-white/[0.04] border-white/[0.08] text-slate-300"
+                            )}>
+                              {tx.isIncoming ? <ArrowDownRight className="h-3.5 w-3.5" /> : <ArrowUpRight className="h-3.5 w-3.5" />}
                             </div>
-                            <span className="capitalize">
-                              {tx.isIncoming ? "incoming" : "outgoing"}
-                            </span>
+                            <span className="text-sm capitalize">{tx.isIncoming ? "In" : "Out"}</span>
                           </div>
                         </TableCell>
                         <TableCell>
-                          <div className="font-medium">
-                            {tx.isIncoming ? "+" : "-"}
-                            {formatLamports(tx.amount)} SOL
-                          </div>
+                          <span className="text-sm font-medium text-white">
+                            {tx.isIncoming ? "+" : "−"}{formatAmount(tx)} {tx.token}
+                          </span>
                         </TableCell>
                         <TableCell>
-                          <div className="truncate max-w-[120px] md:max-w-[200px]">
-                            <div className="font-medium truncate">
-                              {tx.recipient?.toString()}
-                            </div>
-                            <div className="text-xs text-white/70 truncate">
-                              {tx.scheduleAddress?.toString()}
-                            </div>
-                          </div>
+                          <div className="text-sm text-white">{truncAddr(tx.recipient)}</div>
+                          <div className="text-[11px] text-slate-500">{truncAddr(tx.scheduleId)}</div>
                         </TableCell>
                         <TableCell>
-                          <div>
-                            <div className="font-medium">
-                              {formatDateTime(tx.scheduledTime)}
-                            </div>
-                            <div className="flex items-center gap-1 text-xs text-white/70">
-                              <Clock className="h-3 w-3" />
-                              <span>
-                                {tx.executionTime &&
-                                tx.executionTime.toNumber() > 0
-                                  ? formatDateTime(tx.executionTime)
-                                  : "Not executed yet"}
-                              </span>
-                            </div>
-                          </div>
+                          <span className="text-sm text-slate-300">{fmtDate(tx.executedAt)}</span>
                         </TableCell>
                         <TableCell>
-                          <Badge
-                            className={cn(
-                              "capitalize",
-                              status === "completed"
-                                ? "bg-[#10B981]/20 text-[#10B981] hover:bg-[#10B981]/30"
-                                : status === "pending"
-                                  ? "bg-yellow-500/20 text-yellow-500 hover:bg-yellow-500/30"
-                                  : status === "cancelled"
-                                    ? "bg-red-500/20 text-red-500 hover:bg-red-500/30 border border-red-500"
-                                    : "bg-red-500/20 text-red-500 hover:bg-red-500/30"
-                            )}
-                          >
-                            {status}
+                          <Badge className={cn("border text-[10px] capitalize",
+                            cancelled
+                              ? "bg-red-500/10 text-red-400 border-red-500/20 line-through"
+                              : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                          )}>
+                            {cancelled ? "cancelled" : "completed"}
                           </Badge>
                         </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            {tx.txSignature ? (
-                              <>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-8 px-2 text-xs border-white/10 bg-dark-300 hover:bg-white/10"
-                                  onClick={() => {
-                                    navigator.clipboard.writeText(
-                                      tx.txSignature!.toString()
-                                    );
-                                    toast.success("Copied to clipboard");
-                                  }}
-                                >
-                                  <Copy className="h-3 w-3 mr-1" />
-                                  Copy
-                                </Button>
-                                <a
-                                  href={`https://explorer.solana.com/tx/${tx.txSignature.toString()}?cluster=${config.rpcEndpoint === "http://127.0.0.1:8899" ? "custom" : "devnet"}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center justify-center h-8 px-2 text-xs bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 rounded border border-blue-500/30"
-                                >
-                                  <ExternalLink className="h-3 w-3 mr-1" />
-                                  View
-                                </a>
-                              </>
-                            ) : (
-                              <span className="text-white/40">-</span>
-                            )}
-                          </div>
-                        </TableCell>
                         <TableCell className="text-right">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                              >
-                                <MoreHorizontal className="h-4 w-4" />
+                          <div className="flex items-center justify-end gap-1">
+                            {tx.signature && (
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:bg-white/[0.06] hover:text-white"
+                                onClick={() => window.open(`https://explorer.solana.com/tx/${tx.signature}?cluster=${config.rpcEndpoint === "http://127.0.0.1:8899" ? "custom" : "devnet"}`, "_blank")}>
+                                <ExternalLink className="h-3 w-3" />
                               </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent
-                              align="end"
-                              className=" border-white/10 text-white"
-                            >
-                              <DropdownMenuItem className="hover:bg-white/10 focus:bg-white/10 cursor-pointer">
-                                View Details
-                              </DropdownMenuItem>
-                              {tx.txSignature && (
-                                <DropdownMenuItem
-                                  className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
-                                  onClick={() => {
-                                    navigator.clipboard.writeText(
-                                      tx.txSignature!.toString()
-                                    );
-                                    toast.success("Copied to clipboard");
-                                  }}
-                                >
-                                  Copy Transaction ID
-                                </DropdownMenuItem>
-                              )}
-                              {tx.txSignature && (
-                                <DropdownMenuItem
-                                  className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
-                                  onClick={() => {
-                                    window.open(
-                                      `https://explorer.solana.com/tx/${tx.txSignature!.toString()}?cluster=${config.rpcEndpoint === "http://127.0.0.1:8899" ? "custom" : "devnet"}`,
-                                      "_blank"
-                                    );
-                                  }}
-                                >
-                                  View on Explorer
-                                </DropdownMenuItem>
-                              )}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                            )}
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:bg-white/[0.06] hover:text-white"
+                              onClick={() => { navigator.clipboard.writeText(tx.signature || tx.executedBy); toast.success("Copied"); }}>
+                              <Copy className="h-3 w-3" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     );
@@ -610,45 +263,22 @@ export default function TransactionsPage() {
             </Table>
           </div>
 
-          <div className="flex justify-between items-center mt-6">
-            <div className="text-sm text-white/70">
-              Showing {pagedTxs.length} of {filteredTxs.length} transactions
-            </div>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="border-white/10 bg-dark-300 hover:bg-white/10"
-                disabled={page === 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-              >
-                Previous
+          {/* Pagination */}
+          <div className="flex items-center justify-between border-t border-white/[0.06] px-4 py-3">
+            <span className="text-[11px] text-slate-500">{pagedTxs.length} of {filteredTxs.length}</span>
+            <div className="flex gap-1.5">
+              <Button variant="outline" size="sm" className="h-7 rounded-lg border-white/[0.08] bg-white/[0.02] px-3 text-[11px] hover:bg-white/[0.06]"
+                disabled={page === 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+                Prev
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="border-white/10 bg-dark-300 hover:bg-white/10"
-                disabled={page * pageSize >= filteredTxs.length}
-                onClick={() => setPage((p) => p + 1)}
-              >
+              <Button variant="outline" size="sm" className="h-7 rounded-lg border-white/[0.08] bg-white/[0.02] px-3 text-[11px] hover:bg-white/[0.06]"
+                disabled={page * pageSize >= filteredTxs.length} onClick={() => setPage((p) => p + 1)}>
                 Next
               </Button>
             </div>
           </div>
         </div>
       </div>
-      {/* Responsive tweaks for the table container */}
-      <style jsx global>{`
-        @media (max-width: 900px) {
-          .table-responsive {
-            overflow-x: auto;
-            display: block;
-          }
-          .table-responsive table {
-            min-width: 700px;
-          }
-        }
-      `}</style>
     </div>
   );
 }

@@ -1,77 +1,46 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
 @layer base {
   :root {
-    --background: 240 10% 3.9%;
+    --background: 0 0% 3%;
     --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 240 5.9% 10%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
-    --radius: 0.75rem;
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
-    /* added */
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
-  }
 
-  .light {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 240 5.9% 10%;
+    --card: 0 0% 5%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 0 0% 4%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 217 91% 60%;
     --primary-foreground: 0 0% 98%;
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
-    --destructive: 0 84.2% 60.2%;
+
+    --secondary: 0 0% 8%;
+    --secondary-foreground: 0 0% 90%;
+
+    --muted: 0 0% 9%;
+    --muted-foreground: 0 0% 62%;
+
+    --accent: 0 0% 10%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 240 5.9% 10%;
-  }
-  .dark {
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+
+    --border: 0 0% 14%;
+    --input: 0 0% 12%;
+    --ring: 0 0% 100%;
+    --radius: 1.25rem;
+
+    --sidebar-background: 0 0% 4%;
+    --sidebar-foreground: 0 0% 90%;
+    --sidebar-primary: 217 91% 60%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 0 0% 8%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 0 0% 10%;
+    --sidebar-ring: 0 0% 100%;
   }
 }
 
@@ -79,126 +48,69 @@
   * {
     @apply border-border;
   }
+  html {
+    color-scheme: dark;
+  }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+    background-image:
+      radial-gradient(circle at top, rgba(255, 255, 255, 0.045), transparent 28%),
+      radial-gradient(circle at bottom right, rgba(37, 99, 235, 0.08), transparent 24%);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 }
 
-.animate-sparkle {
-  animation: sparkle 1.5s ease-in-out infinite;
-}
-
-@keyframes sparkle {
-  0% {
-    transform: scale(0) rotate(0deg);
-    opacity: 0;
-  }
-  50% {
-    transform: scale(1) rotate(180deg);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(0) rotate(360deg);
-    opacity: 0;
-  }
-}
-.text-gradient {
-  background: linear-gradient(
-    to right,
-    hsl(var(--primary)),
-    hsl(321, 70%, 69%),
-    hsl(var(--primary))
-  );
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  color: transparent;
-  --shiny-width: 100%;
-  background-size: 200% auto;
-  animation: shiny-text 8s linear infinite;
-}
-
-.meteor-container {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  z-index: 0;
-}
-
-.meteor {
-  position: absolute;
-  width: 1px;
-  height: 60px;
-  background: linear-gradient(
-    to bottom,
-    rgba(255, 255, 255, 0),
-    rgba(255, 255, 255, 0.8)
-  );
-  border-radius: 999px;
-  filter: drop-shadow(0 0 6px rgba(105, 155, 255, 1));
-  top: 0;
-  left: 0;
-  opacity: 0;
-  --angle: 0deg;
-  animation: meteor 5s linear infinite;
-}
-
-.grid-pattern {
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
-  background-size: 30px 30px;
-}
-
-.glow-effect {
-  position: relative;
-}
-
-.glow-effect::before {
-  content: "";
-  position: absolute;
-  top: -2px;
-  left: -2px;
-  right: -2px;
-  bottom: -2px;
-  background: linear-gradient(45deg, hsl(var(--primary)), hsl(321, 70%, 69%));
-  border-radius: calc(var(--radius) + 2px);
-  z-index: -1;
-  filter: blur(10px);
-  opacity: 0.5;
-}
-
-.custom-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-
-.custom-scrollbar::-webkit-scrollbar {
-  width: 10px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: #1a1a1a;
-  border-radius: 10px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #333333;
-  border-radius: 10px;
-  transition: background 0.3s ease;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #454545;
-}
-
-/* Firefox scrollbar */
+/* ── Custom Scrollbar (super minimal) ────────────────────────────────────── */
 .custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: #333333 #1a1a1a;
+  scrollbar-color: hsl(var(--border)) transparent;
+}
+.custom-scrollbar::-webkit-scrollbar { width: 4px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: hsl(var(--border) / 0.5);
+  border-radius: 99px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--border));
 }
 
-/* Optional: Ensure smooth scrolling */
-.custom-scrollbar {
-  scroll-behavior: smooth;
+.glass-panel {
+  @apply border border-white/[0.06] bg-white/[0.035] backdrop-blur-xl;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.02),
+    0 20px 60px rgba(0, 0, 0, 0.22);
+}
+
+.app-shell {
+  @apply min-h-screen bg-background text-foreground;
+}
+
+.app-page {
+  @apply mx-auto w-full max-w-[1480px] px-4 py-5 sm:px-6 sm:py-6 lg:px-8;
+}
+
+.page-stack {
+  @apply space-y-4 sm:space-y-6;
+}
+
+.section-surface {
+  @apply glass-panel rounded-[28px] p-4 sm:p-5 lg:p-6;
+}
+
+.section-subtle {
+  @apply rounded-[24px] border border-white/[0.08] bg-white/[0.02] p-4 sm:p-5;
+}
+
+.section-grid {
+  @apply grid gap-4 lg:gap-5;
+}
+
+.field-surface {
+  @apply border-white/10 bg-white/[0.03] text-white placeholder:text-slate-500;
+}
+
+.mobile-scroll {
+  @apply min-w-0 overflow-x-auto;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { PublicKey } from "@solana/web3.js";
 import { useWallet } from "@solana/wallet-adapter-react";
@@ -188,14 +188,16 @@ const AuthPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [nonce, setNonce] = useState<string>("");
 
-  // Generate nonce for signature when component mounts
-  useEffect(() => {
-    const generateNonce = () => {
-      const randomString = Math.random().toString(36).substring(2, 15);
-      setNonce(`Sign this message to verify your wallet: ${randomString}`);
-    };
-    generateNonce();
-  }, []);
+  // Fetch a server-issued one-time nonce from the challenge endpoint.
+  // This replaces the old client-side Math.random() nonce (SEC-001).
+  const fetchChallenge = async (walletPubkey: string): Promise<string> => {
+    const res = await fetch(
+      `/api/auth/challenge?wallet=${encodeURIComponent(walletPubkey)}`
+    );
+    if (!res.ok) throw new Error("Failed to fetch auth challenge");
+    const data: { nonce: string } = await res.json();
+    return data.nonce;
+  };
 
   // Handle wallet connection
   const handleWalletConnect = (pubKey: PublicKey) => {
@@ -223,32 +225,30 @@ const AuthPage = () => {
 
     try {
       setIsLoading(true);
-      // Create a message encoder
-      const encoder = new TextEncoder();
-      // Encode the nonce
-      const message = encoder.encode(nonce);
-      // Sign the encoded message
+
+      // Fetch a fresh server-issued nonce for this wallet (SEC-001).
+      const serverNonce = await fetchChallenge(publicKey.toBase58());
+      setNonce(serverNonce);
+
+      // Sign only the server nonce — not a client-generated string.
+      const message = new TextEncoder().encode(serverNonce);
       const signatureBytes = await signMessage(message);
-      // Convert signature to base64 string
       const signatureBase58 = bs58.encode(signatureBytes);
 
       setSignature(signatureBase58);
       toast.success("Message signed successfully");
 
-      // Attempt to sign in with next-auth
-      await handleSignIn(signatureBase58);
+      await handleSignIn(signatureBase58, serverNonce);
     } catch (error) {
       console.error("Error signing message:", error);
-      toast.error("Failed to sign message", {
-        description: "Please try again",
-      });
+      toast.error("Failed to sign message", { description: "Please try again" });
     } finally {
       setIsLoading(false);
     }
   };
 
   // Handle wallet-based sign in
-  const handleSignIn = async (sig: string) => {
+  const handleSignIn = async (sig: string, challengeNonce: string) => {
     if (!publicKey) {
       toast.error("Wallet not connected");
       return;
@@ -260,23 +260,19 @@ const AuthPage = () => {
       const result = await signIn("signin", {
         publicKey: publicKey.toBase58(),
         signature: sig,
-        nonce,
+        nonce: challengeNonce,  // always the server-issued nonce
         redirect: false,
       });
 
       if (result?.error) {
-        toast.error("Authentication failed", {
-          description: result.error,
-        });
+        toast.error("Authentication failed", { description: result.error });
         return;
       }
 
       if (result?.status === 200) {
         toast.success("Signed in successfully", {
-          description: "Redirecting to dashboard...",
+          description: "Redirecting to dashboard…",
         });
-
-        // Redirect to dashboard or home page after successful login
         window.location.href = "/dashboard";
       }
     } catch (error) {

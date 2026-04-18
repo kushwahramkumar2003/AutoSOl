@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   Card,
   CardContent,
@@ -19,12 +19,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  ArrowDownLeft,
   ArrowUpRight,
-  ArrowDownRight,
-  Search,
+  Copy,
+  ExternalLink,
   Eye,
-  Download,
-  BarChart3,
+  Search,
 } from "lucide-react";
 import { Transaction } from "@/hooks/use-dashboard-data";
 import { cn } from "@/lib/utils";
@@ -67,16 +67,16 @@ export function RecentTransactions({
       .slice(0, maxItems);
   }, [transactions, searchTerm, statusFilter, typeFilter, maxItems]);
 
-  const getStatusColor = (status: string) => {
+  const getStatusClass = (status: string) => {
     switch (status) {
       case "completed":
-        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300";
+        return "border-primary/20 bg-primary/10 text-primary";
       case "pending":
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300";
+        return "border-white/10 bg-white/[0.05] text-slate-200";
       case "failed":
-        return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300";
+        return "border-white/10 bg-white/[0.03] text-slate-400";
       default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300";
+        return "border-white/10 bg-white/[0.05] text-slate-300";
     }
   };
 
@@ -84,214 +84,188 @@ export function RecentTransactions({
     return type === "outgoing" ? (
       <ArrowUpRight className="h-4 w-4" />
     ) : (
-      <ArrowDownRight className="h-4 w-4" />
+      <ArrowDownLeft className="h-4 w-4" />
     );
   };
 
-  const getTypeColor = (type: string) => {
+  const getTypeClass = (type: string) => {
     return type === "outgoing"
-      ? "bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-400"
-      : "bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400";
+      ? "bg-primary/12 text-primary"
+      : "bg-white/[0.08] text-slate-200";
   };
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-  };
-
-  const viewOnExplorer = (signature?: string) => {
-    if (signature) {
-      window.open(`https://solscan.io/tx/${signature}`, "_blank");
-    }
+  const copyToClipboard = async (text: string) => {
+    await navigator.clipboard.writeText(text);
   };
 
   return (
     <Card
-      className={cn("transition-all duration-200 hover:shadow-md", className)}
+      className={cn(
+        "glass-panel rounded-[28px] border-white/[0.06] text-white shadow-[0_18px_50px_rgba(0,0,0,0.24)]",
+        className
+      )}
     >
-      <CardHeader>
-        <div className="flex items-center justify-between">
+      <CardHeader className="pb-4">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <CardTitle className="text-lg font-semibold">
+            <CardTitle className="text-lg font-semibold text-white">
               Recent Transactions
             </CardTitle>
-            <CardDescription>Your latest payment activities</CardDescription>
+            <CardDescription className="mt-1 text-slate-400">
+              Latest confirmed and pending payment activity.
+            </CardDescription>
           </div>
-          <div className="flex items-center space-x-2">
-            {onViewAll && (
-              <Button variant="outline" size="sm" onClick={onViewAll}>
-                View All
+          <div className="flex items-center gap-2">
+            {onViewAll ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onViewAll}
+                className="border-white/10 bg-white/[0.04] text-slate-100 hover:bg-white/[0.08] hover:text-white"
+              >
+                View all
               </Button>
-            )}
-            <Button variant="outline" size="sm">
-              <Download className="h-4 w-4" />
-            </Button>
+            ) : null}
           </div>
         </div>
 
-        {showFilters && (
-          <div className="flex items-center space-x-2 mt-4">
+        {showFilters ? (
+          <div className="flex flex-col gap-2 pt-2 lg:flex-row">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
               <Input
-                placeholder="Search transactions..."
+                placeholder="Search recipient, token, or ID"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="border-white/10 bg-white/[0.04] pl-10 text-slate-100 placeholder:text-slate-500"
               />
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-32">
+              <SelectTrigger className="w-full border-white/10 bg-white/[0.04] text-slate-100 lg:w-40">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
+              <SelectContent className="border-white/10 bg-black text-slate-100">
+                <SelectItem value="all">All status</SelectItem>
                 <SelectItem value="completed">Completed</SelectItem>
                 <SelectItem value="pending">Pending</SelectItem>
                 <SelectItem value="failed">Failed</SelectItem>
               </SelectContent>
             </Select>
             <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-32">
+              <SelectTrigger className="w-full border-white/10 bg-white/[0.04] text-slate-100 lg:w-40">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
+              <SelectContent className="border-white/10 bg-black text-slate-100">
+                <SelectItem value="all">All types</SelectItem>
                 <SelectItem value="outgoing">Outgoing</SelectItem>
                 <SelectItem value="incoming">Incoming</SelectItem>
               </SelectContent>
             </Select>
           </div>
-        )}
+        ) : null}
       </CardHeader>
 
-      <CardContent>
-        <div className="space-y-3">
-          {filteredTransactions.length === 0 ? (
-            <div className="text-center py-8">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center">
-                <Search className="h-8 w-8 text-muted-foreground" />
-              </div>
-              <p className="text-muted-foreground mb-2">
-                No transactions found
-              </p>
-              <p className="text-sm text-muted-foreground">
-                {searchTerm || statusFilter !== "all" || typeFilter !== "all"
-                  ? "Try adjusting your filters"
-                  : "No recent transactions to display"}
-              </p>
-            </div>
-          ) : (
-            filteredTransactions.map((transaction) => (
-              <div
-                key={transaction.id}
-                className={cn(
-                  "flex items-center justify-between p-4 border rounded-lg transition-all duration-200 hover:bg-muted/50 cursor-pointer",
-                  onTransactionClick && "hover:shadow-sm"
-                )}
-                onClick={() => onTransactionClick?.(transaction)}
-              >
-                <div className="flex items-center space-x-4 flex-1">
-                  <div
-                    className={cn(
-                      "p-2 rounded-full",
-                      getTypeColor(transaction.type)
-                    )}
-                  >
-                    {getTypeIcon(transaction.type)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center space-x-2">
-                      <p className="font-medium truncate">
-                        {transaction.recipient}
-                      </p>
-                      <Badge variant="outline" className="text-xs">
-                        {transaction.token}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center space-x-2 mt-1">
-                      <p className="text-sm text-muted-foreground">
-                        {transaction.date}
-                      </p>
-                      <span className="text-xs text-muted-foreground">•</span>
-                      <p className="text-xs text-muted-foreground font-mono">
-                        {transaction.id.slice(0, 8)}...
-                      </p>
-                    </div>
-                  </div>
+      <CardContent className="space-y-3">
+        {filteredTransactions.length === 0 ? (
+          <div className="rounded-[24px] border border-dashed border-white/10 bg-white/[0.02] px-6 py-12 text-center">
+            <p className="text-base font-medium text-slate-200">
+              No transactions to show
+            </p>
+            <p className="mt-1 text-sm text-slate-500">
+              Adjust the filters or wait for new payment activity.
+            </p>
+          </div>
+        ) : (
+          filteredTransactions.map((transaction) => (
+            <div
+              key={transaction.id}
+              className={cn(
+                "flex flex-col gap-4 rounded-[24px] border border-white/[0.08] bg-white/[0.02] p-4 transition-colors hover:border-white/[0.12] hover:bg-white/[0.04]",
+                onTransactionClick && "cursor-pointer"
+              )}
+              onClick={() => onTransactionClick?.(transaction)}
+            >
+              <div className="flex items-start gap-4">
+                <div
+                  className={cn(
+                    "mt-1 flex h-10 w-10 items-center justify-center rounded-2xl",
+                    getTypeClass(transaction.type)
+                  )}
+                >
+                  {getTypeIcon(transaction.type)}
                 </div>
-
-                <div className="flex items-center space-x-3">
-                  <div className="text-right">
-                    <div className="font-medium">
-                      {transaction.type === "outgoing" ? "-" : "+"}
-                      {transaction.amount.toFixed(4)} {transaction.token}
-                    </div>
-                    <Badge
-                      className={cn("mt-1", getStatusColor(transaction.status))}
-                    >
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-medium text-white">
+                      {transaction.recipient}
+                    </p>
+                    <Badge className="border-white/10 bg-white/[0.05] text-slate-200">
+                      {transaction.token}
+                    </Badge>
+                    <Badge className={cn("border", getStatusClass(transaction.status))}>
                       {transaction.status}
                     </Badge>
                   </div>
-
-                  <div className="flex items-center space-x-1">
-                    {transaction.txSignature && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          viewOnExplorer(transaction.txSignature);
-                        }}
-                        className="h-8 w-8 p-0"
-                      >
-                        <BarChart3 className="h-4 w-4" />
-                      </Button>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        copyToClipboard(transaction.id);
-                      }}
-                      className="h-8 w-8 p-0"
-                    >
-                      <BarChart3 className="h-4 w-4" />
-                    </Button>
-                    {onTransactionClick && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onTransactionClick(transaction);
-                        }}
-                        className="h-8 w-8 p-0"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                    )}
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-400">
+                    <span>{transaction.date}</span>
+                    <span className="text-slate-600">•</span>
+                    <span className="font-mono">{transaction.id.slice(0, 12)}...</span>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-lg font-semibold text-white">
+                    {transaction.type === "outgoing" ? "-" : "+"}
+                    {transaction.amount.toFixed(4)} {transaction.token}
+                  </div>
+                  <div className="text-xs uppercase tracking-[0.16em] text-slate-500">
+                    {transaction.type}
                   </div>
                 </div>
               </div>
-            ))
-          )}
-        </div>
-
-        {filteredTransactions.length > 0 && (
-          <div className="mt-4 pt-4 border-t">
-            <div className="flex items-center justify-between text-sm text-muted-foreground">
-              <span>
-                Showing {filteredTransactions.length} of {transactions.length}{" "}
-                transactions
-              </span>
-              {filteredTransactions.length === maxItems && (
-                <Button variant="link" size="sm" onClick={onViewAll}>
-                  View All Transactions
+              <div className="flex items-center justify-end gap-2">
+                {transaction.executorAddress ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-9 w-9 rounded-xl text-slate-300 hover:bg-white/[0.05] hover:text-white"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      window.open(
+                        `https://solscan.io/address/${transaction.executorAddress}`,
+                        "_blank"
+                      );
+                    }}
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                  </Button>
+                ) : null}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-9 w-9 rounded-xl text-slate-300 hover:bg-white/[0.05] hover:text-white"
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    await copyToClipboard(transaction.id);
+                  }}
+                >
+                  <Copy className="h-4 w-4" />
                 </Button>
-              )}
+                {onTransactionClick ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-9 w-9 rounded-xl text-slate-300 hover:bg-white/[0.05] hover:text-white"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onTransactionClick(transaction);
+                    }}
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                ) : null}
+              </div>
             </div>
-          </div>
+          ))
         )}
       </CardContent>
     </Card>

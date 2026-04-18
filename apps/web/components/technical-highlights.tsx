@@ -1,586 +1,316 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useState } from "react";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { ExternalLink, Code, Zap, Droplet, Shield } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ExternalLink, Zap, Shield, Layers, Clock, DollarSign, Activity } from "lucide-react";
 
-export default function TechnicalHighlights() {
-  const [activeTab, setActiveTab] = useState("performance");
-  const [isInView, setIsInView] = useState(false);
-  const [counters, setCounters] = useState({
-    speed: 0,
-    cost: 0,
-    efficiency: 0,
-  });
-
-  // Animate counters when in view
-  useEffect(() => {
-    if (isInView) {
-      const interval = setInterval(() => {
-        setCounters((prev) => ({
-          speed: prev.speed >= 400 ? 400 : prev.speed + 20,
-          cost: prev.cost >= 0.0005 ? 0.0005 : prev.cost + 0.00005,
-          efficiency: prev.efficiency >= 99.9 ? 99.9 : prev.efficiency + 5,
-        }));
-      }, 50);
-
-      return () => clearInterval(interval);
-    }
-  }, [isInView]);
-
-  const codeSnippets: {
-    [key in "performance" | "security" | "scalability"]: string;
-  } = {
-    performance: `// AutoSOL Smart Contract (simplified)
-import { Program } from '@project-serum/anchor';
-
-// Create a recurring payment
-async function createRecurringPayment(
-  sender: PublicKey,
-  recipient: PublicKey,
-  amount: number,
-  interval: number, // in seconds
-  startTime: number, // unix timestamp
-) {
-  return await program.methods
-    .createRecurringPayment(
-      recipient,
-      new BN(amount),
-      new BN(interval),
-      new BN(startTime)
-    )
-    .accounts({
-      sender,
-      systemProgram: SystemProgram.programId,
-    })
-    .rpc();
-}`,
-    security: `// AutoSOL Security Implementation
-import { verify } from '@solana/web3.js';
-
-// Verify transaction signature
-async function verifyPaymentExecution(
-  signature: string,
-  expectedSender: PublicKey,
-  expectedRecipient: PublicKey,
-  expectedAmount: number
-) {
-  const tx = await connection.getTransaction(signature);
-  
-  // Verify sender and recipient
-  const isValid = 
-    tx.transaction.message.accountKeys[0].equals(expectedSender) && 
-    tx.transaction.message.accountKeys[1].equals(expectedRecipient) &&
-    tx.meta.postBalances[1] - tx.meta.preBalances[1] === expectedAmount;
-    
-  return {
-    valid: isValid,
-    timestamp: tx.blockTime,
-    blockHeight: tx.slot
-  };
-}`,
-    scalability: `// AutoSOL Batching Implementation
-import { TransactionInstruction, Transaction } from '@solana/web3.js';
-
-// Process multiple recurring payments in a single transaction
-async function batchProcessPayments(
-  paymentIds: string[],
-  processor: PublicKey
-) {
-  const instructions = [];
-  
-  for (const paymentId of paymentIds) {
-    instructions.push(
-      program.instruction.processPayment(
-        new PublicKey(paymentId),
-        {
-          accounts: {
-            processor,
-            payment: new PublicKey(paymentId),
-            systemProgram: SystemProgram.programId,
-          }
-        }
-      )
-    );
-  }
-  
-  // Create and send transaction with all instructions
-  const transaction = new Transaction().add(...instructions);
-  return await sendAndConfirmTransaction(connection, transaction, [processorKeypair]);
-}`,
-  };
-
-  const features = {
-    performance: [
-      "Sub-second confirmation times",
-      "Transaction costs under $0.001",
-      "Parallel transaction processing",
-      "Optimized contract execution",
-    ],
-    security: [
-      "Audited smart contracts",
-      "Multi-signature authorizations",
-      "Fraud detection algorithms",
-      "Secure key management",
-    ],
-    scalability: [
-      "Carbon-neutral blockchain operations",
-      "Handles 50,000+ TPS",
-      "Automated load balancing",
-      "Horizontal scaling architecture",
-    ],
-  };
-
-  const iconComponents = {
-    performance: <Zap className="h-5 w-5" />,
-    security: <Shield className="h-5 w-5" />,
-    scalability: <Droplet className="h-5 w-5" />,
-  };
+/* ── Architecture diagram ─────────────────────────────────────────────── */
+function ArchitectureDiagram() {
+  const nodes = [
+    { label: "Solana Program", sub: "Anchor / Rust", color: "#9945FF", col: 0 },
+    { label: "Monitor", sub: "Event Listener", color: "#3b82f6", col: 1 },
+    { label: "Redis", sub: "Event Stream", color: "#E84142", col: 2 },
+    { label: "Worker", sub: "DB Sync", color: "#F2A52B", col: 3 },
+    { label: "Executor", sub: "Cron Runner", color: "#26A17B", col: 4 },
+  ];
 
   return (
-    <section
-      id="technical"
-      className="py-24 bg-gradient-to-b from-dark-200 to-dark-300"
-    >
-      <div className="container mx-auto px-4">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.5 }}
-          className="text-center mb-16"
-        >
-          <div className="inline-block mb-4 px-3 py-1 bg-[#6E56CF]/10 rounded-full">
-            <span className="text-sm font-medium text-[#6E56CF]">
-              Built on Solana
-            </span>
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        {nodes.map((node, i) => (
+          <div key={node.label} className="flex flex-1 items-center">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              viewport={{ once: true }}
+              transition={{ delay: i * 0.1 }}
+              className="flex w-full flex-col items-center gap-1 rounded-lg border border-white/[0.06] bg-white/[0.025] p-2.5"
+            >
+              <div
+                className="h-2 w-2 rounded-full"
+                style={{ backgroundColor: node.color }}
+              />
+              <span className="text-[10px] font-medium text-slate-300">
+                {node.label}
+              </span>
+              <span className="text-[9px] text-slate-600">{node.sub}</span>
+            </motion.div>
+            {i < nodes.length - 1 && (
+              <div className="mx-1 h-px w-3 shrink-0 bg-white/[0.08]" />
+            )}
           </div>
-          <h2 className="text-4xl md:text-5xl font-space bg-clip-text text-transparent bg-gradient-to-r from-[#6E56CF] to-[#10B981] mb-4 font-bold">
-            Technical Excellence
-          </h2>
-          <p className="text-white/70 max-w-2xl mx-auto text-lg">
-            Unparalleled speed, security, and cost-efficiency for your recurring
-            payments
-          </p>
-        </motion.div>
+        ))}
+      </div>
+      {/* Data flow labels */}
+      <div className="flex items-center gap-2 px-2">
+        {["Deploy", "Events", "Stream", "Persist", "Execute"].map((label, i) => (
+          <motion.span
+            key={label}
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.5 + i * 0.08 }}
+            className="flex-1 text-center text-[9px] text-slate-600"
+          >
+            {label} →
+          </motion.span>
+        ))}
+      </div>
+    </div>
+  );
+}
 
-        <div className="grid md:grid-cols-2 gap-12 items-start">
+/* ── Benchmark comparison ─────────────────────────────────────────────── */
+function BenchmarkVisual() {
+  const benchmarks = [
+    {
+      label: "AutoSOL (Solana)",
+      speed: "400ms",
+      cost: "$0.0005",
+      barSpeed: 98,
+      barCost: 99,
+      highlight: true,
+    },
+    {
+      label: "Ethereum",
+      speed: "15s",
+      cost: "$5–$20",
+      barSpeed: 12,
+      barCost: 8,
+      highlight: false,
+    },
+    {
+      label: "Polygon",
+      speed: "2s",
+      cost: "$0.01",
+      barSpeed: 60,
+      barCost: 85,
+      highlight: false,
+    },
+  ];
+
+  return (
+    <div className="space-y-3">
+      {benchmarks.map((b, i) => (
+        <motion.div
+          key={b.label}
+          initial={{ opacity: 0, x: -12 }}
+          whileInView={{ opacity: 1, x: 0 }}
+          viewport={{ once: true }}
+          transition={{ delay: i * 0.1 }}
+          className={`rounded-xl border p-3 ${
+            b.highlight
+              ? "border-primary/20 bg-primary/[0.04]"
+              : "border-white/[0.04] bg-white/[0.015]"
+          }`}
+        >
+          <div className="mb-2 flex items-center justify-between">
+            <span className={`text-xs font-medium ${b.highlight ? "text-white" : "text-slate-400"}`}>
+              {b.label}
+            </span>
+            <div className="flex gap-3">
+              <span className="text-[10px] text-slate-500">
+                <Clock className="mr-0.5 inline h-3 w-3" />
+                {b.speed}
+              </span>
+              <span className="text-[10px] text-slate-500">
+                <DollarSign className="mr-0.5 inline h-3 w-3" />
+                {b.cost}
+              </span>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <div className="h-1.5 w-full rounded-full bg-white/[0.06]">
+                <motion.div
+                  className={`h-full rounded-full ${b.highlight ? "bg-primary" : "bg-slate-600"}`}
+                  initial={{ width: 0 }}
+                  whileInView={{ width: `${b.barSpeed}%` }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.8, delay: 0.2 + i * 0.1 }}
+                />
+              </div>
+            </div>
+            <div className="flex-1">
+              <div className="h-1.5 w-full rounded-full bg-white/[0.06]">
+                <motion.div
+                  className={`h-full rounded-full ${b.highlight ? "bg-emerald-400/70" : "bg-slate-600"}`}
+                  initial={{ width: 0 }}
+                  whileInView={{ width: `${b.barCost}%` }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.8, delay: 0.3 + i * 0.1 }}
+                />
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      ))}
+      <div className="flex gap-2 px-3">
+        <span className="flex-1 text-center text-[9px] text-slate-600">Speed</span>
+        <span className="flex-1 text-center text-[9px] text-slate-600">Cost Efficiency</span>
+      </div>
+    </div>
+  );
+}
+
+/* ── Technical section ────────────────────────────────────────────────── */
+export default function TechnicalHighlights() {
+  const [activeTab, setActiveTab] = useState<"speed" | "security" | "architecture">("speed");
+
+  const tabs = [
+    { key: "speed" as const, label: "Speed", icon: <Zap className="h-3.5 w-3.5" /> },
+    { key: "security" as const, label: "Security", icon: <Shield className="h-3.5 w-3.5" /> },
+    { key: "architecture" as const, label: "Architecture", icon: <Layers className="h-3.5 w-3.5" /> },
+  ];
+
+  const content = {
+    speed: {
+      title: "Sub-second payments, near-zero cost",
+      points: [
+        "400ms average confirmation time",
+        "< $0.001 per transaction",
+        "Parallel instruction batching",
+        "Optimized Anchor CPI calls",
+      ],
+      visual: <BenchmarkVisual />,
+    },
+    security: {
+      title: "Non-custodial, authority-gated",
+      points: [
+        "PDA-derived vault accounts per schedule",
+        "Authority-gated executor key validation",
+        "On-chain fee capped at 5% maximum",
+        "Owner-only cancel with full refund",
+      ],
+      visual: (
+        <div className="space-y-2">
+          {[
+            { label: "Vault Derivation", detail: "PDA seeds: [owner, schedule_id]", color: "#9945FF" },
+            { label: "Executor Check", detail: "Signer must match config authority", color: "#3b82f6" },
+            { label: "Fee Validation", detail: "On-chain cap enforced (max 5%)", color: "#26A17B" },
+            { label: "Cancel & Refund", detail: "Owner-only, remaining SOL/SPL returned", color: "#F2A52B" },
+          ].map((item, i) => (
+            <motion.div
+              key={item.label}
+              initial={{ opacity: 0, x: -8 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: i * 0.08 }}
+              className="flex items-center gap-3 rounded-lg border border-white/[0.04] bg-white/[0.02] px-3 py-2"
+            >
+              <div className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: item.color }} />
+              <div className="flex-1">
+                <div className="text-[11px] font-medium text-slate-300">{item.label}</div>
+                <div className="text-[10px] text-slate-600">{item.detail}</div>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      ),
+    },
+    architecture: {
+      title: "Event-driven microservice pipeline",
+      points: [
+        "Rust-based blockchain monitor for events",
+        "Redis streams for reliable delivery",
+        "Worker service for DB synchronization",
+        "Separate executor with cron scheduling",
+      ],
+      visual: <ArchitectureDiagram />,
+    },
+  };
+
+  const active = content[activeTab];
+
+  return (
+    <section id="technical" className="py-12 lg:py-16">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="grid gap-4 lg:grid-cols-5">
+          {/* Left panel — tab content */}
           <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            whileInView={{ opacity: 1, x: 0 }}
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.5 }}
-            className="bg-dark-100/40 backdrop-blur-sm p-6 rounded-2xl border border-white/5 shadow-xl"
+            className="rounded-[22px] border border-white/[0.06] bg-white/[0.02] p-5 sm:p-6 lg:col-span-2"
           >
-            <Tabs
-              defaultValue="performance"
-              value={activeTab}
-              onValueChange={setActiveTab}
-            >
-              <TabsList className="grid grid-cols-3 mb-6 bg-dark-300/50">
-                <TabsTrigger
-                  value="performance"
-                  className="data-[state=active]:bg-[#6E56CF]/20 data-[state=active]:text-[#6E56CF]"
+            {/* Tab bar */}
+            <div className="flex gap-1 rounded-xl border border-white/[0.06] bg-white/[0.02] p-1">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveTab(tab.key)}
+                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-medium transition-colors ${
+                    activeTab === tab.key
+                      ? "bg-white/[0.08] text-white"
+                      : "text-slate-500 hover:text-slate-300"
+                  }`}
                 >
-                  Performance
-                </TabsTrigger>
-                <TabsTrigger
-                  value="security"
-                  className="data-[state=active]:bg-[#6E56CF]/20 data-[state=active]:text-[#6E56CF]"
-                >
-                  Security
-                </TabsTrigger>
-                <TabsTrigger
-                  value="scalability"
-                  className="data-[state=active]:bg-[#6E56CF]/20 data-[state=active]:text-[#6E56CF]"
-                >
-                  Scalability
-                </TabsTrigger>
-              </TabsList>
-
-              {Object.keys(codeSnippets).map((key) => (
-                <TabsContent key={key} value={key} className="space-y-6">
-                  <AnimatePresence mode="wait">
-                    <motion.div
-                      key={key}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 0.3 }}
-                      className="relative"
-                    >
-                      <div className="absolute top-0 right-0 bg-dark-300/80 px-3 py-1.5 rounded-bl-lg rounded-tr-lg text-white/70 text-xs flex items-center">
-                        <Code className="h-3.5 w-3.5 mr-1.5" />
-                        TypeScript
-                      </div>
-                      <div className="glass p-6 rounded-xl bg-dark-400/80 border border-white/5 overflow-hidden">
-                        <pre className="text-sm overflow-x-auto text-white/90">
-                          <code className="language-typescript">
-                            {
-                              codeSnippets[
-                                key as
-                                  | "performance"
-                                  | "security"
-                                  | "scalability"
-                              ]
-                            }
-                          </code>
-                        </pre>
-                      </div>
-                    </motion.div>
-                  </AnimatePresence>
-
-                  <div className="space-y-4">
-                    <h3 className="text-2xl font-bold text-white font-space flex items-center">
-                      {iconComponents[key as keyof typeof iconComponents]}
-                      <span className="ml-2">
-                        {key.charAt(0).toUpperCase() + key.slice(1)} Optimized
-                      </span>
-                    </h3>
-                    <p className="text-white/70">
-                      AutoSOL leverages Solana&apos;s high-performance
-                      blockchain to deliver lightning-fast, low-cost recurring
-                      payments. Our smart contracts are optimized for efficiency
-                      and security.
-                    </p>
-                    <ul className="space-y-2">
-                      {features[key as keyof typeof features].map(
-                        (feature, index) => (
-                          <li key={index} className="flex items-start gap-2">
-                            <div className="w-5 h-5 rounded-full bg-gradient-to-r from-[#6E56CF] to-[#10B981] flex items-center justify-center mt-1 flex-shrink-0">
-                              <svg
-                                width="12"
-                                height="12"
-                                viewBox="0 0 12 12"
-                                fill="none"
-                                xmlns="http://www.w3.org/2000/svg"
-                              >
-                                <path
-                                  d="M10 3L4.5 8.5L2 6"
-                                  stroke="white"
-                                  strokeWidth="2"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                />
-                              </svg>
-                            </div>
-                            <span className="text-white/70">{feature}</span>
-                          </li>
-                        )
-                      )}
-                    </ul>
-                  </div>
-                </TabsContent>
+                  {tab.icon}
+                  {tab.label}
+                </button>
               ))}
-            </Tabs>
+            </div>
+
+            <h3 className="mt-5 text-lg font-semibold text-white">
+              {active.title}
+            </h3>
+
+            <ul className="mt-4 space-y-2">
+              {active.points.map((p, i) => (
+                <li key={i} className="flex items-start gap-2 text-sm text-slate-400">
+                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+                  {p}
+                </li>
+              ))}
+            </ul>
 
             <div className="mt-6">
               <Button
                 variant="outline"
-                className="border-[#6E56CF] text-[#6E56CF] hover:bg-[#6E56CF]/20 hover:text-white group"
+                className="rounded-xl border-white/10 bg-white/[0.03] text-sm text-white hover:bg-white/[0.06]"
               >
-                View Technical Documentation
-                <ExternalLink className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
+                View Docs
+                <ExternalLink className="ml-1.5 h-3.5 w-3.5" />
               </Button>
             </div>
           </motion.div>
 
+          {/* Right panel — visual + stats */}
           <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true, amount: 0.3 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-            onViewportEnter={() => setIsInView(true)}
-            className="space-y-8"
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+            className="flex flex-col gap-4 lg:col-span-3"
           >
-            <div className="glass p-6 shadow-xl relative overflow-hidden bg-dark-100/40 backdrop-blur-sm rounded-2xl border border-white/5">
-              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#6E56CF] to-[#10B981]"></div>
-              <h3 className="text-xl font-bold text-white mb-6 font-space">
-                Performance Metrics
-              </h3>
-
-              <div className="space-y-6">
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-white/70">Transaction Speed</span>
-                    <motion.span
-                      className="font-medium text-white"
-                      key={counters.speed}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ duration: 0.2 }}
-                    >
-                      {counters.speed}ms
-                    </motion.span>
-                  </div>
-                  <div className="w-full bg-white/10 rounded-full h-2.5 overflow-hidden">
-                    <motion.div
-                      className="bg-gradient-to-r from-[#6E56CF] to-[#6E56CF]/70 h-2.5 rounded-full"
-                      initial={{ width: "0%" }}
-                      animate={{ width: "95%" }}
-                      transition={{
-                        duration: 1.5,
-                        delay: 0.3,
-                        ease: "easeOut",
-                      }}
-                    ></motion.div>
-                  </div>
-                  <div className="flex justify-between text-xs text-white/50">
-                    <span>Solana (AutoSOL)</span>
-                    <span>Ethereum (15sec)</span>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-white/70">Transaction Cost</span>
-                    <motion.span
-                      className="font-medium text-white"
-                      key={counters.cost}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ duration: 0.2 }}
-                    >
-                      ${counters.cost.toFixed(4)}
-                    </motion.span>
-                  </div>
-                  <div className="w-full bg-white/10 rounded-full h-2.5 overflow-hidden">
-                    <motion.div
-                      className="bg-gradient-to-r from-[#10B981] to-[#10B981]/70 h-2.5 rounded-full"
-                      initial={{ width: "0%" }}
-                      animate={{ width: "98%" }}
-                      transition={{
-                        duration: 1.5,
-                        delay: 0.5,
-                        ease: "easeOut",
-                      }}
-                    ></motion.div>
-                  </div>
-                  <div className="flex justify-between text-xs text-white/50">
-                    <span>Solana (AutoSOL)</span>
-                    <span>Ethereum ($5-$20)</span>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-white/70">Energy Efficiency</span>
-                    <motion.span
-                      className="font-medium text-white"
-                      key={counters.efficiency}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ duration: 0.2 }}
-                    >
-                      {counters.efficiency.toFixed(1)}%
-                    </motion.span>
-                  </div>
-                  <div className="w-full bg-white/10 rounded-full h-2.5 overflow-hidden">
-                    <motion.div
-                      className="bg-gradient-to-r from-[#6E56CF] to-[#10B981] h-2.5 rounded-full"
-                      initial={{ width: "0%" }}
-                      animate={{ width: "90%" }}
-                      transition={{
-                        duration: 1.5,
-                        delay: 0.7,
-                        ease: "easeOut",
-                      }}
-                    ></motion.div>
-                  </div>
-                  <div className="flex justify-between text-xs text-white/50">
-                    <span>Solana (AutoSOL)</span>
-                    <span>Bitcoin</span>
-                  </div>
-                </div>
-              </div>
+            {/* Visual */}
+            <div className="rounded-[22px] border border-white/[0.06] bg-white/[0.02] p-5 sm:p-6">
+              {active.visual}
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <motion.div
-                className="glass p-6 shadow-md bg-dark-100/40 backdrop-blur-sm rounded-2xl border border-white/5 relative overflow-hidden"
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: 0.3 }}
-              >
-                <div className="absolute -right-8 -top-8 w-16 h-16 rounded-full bg-[#6E56CF]/10"></div>
-                <div className="text-[#6E56CF] mb-3">
-                  <svg
-                    width="28"
-                    height="28"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                    <path
-                      d="M12 6V12L16 14"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </div>
-                <motion.h4
-                  className="font-bold text-3xl text-white font-space"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.5, delay: 1 }}
+            {/* Stats row */}
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { icon: <Clock className="h-4 w-4 text-primary" />, value: "400ms", label: "Avg. Confirmation" },
+                { icon: <DollarSign className="h-4 w-4 text-emerald-400" />, value: "$0.0005", label: "Avg. Tx Cost" },
+                { icon: <Activity className="h-4 w-4 text-[#F2A52B]" />, value: "99.9%", label: "Execution Uptime" },
+              ].map((stat, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, y: 8 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: 0.2 + i * 0.08 }}
+                  className="rounded-[18px] border border-white/[0.06] bg-white/[0.02] p-4"
                 >
-                  {isInView ? "400ms" : "---"}
-                </motion.h4>
-                <p className="text-white/70">Average Transaction Time</p>
-              </motion.div>
-
-              <motion.div
-                className="glass p-6 shadow-md bg-dark-100/40 backdrop-blur-sm rounded-2xl border border-white/5 relative overflow-hidden"
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: 0.4 }}
-              >
-                <div className="absolute -right-8 -top-8 w-16 h-16 rounded-full bg-[#10B981]/10"></div>
-                <div className="text-[#10B981] mb-3">
-                  <svg
-                    width="28"
-                    height="28"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      d="M12 1V23"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                    <path
-                      d="M17 5H9.5C8.57174 5 7.6815 5.36875 7.02513 6.02513C6.36875 6.6815 6 7.57174 6 8.5C6 9.42826 6.36875 10.3185 7.02513 10.9749C7.6815 11.6313 8.57174 12 9.5 12H14.5C15.4283 12 16.3185 12.3687 16.9749 13.0251C17.6313 13.6815 18 14.5717 18 15.5C18 16.4283 17.6313 17.3185 16.9749 17.9749C16.3185 18.6313 15.4283 19 14.5 19H6"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </div>
-                <motion.h4
-                  className="font-bold text-3xl text-white font-space"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.5, delay: 1.1 }}
-                >
-                  {isInView ? "$0.0005" : "---"}
-                </motion.h4>
-                <p className="text-white/70">Average Transaction Cost</p>
-              </motion.div>
+                  <div className="mb-2">{stat.icon}</div>
+                  <div className="text-xl font-semibold text-white">{stat.value}</div>
+                  <div className="mt-0.5 text-[11px] text-slate-500">{stat.label}</div>
+                </motion.div>
+              ))}
             </div>
-
-            <motion.div
-              className="glass p-6 shadow-md bg-dark-100/40 backdrop-blur-sm rounded-2xl border border-white/5"
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: 0.5 }}
-            >
-              <h3 className="text-xl font-bold text-white mb-4 font-space">
-                Why Choose AutoSOL?
-              </h3>
-              <ul className="space-y-3">
-                <li className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-gradient-to-r from-[#6E56CF] to-[#10B981] flex items-center justify-center mt-0.5 flex-shrink-0">
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path
-                        d="M20 6L9 17L4 12"
-                        stroke="white"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  </div>
-                  <div>
-                    <h4 className="font-medium text-white text-lg">
-                      Lightning Fast
-                    </h4>
-                    <p className="text-white/70 text-sm">
-                      Transactions confirm in milliseconds, not minutes or hours
-                    </p>
-                  </div>
-                </li>
-                <li className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-gradient-to-r from-[#6E56CF] to-[#10B981] flex items-center justify-center mt-0.5 flex-shrink-0">
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path
-                        d="M20 6L9 17L4 12"
-                        stroke="white"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  </div>
-                  <div>
-                    <h4 className="font-medium text-white text-lg">
-                      Practically Free
-                    </h4>
-                    <p className="text-white/70 text-sm">
-                      Transaction fees are a fraction of a cent, saving you
-                      money
-                    </p>
-                  </div>
-                </li>
-                <li className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-gradient-to-r from-[#6E56CF] to-[#10B981] flex items-center justify-center mt-0.5 flex-shrink-0">
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path
-                        d="M20 6L9 17L4 12"
-                        stroke="white"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  </div>
-                  <div>
-                    <h4 className="font-medium text-white text-lg">
-                      Planet Friendly
-                    </h4>
-                    <p className="text-white/70 text-sm">
-                      Energy-efficient blockchain with minimal environmental
-                      impact
-                    </p>
-                  </div>
-                </li>
-              </ul>
-            </motion.div>
           </motion.div>
         </div>
       </div>

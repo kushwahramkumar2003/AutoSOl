@@ -84,7 +84,7 @@ const tokens = [
     symbol: "SOL",
     amount: 12.45,
     value: 1245.0,
-    color: "#9945FF",
+    color: "#3b82f6",
     percentage: 65,
   },
   {
@@ -92,7 +92,7 @@ const tokens = [
     symbol: "USDC",
     amount: 345.67,
     value: 345.67,
-    color: "#2775CA",
+    color: "#60a5fa",
     percentage: 18,
   },
   {
@@ -100,7 +100,7 @@ const tokens = [
     symbol: "BONK",
     amount: 1250000,
     value: 250.0,
-    color: "#F7931A",
+    color: "#94a3b8",
     percentage: 13,
   },
   {
@@ -108,25 +108,27 @@ const tokens = [
     symbol: "RAY",
     amount: 25.5,
     value: 76.5,
-    color: "#00C2CE",
+    color: "#1d4ed8",
     percentage: 4,
   },
 ];
 
 export default function WalletsPage() {
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="app-shell flex min-h-screen flex-col">
       <DashboardHeader />
 
-      <div className="flex-1 p-6">
-        <div className="flex justify-between items-center mb-6">
+      <div className="app-page page-stack flex-1">
+        <div className="mb-2 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-white">Wallets</h1>
-            <p className="text-white/70 mt-1">
+            <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+              Wallets
+            </h1>
+            <p className="mt-2 text-sm text-slate-400">
               Manage your connected Solana wallets
             </p>
           </div>
-          <Button className="bg-gradient-to-r from-[#6E56CF] to-[#10B981] hover:from-[#5a46b0] hover:to-[#0e9d6d] text-white shadow-neon">
+          <Button className="rounded-2xl bg-primary text-white hover:bg-primary/90">
             <Plus className="h-4 w-4 mr-2" />
             Connect Wallet
           </Button>
@@ -139,15 +141,15 @@ export default function WalletsPage() {
                 <Card
                   key={wallet.id}
                   className={cn(
-                    "bg-dark-200 border-white/10 text-white",
-                    wallet.isActive ? "border-[#6E56CF]/50" : ""
+                    "section-surface text-white",
+                    wallet.isActive ? "border-primary/30" : ""
                   )}
                 >
                   <CardHeader className="pb-2">
                     <div className="flex justify-between items-start">
                       <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-[#6E56CF]/20 flex items-center justify-center">
-                          <WalletIcon className="h-4 w-4 text-[#6E56CF]" />
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
+                          <WalletIcon className="h-4 w-4 text-primary" />
                         </div>
                         <div>
                           <CardTitle className="text-base">
@@ -170,7 +172,7 @@ export default function WalletsPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent
                           align="end"
-                          className="bg-dark-200 border-white/10 text-white"
+                          className="border-white/10 bg-black text-white"
                         >
                           <DropdownMenuItem className="hover:bg-white/10 focus:bg-white/10 cursor-pointer">
                             Edit Name
@@ -179,11 +181,11 @@ export default function WalletsPage() {
                             View on Explorer
                           </DropdownMenuItem>
                           {wallet.isActive ? (
-                            <DropdownMenuItem className="hover:bg-white/10 focus:bg-white/10 cursor-pointer text-yellow-500">
+                            <DropdownMenuItem className="cursor-pointer text-slate-300 hover:bg-white/10 focus:bg-white/10">
                               Disconnect
                             </DropdownMenuItem>
                           ) : (
-                            <DropdownMenuItem className="hover:bg-white/10 focus:bg-white/10 cursor-pointer text-[#10B981]">
+                            <DropdownMenuItem className="cursor-pointer text-primary hover:bg-white/10 focus:bg-white/10">
                               Reconnect
                             </DropdownMenuItem>
                           )}
@@ -245,8 +247,8 @@ export default function WalletsPage() {
                         <Badge
                           className={cn(
                             wallet.isActive
-                              ? "bg-[#10B981]/20 text-[#10B981] hover:bg-[#10B981]/30"
-                              : "bg-red-500/20 text-red-500 hover:bg-red-500/30"
+                              ? "bg-primary/10 text-primary hover:bg-primary/15"
+                              : "bg-white/[0.05] text-slate-400 hover:bg-white/[0.08]"
                           )}
                         >
                           {wallet.isActive ? "Active" : "Disconnected"}
@@ -264,7 +266,7 @@ export default function WalletsPage() {
               ))}
             </div>
 
-            <Card className="bg-dark-200 border-white/10 text-white">
+            <Card className="section-surface text-white">
               <CardHeader>
                 <CardTitle className="text-lg">
                   Recent Wallet Activity
@@ -278,11 +280,11 @@ export default function WalletsPage() {
                   {[1, 2, 3].map((i) => (
                     <div
                       key={i}
-                      className="flex items-center justify-between p-3 rounded-lg border border-white/10 bg-dark-300"
+                      className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.03] p-3"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-[#6E56CF]/20 flex items-center justify-center">
-                          <ArrowUpRight className="h-5 w-5 text-[#6E56CF]" />
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                          <ArrowUpRight className="h-5 w-5 text-primary" />
                         </div>
                         <div>
                           <h4 className="font-medium">Sent 2.5 SOL</h4>
@@ -290,7 +292,7 @@ export default function WalletsPage() {
                             <span className="text-sm text-white/70">
                               To: 8xDR54a...9j2K
                             </span>
-                            <Badge className="bg-[#10B981]/20 text-[#10B981] hover:bg-[#10B981]/30">
+                            <Badge className="bg-primary/10 text-primary hover:bg-primary/15">
                               Completed
                             </Badge>
                           </div>
@@ -305,7 +307,7 @@ export default function WalletsPage() {
                 </div>
                 <Button
                   variant="outline"
-                  className="w-full mt-4 border-white/10 bg-dark-300 hover:bg-white/10"
+                  className="mt-4 w-full border-white/10 bg-white/[0.03] hover:bg-white/[0.06]"
                 >
                   View All Activity
                 </Button>
@@ -316,7 +318,7 @@ export default function WalletsPage() {
           <div className="space-y-6">
             <TokenDistributionCard tokens={tokens} />
 
-            <Card className="bg-dark-200 border-white/10 text-white">
+            <Card className="section-surface text-white">
               <CardHeader>
                 <CardTitle className="text-lg">Wallet Security</CardTitle>
                 <CardDescription className="text-white/70">
@@ -324,7 +326,7 @@ export default function WalletsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="p-3 rounded-lg border border-white/10 bg-dark-300">
+                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
                   <h4 className="font-medium">Two-Factor Authentication</h4>
                   <p className="text-sm text-white/70 mt-1">
                     Add an extra layer of security to your account
@@ -337,7 +339,7 @@ export default function WalletsPage() {
                   </Button>
                 </div>
 
-                <div className="p-3 rounded-lg border border-white/10 bg-dark-300">
+                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
                   <h4 className="font-medium">Transaction Notifications</h4>
                   <p className="text-sm text-white/70 mt-1">
                     Get notified for all wallet activities
@@ -350,7 +352,7 @@ export default function WalletsPage() {
                   </Button>
                 </div>
 
-                <div className="p-3 rounded-lg border border-white/10 bg-dark-300">
+                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
                   <h4 className="font-medium">Spending Limits</h4>
                   <p className="text-sm text-white/70 mt-1">
                     Set daily transaction limits for your wallets

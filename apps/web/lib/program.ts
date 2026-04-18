@@ -3,38 +3,58 @@ import { AutoSol } from "@/program/types";
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { PublicKey, Connection, Keypair } from "@solana/web3.js";
-import { BN } from "@coral-xyz/anchor";
+import {
+  TOKEN_PROGRAM_ID,
+  getAssociatedTokenAddress,
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  createAssociatedTokenAccountInstruction,
+  getAccount,
+} from "@solana/spl-token";
 
-// Constants - Update these with your actual deployed addresses
+// ─── PDA seed constants (must match on-chain program) ────────────────────────
 const GLOBAL_FEE_SETTINGS_SEED = "global_fee_settings";
 const GLOBAL_FEE_VAULT_SEED = "global_fee_vault";
 const SOL_VAULT_SEED = "sol_vault";
+const SPL_VAULT_SEED = "spl_vault";
+const VAULT_AUTHORITY_SEED = "vault_authority";
+const SPL_FEE_VAULT_SEED = "spl_fee_vault";
+const FEE_VAULT_AUTHORITY_SEED = "fee_vault_authority";
 
-// Types for better type safety
+// Native SOL wrapped mint address
+const NATIVE_SOL_MINT = new PublicKey(
+  "So11111111111111111111111111111111111111112"
+);
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+
 export interface PaymentScheduleData {
   owner: PublicKey;
   totalAmount: anchor.BN;
   remainingAmount: anchor.BN;
   paymentAmount: anchor.BN;
   recipient: PublicKey;
+  mint: PublicKey;
   payments: Payment[];
   createdAt: anchor.BN;
   status: ScheduleStatus;
+  paymentType: PaymentType;
   memo: string;
+  vaultBump: number;
 }
 
 export interface Payment {
   scheduledTime: anchor.BN;
   executed: boolean;
   executionTime: anchor.BN;
-  txSignature: PublicKey | null;
+  executedBy: PublicKey | null;
+  txSignature?: PublicKey | null;
 }
 
 export interface FeeSettingsData {
   authority: PublicKey;
   feePercentage: number;
-  httpBackendWallet: PublicKey;
-  feeWithdrawalAllowedKeys: PublicKey[];
+  executorAllowedKeys: PublicKey[];
+  feeCollectorAllowedKeys: PublicKey[];
   initialized: boolean;
 }
 
@@ -44,11 +64,20 @@ export enum ScheduleStatus {
   Cancelled = "Cancelled",
 }
 
+export enum PaymentType {
+  Sol = "Sol",
+  SplToken = "SplToken",
+}
+
 export interface CreateScheduleParams {
-  paymentAmount: number; // in lamports
+  paymentAmount: number; // in lamports or smallest token unit
   recipientAddress: PublicKey;
   scheduleTimes: number[]; // Unix timestamps
   memo: string;
+}
+
+export interface CreateSplScheduleParams extends CreateScheduleParams {
+  mint: PublicKey;
 }
 
 export interface ScheduleWithAddress {
@@ -88,12 +117,11 @@ export class AutoSolProgram {
     this.program = new Program(idl as unknown as AutoSol, provider);
     this.connection = provider.connection;
     this.programId = new PublicKey(idl.address);
-    this.logger = customLogger || (debug ? console.log : () => {});
+    this.logger = customLogger || (debug ? console.log : () => { });
   }
 
-  /**
-   * Get the Program Derived Address (PDA) for fee settings
-   */
+  // ─── PDA derivations ──────────────────────────────────────────────────
+
   private getFeeSettingsPDA(): [PublicKey, number] {
     return PublicKey.findProgramAddressSync(
       [Buffer.from(GLOBAL_FEE_SETTINGS_SEED)],
@@ -101,9 +129,6 @@ export class AutoSolProgram {
     );
   }
 
-  /**
-   * Get the Program Derived Address (PDA) for fee vault
-   */
   private getFeeVaultPDA(): [PublicKey, number] {
     return PublicKey.findProgramAddressSync(
       [Buffer.from(GLOBAL_FEE_VAULT_SEED)],
@@ -111,9 +136,6 @@ export class AutoSolProgram {
     );
   }
 
-  /**
-   * Get the Program Derived Address (PDA) for SOL payment vault
-   */
   private getPaymentVaultPDA(scheduleAddress: PublicKey): [PublicKey, number] {
     return PublicKey.findProgramAddressSync(
       [Buffer.from(SOL_VAULT_SEED), scheduleAddress.toBuffer()],
@@ -121,9 +143,56 @@ export class AutoSolProgram {
     );
   }
 
-  /**
-   * Get the fee settings account data
-   */
+  private getSplVaultPDA(
+    scheduleAddress: PublicKey,
+    mint: PublicKey
+  ): [PublicKey, number] {
+    return PublicKey.findProgramAddressSync(
+      [
+        Buffer.from(SPL_VAULT_SEED),
+        scheduleAddress.toBuffer(),
+        mint.toBuffer(),
+      ],
+      this.programId
+    );
+  }
+
+  private getVaultAuthorityPDA(
+    scheduleAddress: PublicKey
+  ): [PublicKey, number] {
+    return PublicKey.findProgramAddressSync(
+      [Buffer.from(VAULT_AUTHORITY_SEED), scheduleAddress.toBuffer()],
+      this.programId
+    );
+  }
+
+  private getSplFeeVaultPDA(mint: PublicKey): [PublicKey, number] {
+    return PublicKey.findProgramAddressSync(
+      [Buffer.from(SPL_FEE_VAULT_SEED), mint.toBuffer()],
+      this.programId
+    );
+  }
+
+  private getFeeVaultAuthorityPDA(mint: PublicKey): [PublicKey, number] {
+    return PublicKey.findProgramAddressSync(
+      [Buffer.from(FEE_VAULT_AUTHORITY_SEED), mint.toBuffer()],
+      this.programId
+    );
+  }
+
+  // ─── Public helpers ───────────────────────────────────────────────────
+
+  /** Returns true if the given mint address is native SOL (wrapped). */
+  public static isNativeSol(mint: string | PublicKey): boolean {
+    const mintStr = typeof mint === "string" ? mint : mint.toString();
+    return (
+      mintStr === NATIVE_SOL_MINT.toString() ||
+      mintStr === "11111111111111111111111111111111"
+    );
+  }
+
+  // ─── Fetch helpers ────────────────────────────────────────────────────
+
   public async getFeeSettings(): Promise<FeeSettingsData> {
     try {
       const [feeSettingsAddress] = this.getFeeSettingsPDA();
@@ -133,8 +202,8 @@ export class AutoSolProgram {
       return {
         authority: feeSettings.authority,
         feePercentage: feeSettings.feePercentage,
-        httpBackendWallet: feeSettings.httpBackendWallet,
-        feeWithdrawalAllowedKeys: feeSettings.feeWithdrawalAllowedKeys,
+        executorAllowedKeys: feeSettings.executorAllowedKeys,
+        feeCollectorAllowedKeys: feeSettings.feeCollectorAllowedKeys,
         initialized: feeSettings.initialized,
       };
     } catch (error) {
@@ -147,9 +216,6 @@ export class AutoSolProgram {
     }
   }
 
-  /**
-   * Get a payment schedule account data
-   */
   public async getPaymentSchedule(
     scheduleAddress: PublicKey
   ): Promise<PaymentScheduleData> {
@@ -157,29 +223,7 @@ export class AutoSolProgram {
       const schedule =
         await this.program.account.paymentSchedule.fetch(scheduleAddress);
 
-      return {
-        owner: schedule.owner,
-        totalAmount: schedule.totalAmount,
-        remainingAmount: schedule.remainingAmount,
-        paymentAmount: schedule.paymentAmount,
-        recipient: schedule.recipient,
-        payments: schedule.payments.map(
-          (payment: {
-            scheduledTime: anchor.BN;
-            executed: boolean;
-            executionTime: anchor.BN;
-            txSignature: PublicKey | null;
-          }) => ({
-            scheduledTime: payment.scheduledTime,
-            executed: payment.executed,
-            executionTime: payment.executionTime,
-            txSignature: payment.txSignature,
-          })
-        ),
-        createdAt: schedule.createdAt,
-        status: this.mapScheduleStatus(schedule.status),
-        memo: schedule.memo,
-      };
+      return this.mapScheduleData(schedule);
     } catch (error) {
       this.logger("Error fetching payment schedule:", error);
       throw new AutoSolError(
@@ -190,9 +234,36 @@ export class AutoSolProgram {
     }
   }
 
-  /**
-   * Map schedule status from program to TypeScript enum
-   */
+  private mapScheduleData(schedule: any): PaymentScheduleData {
+    return {
+      owner: schedule.owner,
+      totalAmount: schedule.totalAmount,
+      remainingAmount: schedule.remainingAmount,
+      paymentAmount: schedule.paymentAmount,
+      recipient: schedule.recipient,
+      mint: schedule.mint,
+      payments: schedule.payments.map(
+        (payment: {
+          scheduledTime: anchor.BN;
+          executed: boolean;
+          executionTime: anchor.BN;
+          executedBy: PublicKey | null;
+        }) => ({
+          scheduledTime: payment.scheduledTime,
+          executed: payment.executed,
+          executionTime: payment.executionTime,
+          executedBy: payment.executedBy,
+          txSignature: payment.executedBy,
+        })
+      ),
+      createdAt: schedule.createdAt,
+      status: this.mapScheduleStatus(schedule.status),
+      paymentType: this.mapPaymentType(schedule.paymentType),
+      memo: schedule.memo,
+      vaultBump: schedule.vaultBump,
+    };
+  }
+
   private mapScheduleStatus(status: {
     active?: Record<string, never>;
     completed?: Record<string, never>;
@@ -204,9 +275,16 @@ export class AutoSolProgram {
     return ScheduleStatus.Active;
   }
 
-  /**
-   * Calculate the total cost including fees for a payment schedule
-   */
+  private mapPaymentType(paymentType: {
+    sol?: Record<string, never>;
+    splToken?: Record<string, never>;
+  }): PaymentType {
+    if (paymentType.splToken) return PaymentType.SplToken;
+    return PaymentType.Sol;
+  }
+
+  // ─── Cost calculation ─────────────────────────────────────────────────
+
   public async calculateTotalCost(
     paymentAmount: number,
     scheduleCount: number
@@ -219,11 +297,7 @@ export class AutoSolProgram {
       );
       const totalCost = totalAmount + feeAmount;
 
-      return {
-        totalAmount,
-        feeAmount,
-        totalCost,
-      };
+      return { totalAmount, feeAmount, totalCost };
     } catch (error) {
       this.logger("Error calculating total cost:", error);
       throw new AutoSolError(
@@ -234,9 +308,8 @@ export class AutoSolProgram {
     }
   }
 
-  /**
-   * Create a new payment schedule for SOL payments
-   */
+  // ─── Create SOL payment schedule ──────────────────────────────────────
+
   public async createPaymentSchedule(
     params: CreateScheduleParams,
     paymentScheduleKeypair: Keypair = Keypair.generate()
@@ -248,37 +321,12 @@ export class AutoSolProgram {
 
       const { paymentAmount, recipientAddress, scheduleTimes, memo } = params;
 
-      // Validation
-      if (scheduleTimes.length === 0) {
-        throw new AutoSolError(
-          "Schedule times cannot be empty",
-          "EMPTY_SCHEDULE"
-        );
-      }
+      this.validateScheduleTimes(scheduleTimes);
 
-      if (scheduleTimes.length > 10) {
-        throw new AutoSolError(
-          "Too many schedule times provided (max 10)",
-          "TOO_MANY_SCHEDULE_TIMES"
-        );
-      }
-
-      // Validate that all scheduled times are in the future
-      const currentTime = Math.floor(Date.now() / 1000);
-      for (const time of scheduleTimes) {
-        if (time <= currentTime) {
-          throw new AutoSolError(
-            "All schedule times must be in the future",
-            "INVALID_SCHEDULE_TIME"
-          );
-        }
-      }
-
-      // Convert schedule times to BN
       const scheduleTimesBN = scheduleTimes.map((time) => new anchor.BN(time));
       const paymentAmountBN = new anchor.BN(paymentAmount);
 
-      this.logger("Creating payment schedule with params:", {
+      this.logger("Creating SOL payment schedule with params:", {
         paymentAmount: paymentAmountBN.toString(),
         recipient: recipientAddress.toString(),
         scheduleTimes: scheduleTimesBN.map((t) => t.toString()),
@@ -297,10 +345,10 @@ export class AutoSolProgram {
           user: this.program.provider.publicKey,
         })
         .signers([paymentScheduleKeypair])
-        .rpc();
+        .rpc({ skipPreflight: false, maxRetries: 1, commitment: "confirmed" });
 
       this.logger(
-        "Payment schedule created:",
+        "SOL payment schedule created:",
         paymentScheduleKeypair.publicKey.toString()
       );
 
@@ -310,20 +358,143 @@ export class AutoSolProgram {
       };
     } catch (error) {
       this.logger("Error creating payment schedule:", error);
-      if (error instanceof AutoSolError) {
-        throw error;
-      }
-      throw new AutoSolError(
-        "Failed to create payment schedule",
-        "CREATE_SCHEDULE_ERROR",
-        error as Error
-      );
+      if (error instanceof AutoSolError) throw error;
+      throw this.wrapTransactionError(error, "CREATE_SCHEDULE_ERROR");
     }
   }
 
-  /**
-   * Cancel a payment schedule and refund remaining SOL
-   */
+  // ─── Create SPL payment schedule ──────────────────────────────────────
+
+  public async createSplPaymentSchedule(
+    params: CreateSplScheduleParams,
+    paymentScheduleKeypair: Keypair = Keypair.generate()
+  ): Promise<{ scheduleAddress: PublicKey; txSignature: string }> {
+    try {
+      if (!this.program.provider.publicKey) {
+        throw new AutoSolError("Wallet not connected", "WALLET_NOT_CONNECTED");
+      }
+
+      const { paymentAmount, recipientAddress, scheduleTimes, memo, mint } =
+        params;
+
+      this.validateScheduleTimes(scheduleTimes);
+
+      const scheduleTimesBN = scheduleTimes.map((time) => new anchor.BN(time));
+      const paymentAmountBN = new anchor.BN(paymentAmount);
+
+      // Derive user's ATA for this mint
+      const userTokenAccount = await getAssociatedTokenAddress(
+        mint,
+        this.program.provider.publicKey
+      );
+
+      // ── Preflight: ensure user ATA exists, create if missing ──────────
+      let needsAtaCreation = false;
+      try {
+        await getAccount(this.connection, userTokenAccount);
+      } catch {
+        // Account doesn't exist — we'll prepend a create-ATA instruction
+        needsAtaCreation = true;
+        this.logger(
+          "User ATA does not exist for mint",
+          mint.toString(),
+          "— will create it in the same transaction"
+        );
+      }
+
+      // Derive PDAs
+      const [paymentVault] = this.getSplVaultPDA(
+        paymentScheduleKeypair.publicKey,
+        mint
+      );
+      const [vaultAuthority] = this.getVaultAuthorityPDA(
+        paymentScheduleKeypair.publicKey
+      );
+      const [feeVault] = this.getSplFeeVaultPDA(mint);
+      const [feeVaultAuthority] = this.getFeeVaultAuthorityPDA(mint);
+
+      this.logger("Creating SPL payment schedule with params:", {
+        paymentAmount: paymentAmountBN.toString(),
+        recipient: recipientAddress.toString(),
+        mint: mint.toString(),
+        scheduleTimes: scheduleTimesBN.map((t) => t.toString()),
+        memo,
+        needsAtaCreation,
+      });
+
+      // Build the main program instruction
+      const mainIx = await this.program.methods
+        .createSplPaymentSchedule(
+          paymentAmountBN,
+          recipientAddress,
+          scheduleTimesBN,
+          memo
+        )
+        .accounts({
+          paymentSchedule: paymentScheduleKeypair.publicKey,
+          user: this.program.provider.publicKey,
+          userTokenAccount,
+          paymentVault,
+          vaultAuthority,
+          feeVault,
+          feeVaultAuthority,
+          mint,
+          systemProgram: anchor.web3.SystemProgram.programId,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+        } as any)
+        .instruction();
+
+      // Assemble transaction: optionally prepend ATA creation
+      const tx = new anchor.web3.Transaction();
+
+      if (needsAtaCreation) {
+        tx.add(
+          createAssociatedTokenAccountInstruction(
+            this.program.provider.publicKey, // payer
+            userTokenAccount,                // ATA address
+            this.program.provider.publicKey, // owner
+            mint,                            // mint
+            TOKEN_PROGRAM_ID,
+            ASSOCIATED_TOKEN_PROGRAM_ID
+          )
+        );
+      }
+
+      tx.add(mainIx);
+
+      // Send transaction
+      const { blockhash, lastValidBlockHeight } =
+        await this.connection.getLatestBlockhash("confirmed");
+      tx.recentBlockhash = blockhash;
+      tx.lastValidBlockHeight = lastValidBlockHeight;
+      tx.feePayer = this.program.provider.publicKey;
+      tx.sign(paymentScheduleKeypair);
+
+      const txSignature = await this.program.provider.sendAndConfirm!(tx, [paymentScheduleKeypair], {
+        skipPreflight: false,
+        maxRetries: 1,
+        commitment: "confirmed",
+      });
+
+      this.logger(
+        "SPL payment schedule created:",
+        paymentScheduleKeypair.publicKey.toString()
+      );
+
+      return {
+        scheduleAddress: paymentScheduleKeypair.publicKey,
+        txSignature,
+      };
+    } catch (error) {
+      this.logger("Error creating SPL payment schedule:", error);
+      if (error instanceof AutoSolError) throw error;
+      throw this.wrapTransactionError(error, "CREATE_SPL_SCHEDULE_ERROR");
+    }
+  }
+
+  // ─── Cancel SOL payment schedule ──────────────────────────────────────
+
   public async cancelPaymentSchedule(
     scheduleAddress: PublicKey
   ): Promise<string> {
@@ -347,7 +518,7 @@ export class AutoSolProgram {
         );
       }
 
-      this.logger("Cancelling payment schedule:", scheduleAddress.toString());
+      this.logger("Cancelling SOL payment schedule:", scheduleAddress.toString());
 
       const txSignature = await this.program.methods
         .cancelPaymentSchedule()
@@ -357,13 +528,11 @@ export class AutoSolProgram {
         })
         .rpc();
 
-      this.logger("Payment schedule cancelled:", txSignature);
+      this.logger("SOL payment schedule cancelled:", txSignature);
       return txSignature;
     } catch (error) {
       this.logger("Error cancelling payment schedule:", error);
-      if (error instanceof AutoSolError) {
-        throw error;
-      }
+      if (error instanceof AutoSolError) throw error;
       throw new AutoSolError(
         "Failed to cancel payment schedule",
         "CANCEL_SCHEDULE_ERROR",
@@ -372,9 +541,85 @@ export class AutoSolProgram {
     }
   }
 
-  /**
-   * Get all payment schedules for a specific owner
-   */
+  // ─── Cancel SPL payment schedule ──────────────────────────────────────
+
+  public async cancelSplPaymentSchedule(
+    scheduleAddress: PublicKey
+  ): Promise<string> {
+    try {
+      if (!this.program.provider.publicKey) {
+        throw new AutoSolError("Wallet not connected", "WALLET_NOT_CONNECTED");
+      }
+
+      const scheduleData = await this.getPaymentSchedule(scheduleAddress);
+      if (!scheduleData.owner.equals(this.program.provider.publicKey)) {
+        throw new AutoSolError(
+          "You are not the owner of this payment schedule",
+          "UNAUTHORIZED_CANCELLATION"
+        );
+      }
+
+      if (scheduleData.status !== ScheduleStatus.Active) {
+        throw new AutoSolError(
+          "Payment schedule is not active",
+          "INVALID_SCHEDULE_STATUS"
+        );
+      }
+
+      const mint = scheduleData.mint;
+
+      // Owner's ATA to receive refund
+      const ownerTokenAccount = await getAssociatedTokenAddress(
+        mint,
+        this.program.provider.publicKey
+      );
+
+      const [paymentVault] = this.getSplVaultPDA(scheduleAddress, mint);
+      const [vaultAuthority] = this.getVaultAuthorityPDA(scheduleAddress);
+
+      this.logger(
+        "Cancelling SPL payment schedule:",
+        scheduleAddress.toString()
+      );
+
+      const txSignature = await this.program.methods
+        .cancelSplPaymentSchedule()
+        .accounts({
+          paymentSchedule: scheduleAddress,
+          owner: this.program.provider.publicKey,
+          ownerTokenAccount,
+          paymentVault,
+          vaultAuthority,
+          mint,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        } as any)
+        .rpc();
+
+      this.logger("SPL payment schedule cancelled:", txSignature);
+      return txSignature;
+    } catch (error) {
+      this.logger("Error cancelling SPL payment schedule:", error);
+      if (error instanceof AutoSolError) throw error;
+      throw new AutoSolError(
+        "Failed to cancel SPL payment schedule",
+        "CANCEL_SPL_SCHEDULE_ERROR",
+        error as Error
+      );
+    }
+  }
+
+  // ─── Smart cancel (auto-detects SOL vs SPL) ──────────────────────────
+
+  public async cancelSchedule(scheduleAddress: PublicKey): Promise<string> {
+    const scheduleData = await this.getPaymentSchedule(scheduleAddress);
+    if (scheduleData.paymentType === PaymentType.SplToken) {
+      return this.cancelSplPaymentSchedule(scheduleAddress);
+    }
+    return this.cancelPaymentSchedule(scheduleAddress);
+  }
+
+  // ─── Query schedules ─────────────────────────────────────────────────
+
   public async getSchedulesForOwner(
     ownerAddress: PublicKey
   ): Promise<ScheduleWithAddress[]> {
@@ -390,29 +635,7 @@ export class AutoSolProgram {
 
       return schedules.map((schedule) => ({
         address: schedule.publicKey,
-        data: {
-          owner: schedule.account.owner,
-          totalAmount: schedule.account.totalAmount,
-          remainingAmount: schedule.account.remainingAmount,
-          paymentAmount: schedule.account.paymentAmount,
-          recipient: schedule.account.recipient,
-          payments: schedule.account.payments.map(
-            (payment: {
-              scheduledTime: BN;
-              executed: boolean;
-              executionTime: BN;
-              txSignature: PublicKey | null;
-            }) => ({
-              scheduledTime: payment.scheduledTime,
-              executed: payment.executed,
-              executionTime: payment.executionTime,
-              txSignature: payment.txSignature,
-            })
-          ),
-          createdAt: schedule.account.createdAt,
-          status: schedule.account.status as unknown as ScheduleStatus,
-          memo: schedule.account.memo,
-        },
+        data: this.mapScheduleData(schedule.account),
       }));
     } catch (error) {
       this.logger("Error fetching schedules for owner:", error);
@@ -424,47 +647,36 @@ export class AutoSolProgram {
     }
   }
 
-  /**
-   * Get all payment schedules where the given address is the recipient (incoming payments)
-   */
   public async getSchedulesForRecipient(
     recipientAddress: PublicKey
   ): Promise<ScheduleWithAddress[]> {
     try {
-      const schedules = await this.program.account.paymentSchedule.all([
-        {
-          memcmp: {
-            offset: 8 + 32 + 8 + 8 + 8, // Skip discriminator + owner + totalAmount + remainingAmount + paymentAmount
-            bytes: recipientAddress.toBase58(),
+      let schedules;
+
+      try {
+        schedules = await this.program.account.paymentSchedule.all([
+          {
+            memcmp: {
+              offset: 8 + 32 + 8 + 8 + 8,
+              bytes: recipientAddress.toBase58(),
+            },
           },
-        },
-      ]);
+        ]);
+      } catch (memcmpError) {
+        this.logger(
+          "Recipient memcmp lookup failed, falling back to full scan:",
+          memcmpError
+        );
+
+        const allSchedules = await this.program.account.paymentSchedule.all();
+        schedules = allSchedules.filter((schedule) =>
+          schedule.account.recipient.equals(recipientAddress)
+        );
+      }
 
       return schedules.map((schedule) => ({
         address: schedule.publicKey,
-        data: {
-          owner: schedule.account.owner,
-          totalAmount: schedule.account.totalAmount,
-          remainingAmount: schedule.account.remainingAmount,
-          paymentAmount: schedule.account.paymentAmount,
-          recipient: schedule.account.recipient,
-          payments: schedule.account.payments.map(
-            (payment: {
-              scheduledTime: BN;
-              executed: boolean;
-              executionTime: BN;
-              txSignature: PublicKey | null;
-            }) => ({
-              scheduledTime: payment.scheduledTime,
-              executed: payment.executed,
-              executionTime: payment.executionTime,
-              txSignature: payment.txSignature,
-            })
-          ),
-          createdAt: schedule.account.createdAt,
-          status: schedule.account.status as unknown as ScheduleStatus,
-          memo: schedule.account.memo,
-        },
+        data: this.mapScheduleData(schedule.account),
       }));
     } catch (error) {
       this.logger("Error fetching schedules for recipient:", error);
@@ -476,9 +688,6 @@ export class AutoSolProgram {
     }
   }
 
-  /**
-   * Get all active payment schedules for the current user
-   */
   public async getActiveSchedules(): Promise<ScheduleWithAddress[]> {
     try {
       if (!this.program.provider.publicKey) {
@@ -501,9 +710,8 @@ export class AutoSolProgram {
     }
   }
 
-  /**
-   * Get payment schedule statistics for the current user
-   */
+  // ─── Stats ────────────────────────────────────────────────────────────
+
   public async getScheduleStats(): Promise<{
     totalSchedules: number;
     activeSchedules: number;
@@ -558,9 +766,8 @@ export class AutoSolProgram {
     }
   }
 
-  /**
-   * Check if a wallet has sufficient balance for a payment schedule
-   */
+  // ─── Balance check ────────────────────────────────────────────────────
+
   public async checkSufficientBalance(
     paymentAmount: number,
     scheduleCount: number
@@ -600,24 +807,66 @@ export class AutoSolProgram {
     }
   }
 
-  /**
-   * Get the current user's wallet address
-   */
+  // ─── Accessors ────────────────────────────────────────────────────────
+
   public getWalletAddress(): PublicKey | null {
     return this.program.provider.publicKey ?? null;
   }
 
-  /**
-   * Get the program ID
-   */
   public getProgramId(): PublicKey {
     return this.programId;
   }
 
-  /**
-   * Get connection
-   */
   public getConnection(): Connection {
     return this.connection;
+  }
+
+  // ─── Private helpers ──────────────────────────────────────────────────
+
+  private validateScheduleTimes(scheduleTimes: number[]): void {
+    if (scheduleTimes.length === 0) {
+      throw new AutoSolError(
+        "Schedule times cannot be empty",
+        "EMPTY_SCHEDULE"
+      );
+    }
+
+    if (scheduleTimes.length > 10) {
+      throw new AutoSolError(
+        "Too many schedule times provided (max 10)",
+        "TOO_MANY_SCHEDULE_TIMES"
+      );
+    }
+
+    const currentTime = Math.floor(Date.now() / 1000);
+    for (const time of scheduleTimes) {
+      if (time <= currentTime) {
+        throw new AutoSolError(
+          "All schedule times must be in the future",
+          "INVALID_SCHEDULE_TIME"
+        );
+      }
+    }
+  }
+
+  private wrapTransactionError(error: unknown, defaultCode: string): AutoSolError {
+    const errMsg = error instanceof Error ? error.message : String(error);
+    if (
+      errMsg.toLowerCase().includes("already been processed") ||
+      errMsg.toLowerCase().includes("blockhash not found") ||
+      errMsg.toLowerCase().includes("transaction simulation failed")
+    ) {
+      return new AutoSolError(
+        "This transaction was already submitted. Please check your Payments page — your schedule may have been created successfully.",
+        "DUPLICATE_TRANSACTION",
+        error as Error
+      );
+    }
+
+    return new AutoSolError(
+      "Failed to create payment schedule",
+      defaultCode,
+      error as Error
+    );
   }
 }

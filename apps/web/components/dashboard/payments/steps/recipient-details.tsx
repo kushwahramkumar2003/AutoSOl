@@ -1,21 +1,22 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
+import { PublicKey } from "@solana/web3.js";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import {
-  Search,
-  User,
-  Clipboard,
-  CheckCircle,
-  Clock,
-  Loader2,
-} from "lucide-react";
-import { motion } from "framer-motion";
 import { useProgram } from "@/hooks/use-program";
-import { useWallet } from "@solana/wallet-adapter-react";
-import { PublicKey } from "@solana/web3.js";
+import {
+  CheckCircle,
+  Clipboard,
+  Loader2,
+  Search,
+  ShieldCheck,
+  User,
+  XCircle,
+} from "lucide-react";
 
 interface RecipientDetailsProps {
   data: {
@@ -38,17 +39,11 @@ export default function RecipientDetailsStep({
 }: RecipientDetailsProps) {
   const { program } = useProgram();
   const { publicKey } = useWallet();
-  const [recentRecipients, setRecentRecipients] = useState<RecentRecipient[]>(
-    []
-  );
+  const [recentRecipients, setRecentRecipients] = useState<RecentRecipient[]>([]);
   const [loading, setLoading] = useState(false);
+  const [addressValid, setAddressValid] = useState<boolean | null>(null);
   const [copied, setCopied] = useState(false);
-  const [addressValidation, setAddressValidation] = useState<{
-    valid: boolean;
-    message: string;
-  }>({ valid: true, message: "" });
 
-  // Fetch recent recipients from user's payment history
   useEffect(() => {
     const fetchRecentRecipients = async () => {
       if (!program || !publicKey) {
@@ -58,11 +53,7 @@ export default function RecipientDetailsStep({
 
       try {
         setLoading(true);
-
-        // Get all schedules where the current user is the owner (outgoing payments)
         const outgoingSchedules = await program.getSchedulesForOwner(publicKey);
-
-        // Create a map to track unique recipients and their usage
         const recipientMap = new Map<
           string,
           { count: number; lastUsed: Date; name: string }
@@ -71,20 +62,17 @@ export default function RecipientDetailsStep({
         outgoingSchedules.forEach((schedule) => {
           const recipientAddress = schedule.data.recipient.toString();
           const existing = recipientMap.get(recipientAddress);
+          const scheduleDate = new Date(schedule.data.createdAt.toNumber() * 1000);
 
           if (existing) {
             existing.count += 1;
-            // Update last used date if this schedule is more recent
-            const scheduleDate = new Date(
-              schedule.data.createdAt.toNumber() * 1000
-            );
             if (scheduleDate > existing.lastUsed) {
               existing.lastUsed = scheduleDate;
             }
           } else {
             recipientMap.set(recipientAddress, {
               count: 1,
-              lastUsed: new Date(schedule.data.createdAt.toNumber() * 1000),
+              lastUsed: scheduleDate,
               name:
                 schedule.data.memo ||
                 `Recipient ${recipientAddress.slice(0, 4)}...${recipientAddress.slice(-4)}`,
@@ -92,20 +80,18 @@ export default function RecipientDetailsStep({
           }
         });
 
-        // Convert to array and sort by last used date (most recent first)
-        const recipients: RecentRecipient[] = Array.from(recipientMap.entries())
-          .map(([address, data]) => ({
+        const recipients = Array.from(recipientMap.entries())
+          .map(([address, value]) => ({
             address,
-            name: data.name,
-            lastUsed: data.lastUsed,
-            paymentCount: data.count,
+            name: value.name,
+            lastUsed: value.lastUsed,
+            paymentCount: value.count,
           }))
           .sort((a, b) => b.lastUsed.getTime() - a.lastUsed.getTime())
-          .slice(0, 6); // Show only the 6 most recent recipients
+          .slice(0, 6);
 
         setRecentRecipients(recipients);
       } catch {
-        console.error("Error fetching recent recipients");
         setRecentRecipients([]);
       } finally {
         setLoading(false);
@@ -115,243 +101,153 @@ export default function RecipientDetailsStep({
     fetchRecentRecipients();
   }, [program, publicKey]);
 
-  const handleSelectRecent = (recipient: RecentRecipient) => {
-    updateData({
-      name: recipient.name,
-      address: recipient.address,
-    });
-  };
-
-  const validateAddress = (address: string) => {
-    if (!address) {
-      return { valid: true, message: "" };
+  useEffect(() => {
+    if (!data.address) {
+      setAddressValid(null);
+      return;
     }
 
     try {
-      new PublicKey(address);
-      return { valid: true, message: "" };
-    } catch (error) {
-      console.log(error)
-      return { valid: false, message: "Invalid Solana address format" };
+      new PublicKey(data.address);
+      setAddressValid(true);
+    } catch {
+      setAddressValid(false);
     }
-  };
-
-  useEffect(() => {
-    setAddressValidation(validateAddress(data.address));
   }, [data.address]);
 
-  const handleCopyToClipboard = () => {
-    navigator.clipboard.writeText(data.address);
+  const copyAddress = async () => {
+    if (!data.address) return;
+    await navigator.clipboard.writeText(data.address);
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const formatDate = (date: Date) => {
-    const now = new Date();
-    const diffInDays = Math.floor(
-      (now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24)
-    );
-
-    if (diffInDays === 0) return "Today";
-    if (diffInDays === 1) return "Yesterday";
-    if (diffInDays < 7) return `${diffInDays} days ago`;
-    if (diffInDays < 30) return `${Math.floor(diffInDays / 7)} weeks ago`;
-    return date.toLocaleDateString();
+    setTimeout(() => setCopied(false), 1500);
   };
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
-      className="space-y-8 w-full max-w-full px-4"
+      transition={{ duration: 0.25 }}
+      className="grid gap-5 xl:grid-cols-[minmax(0,1fr),260px]"
     >
-      <div className="text-center md:text-left">
-        <motion.h2
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="text-2xl font-bold mb-3"
-        >
-          Recipient Details
-        </motion.h2>
-        <p className="text-white/70 max-w-lg">
-          Enter the wallet address of the person or organization you want to pay
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <motion.div
-          initial={{ opacity: 0, x: -10 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.1 }}
-          className="space-y-6"
-        >
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label
-                htmlFor="recipient-address"
-                className="text-sm font-medium flex items-center"
+      <section className="space-y-5">
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="recipient-address" className="text-sm text-slate-300">
+              Wallet Address
+            </Label>
+            <div className="group relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500 transition-colors group-focus-within:text-slate-300" />
+              <Input
+                id="recipient-address"
+                placeholder="Enter Solana wallet address"
+                value={data.address}
+                onChange={(e) => updateData({ ...data, address: e.target.value })}
+                className="field-surface pl-10 pr-11 transition-colors focus:border-white/20"
+              />
+              <button
+                type="button"
+                onClick={copyAddress}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 transition-colors hover:text-white"
+                aria-label="Copy address"
               >
-                Recipient Address
-                <span className="text-red-500 ml-1">*</span>
-              </Label>
-              <div className="relative group">
-                <Input
-                  id="recipient-address"
-                  placeholder="Enter Solana wallet address"
-                  value={data.address}
-                  onChange={(e) =>
-                    updateData({ ...data, address: e.target.value })
-                  }
-                  className="border-white/10 focus-visible:ring-[#6E56CF] pl-10 pr-10 py-6 transition-all duration-200 ease-in-out rounded-md"
-                />
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-white/50 group-hover:text-[#6E56CF] transition-colors duration-200" />
-                <button
-                  onClick={handleCopyToClipboard}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 h-6 w-6 rounded-full hover:bg-[#6E56CF]/20 transition-all duration-200 flex items-center justify-center"
-                  aria-label="Copy address"
-                >
-                  {copied ? (
-                    <CheckCircle className="h-4 w-4 text-[#10B981] transition-all duration-200" />
-                  ) : (
-                    <Clipboard className="h-4 w-4 text-white/50 hover:text-[#6E56CF] transition-all duration-200" />
-                  )}
-                </button>
-              </div>
-              {!addressValidation.valid && (
-                <motion.p
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  className="text-xs text-red-400 mt-1"
-                >
-                  {addressValidation.message}
-                </motion.p>
-              )}
-              <p className="text-xs text-white/50">
-                Enter a valid Solana wallet address
-              </p>
+                {copied ? (
+                  <CheckCircle className="h-4 w-4 text-emerald-400" />
+                ) : (
+                  <Clipboard className="h-4 w-4" />
+                )}
+              </button>
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="recipient-name" className="text-sm font-medium">
-                Recipient Name
-              </Label>
-              <div className="relative group">
-                <Input
-                  id="recipient-name"
-                  placeholder="Enter a name for this recipient"
-                  value={data.name}
-                  onChange={(e) =>
-                    updateData({ ...data, name: e.target.value })
-                  }
-                  className="border-white/10 focus-visible:ring-[#6E56CF] pl-10 py-6 transition-all duration-200 ease-in-out rounded-md"
-                />
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-white/50 group-hover:text-[#6E56CF] transition-colors duration-200" />
-              </div>
-              <p className="text-xs text-white/50">
-                This name will help you identify the recipient in your address
-                book
-              </p>
-            </div>
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, x: 10 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.2 }}
-          className="space-y-4"
-        >
-          <div className="pt-4 border-t border-white/10">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-medium flex items-center">
-                <Clock className="mr-2 h-4 w-4 text-[#6E56CF]" />
-                Recent Recipients
-              </h3>
-              {recentRecipients.length > 0 && (
-                <span className="text-xs text-white/50">
-                  {recentRecipients.length} recipient
-                  {recentRecipients.length !== 1 ? "s" : ""}
-                </span>
-              )}
-            </div>
-
-            {loading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-[#6E56CF]" />
-                <span className="ml-2 text-sm text-white/70">
-                  Loading recent recipients...
-                </span>
-              </div>
-            ) : recentRecipients.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {recentRecipients.map((recipient, index) => (
-                  <motion.div
-                    key={recipient.address}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.1 * index }}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    <Button
-                      variant="outline"
-                      className="justify-start border-white/10 bg-dark-300 hover:bg-[#6E56CF]/20 hover:border-[#6E56CF]/50 h-auto py-3 w-full transition-all duration-200 ease-in-out"
-                      onClick={() => handleSelectRecent(recipient)}
-                    >
-                      <div className="flex items-center gap-3 w-full">
-                        <div className="w-10 h-10 rounded-full bg-[#6E56CF]/20 flex items-center justify-center flex-shrink-0">
-                          <User className="h-5 w-5 text-[#6E56CF]" />
-                        </div>
-                        <div className="text-left overflow-hidden flex-1">
-                          <div className="font-medium truncate text-sm">
-                            {recipient.name}
-                          </div>
-                          <div className="text-xs text-white/50 truncate">
-                            {recipient.address.slice(0, 4)}...
-                            {recipient.address.slice(-4)}
-                          </div>
-                          <div className="text-xs text-white/40 mt-1">
-                            {recipient.paymentCount} payment
-                            {recipient.paymentCount !== 1 ? "s" : ""} •{" "}
-                            {formatDate(recipient.lastUsed)}
-                          </div>
-                        </div>
-                      </div>
-                    </Button>
-                  </motion.div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-3">
-                  <User className="h-8 w-8 text-white/30" />
-                </div>
-                <p className="text-sm text-white/50 mb-2">
-                  No recent recipients
-                </p>
-                <p className="text-xs text-white/40">
-                  Your recent recipients will appear here after you make
-                  payments
-                </p>
+            {data.address && (
+              <div className="flex items-center gap-1.5">
+                {addressValid ? (
+                  <>
+                    <CheckCircle className="h-3 w-3 text-emerald-400" />
+                    <span className="text-xs text-emerald-400">Valid Solana address</span>
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="h-3 w-3 text-red-400" />
+                    <span className="text-xs text-red-400">Invalid address format</span>
+                  </>
+                )}
               </div>
             )}
           </div>
 
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.4 }}
-            className="mt-6 p-4 bg-dark-300 border border-white/10 rounded-lg"
-          >
-            <h4 className="text-sm font-medium mb-2">Need Help?</h4>
-            <p className="text-xs text-white/70">
-              Make sure to double-check the wallet address before confirming.
-              Transactions on Solana are irreversible.
+          <div className="space-y-1.5">
+            <Label htmlFor="recipient-name" className="text-sm text-slate-300">
+              Label
+            </Label>
+            <div className="group relative">
+              <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500 transition-colors group-focus-within:text-slate-300" />
+              <Input
+                id="recipient-name"
+                placeholder="Payroll, vendor, contributor, treasury"
+                value={data.name}
+                onChange={(e) => updateData({ ...data, name: e.target.value })}
+                className="field-surface pl-10 transition-colors focus:border-white/20"
+              />
+            </div>
+            <p className="text-[11px] text-slate-500">
+              Helps you identify this recipient in your dashboard.
             </p>
-          </motion.div>
-        </motion.div>
-      </div>
+          </div>
+        </div>
+      </section>
+
+      <aside className="space-y-3">
+        <div className="flex items-center gap-2 rounded-xl bg-primary/[0.06] px-3 py-2.5">
+          <ShieldCheck className="h-4 w-4 shrink-0 text-primary" />
+          <span className="text-xs text-slate-400">
+            Double-check the wallet address before submitting.
+          </span>
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between px-1">
+            <span className="text-xs font-medium text-slate-400">Recent Recipients</span>
+            {recentRecipients.length > 0 && (
+              <span className="text-[11px] text-slate-500">
+                {recentRecipients.length} saved
+              </span>
+            )}
+          </div>
+
+          {loading ? (
+            <div className="flex items-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-3 text-sm text-slate-400">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Loading…
+            </div>
+          ) : recentRecipients.length > 0 ? (
+            <div className="space-y-1.5">
+              {recentRecipients.map((recipient) => (
+                <button
+                  key={recipient.address}
+                  type="button"
+                  onClick={() =>
+                    updateData({
+                      address: recipient.address,
+                      name: recipient.name,
+                    })
+                  }
+                  className="group w-full rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2.5 text-left transition-all hover:border-white/[0.12] hover:bg-white/[0.04]"
+                >
+                  <div className="truncate text-sm font-medium text-white">
+                    {recipient.name}
+                  </div>
+                  <div className="truncate text-[11px] text-slate-500">
+                    {recipient.address.slice(0, 8)}…{recipient.address.slice(-6)}
+                  </div>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-xl border border-dashed border-white/[0.08] bg-white/[0.015] px-3 py-4 text-center text-xs text-slate-500">
+              No recent recipients yet.
+            </div>
+          )}
+        </div>
+      </aside>
     </motion.div>
   );
 }

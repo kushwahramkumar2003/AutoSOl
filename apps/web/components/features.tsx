@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { motion, useAnimation, useInView } from "framer-motion";
+import { useRef, useEffect, useState } from "react";
+import { motion, useMotionValue, useTransform } from "framer-motion";
 import {
   Clock,
   CreditCard,
@@ -11,288 +11,414 @@ import {
   Wallet,
   RefreshCcw,
   Settings,
+  ArrowRight,
+  Calendar,
+  CheckCircle,
 } from "lucide-react";
 
-export default function Features() {
-  const features = [
-    {
-      icon: <Clock className="h-6 w-6" />,
-      title: "Scheduled Payments",
-      description:
-        "Set up recurring payments on any schedule - daily, weekly, monthly, or custom intervals.",
-      color: "#6E56CF",
-    },
-    {
-      icon: <CreditCard className="h-6 w-6" />,
-      title: "Multi-Token Support",
-      description:
-        "Support for SOL and all SPL tokens, including USDC, BONK, and more.",
-      color: "#8A63D2",
-    },
-    {
-      icon: <Shield className="h-6 w-6" />,
-      title: "Secure & Non-Custodial",
-      description:
-        "Your funds remain in your wallet until the scheduled payment execution.",
-      color: "#A770D6",
-    },
-    {
-      icon: <Zap className="h-6 w-6" />,
-      title: "Lightning Fast",
-      description:
-        "Leverage Solana's speed with sub-second confirmation times.",
-      color: "#C27DDA",
-    },
-    {
-      icon: <BarChart className="h-6 w-6" />,
-      title: "Payment Analytics",
-      description:
-        "Track and analyze your payment history with detailed insights.",
-      color: "#DE8ADE",
-    },
-    {
-      icon: <Wallet className="h-6 w-6" />,
-      title: "Multi-Wallet Integration",
-      description:
-        "Connect with Phantom, Solflare, Backpack, and other popular wallets.",
-      color: "#F897E2",
-    },
-    {
-      icon: <RefreshCcw className="h-6 w-6" />,
-      title: "Auto-Retry Mechanism",
-      description:
-        "Failed payments automatically retry to ensure successful transactions.",
-      color: "#FFA4E6",
-    },
-    {
-      icon: <Settings className="h-6 w-6" />,
-      title: "Customizable Triggers",
-      description:
-        "Set conditional payments based on on-chain events or external triggers.",
-      color: "#FFB1EA",
-    },
+/* ── Token orbit visual ───────────────────────────────────────────────── */
+function TokenOrbit() {
+  const tokens = [
+    { symbol: "◎", icon: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png", color: "#9945FF", label: "SOL" },
+    { symbol: "$", icon: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png", color: "#2775CA", label: "USDC" },
+    { symbol: "₮", icon: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB/logo.svg", color: "#26A17B", label: "USDT" },
+    { symbol: "B", icon: "https://s2.coinmarketcap.com/static/img/coins/64x64/23095.png", color: "#F2A52B", label: "BONK" },
+    { symbol: "J", icon: "https://static.jup.ag/jup/icon.png", color: "#4FC08D", label: "JUP" },
+    { symbol: "R", icon: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R/logo.png", color: "transparent", label: "RAY" },
   ];
 
-  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
-  const [activeFeature, setActiveFeature] = useState<number | null>(null);
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
-  const sectionRef = useRef(null);
-  const isInView = useInView(sectionRef, { once: false, amount: 0.2 });
-  const controls = useAnimation();
+  return (
+    <div className="relative flex h-44 items-center justify-center">
+      <div className="relative z-10 flex h-12 w-12 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.04]">
+        <CreditCard className="h-5 w-5 text-slate-300" />
+      </div>
+      <div className="absolute h-36 w-36 rounded-full border border-white/[0.04]" />
+      {tokens.map((token, i) => {
+        const angle = (360 / tokens.length) * i;
+        return (
+          <motion.div
+            key={token.label}
+            className="absolute"
+            animate={{ rotate: [angle, angle + 360] }}
+            transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+          >
+            <motion.div
+              className="absolute flex items-center justify-center rounded-full text-[10px] font-bold text-white overflow-hidden"
+              style={{
+                width: 28, height: 28, backgroundColor: token.color,
+                left: -14, top: -82,
+              }}
+              animate={{ rotate: [-(angle), -(angle + 360)] }}
+              transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+            >
+              {token.icon ? (
+                <img src={token.icon} alt={token.label} className="h-full w-full object-cover" />
+              ) : (
+                token.symbol
+              )}
+            </motion.div>
+          </motion.div>
+        );
+      })}
+    </div>
+  );
+}
 
-  console.log(activeFeature);
-
-  useEffect(() => {
-    if (isInView) {
-      controls.start("visible");
-    }
-  }, [isInView, controls]);
-
-  const containerVariants = {
-    hidden: {},
-    visible: {
-      transition: {
-        staggerChildren: 0.1,
-      },
-    },
-  };
-
-  const featureVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: {
-        type: "spring" as const,
-        damping: 20,
-        stiffness: 100,
-      },
-    },
-  } as const;
-
-  const handleMouseMove = (e: React.MouseEvent, index: number) => {
-    if (hoveredIndex === index) {
-      const rect = e.currentTarget.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      setMousePosition({ x, y });
-    }
-  };
+/* ── Schedule type selector ───────────────────────────────────────────── */
+function ScheduleTypesVisual() {
+  const types = [
+    { label: "Daily", icon: <Clock className="h-3.5 w-3.5" />, active: false },
+    { label: "Weekly", icon: <Calendar className="h-3.5 w-3.5" />, active: true },
+    { label: "Monthly", icon: <Calendar className="h-3.5 w-3.5" />, active: false },
+    { label: "Custom", icon: <Settings className="h-3.5 w-3.5" />, active: false },
+  ];
 
   return (
-    <section
-      ref={sectionRef}
-      id="features"
-      className="py-32 bg-gradient-to-b from-dark-200 to-dark-300 relative overflow-hidden"
-    >
-      {/* Background elements */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-20 -left-20 w-64 h-64 bg-purple-800/10 rounded-full blur-3xl"></div>
-        <div className="absolute top-1/2 -right-32 w-96 h-96 bg-indigo-800/10 rounded-full blur-3xl"></div>
-        <div className="absolute -bottom-20 left-1/3 w-80 h-80 bg-violet-800/10 rounded-full blur-3xl"></div>
+    <div className="space-y-3">
+      <div className="flex gap-1.5">
+        {types.map((t, i) => (
+          <motion.div
+            key={t.label}
+            initial={{ opacity: 0, scale: 0.9 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true }}
+            transition={{ delay: i * 0.08 }}
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-medium ${
+              t.active
+                ? "border border-primary/30 bg-primary/10 text-primary"
+                : "border border-white/[0.06] bg-white/[0.03] text-slate-500"
+            }`}
+          >
+            {t.icon}
+            {t.label}
+          </motion.div>
+        ))}
       </div>
+      <div className="flex items-center gap-1">
+        {Array.from({ length: 7 }).map((_, i) => (
+          <div key={i} className="flex flex-1 flex-col items-center gap-1">
+            <div className="text-[9px] text-slate-600">
+              {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][i]}
+            </div>
+            <div
+              className={`h-6 w-full rounded-md ${
+                i === 2 ? "border border-primary/30 bg-primary/15" : "bg-white/[0.03]"
+              }`}
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
-      <div className="container mx-auto px-4 relative z-10">
+/* ── Live execution feed ──────────────────────────────────────────────── */
+function ExecutionFeed() {
+  const events = [
+    { time: "2s ago", text: "Payment #127 executed", status: "success" },
+    { time: "1m ago", text: "Schedule verified", status: "info" },
+    { time: "3m ago", text: "Payment #126 confirmed", status: "success" },
+    { time: "5m ago", text: "Vault funded 2.5 SOL", status: "info" },
+  ];
+
+  return (
+    <div className="space-y-1.5">
+      {events.map((ev, i) => (
         <motion.div
-          initial={{ opacity: 0, y: 40 }}
+          key={i}
+          initial={{ opacity: 0, x: -8 }}
+          whileInView={{ opacity: 1, x: 0 }}
+          viewport={{ once: true }}
+          transition={{ delay: i * 0.1 }}
+          className="flex items-center gap-2 rounded-lg border border-white/[0.04] bg-white/[0.02] px-3 py-2"
+        >
+          <div className={`h-1.5 w-1.5 rounded-full ${ev.status === "success" ? "bg-emerald-400" : "bg-primary"}`} />
+          <span className="flex-1 text-xs text-slate-300">{ev.text}</span>
+          <span className="text-[10px] text-slate-600">{ev.time}</span>
+        </motion.div>
+      ))}
+    </div>
+  );
+}
+
+/* ── Security layers ──────────────────────────────────────────────────── */
+function SecurityVisual() {
+  const layers = [
+    { label: "Owner Authority", w: "100%" },
+    { label: "PDA Vault", w: "85%" },
+    { label: "Executor Gate", w: "70%" },
+    { label: "On-chain Verify", w: "55%" },
+  ];
+
+  return (
+    <div className="space-y-2">
+      {layers.map((l, i) => (
+        <motion.div
+          key={l.label}
+          initial={{ opacity: 0, width: 0 }}
+          whileInView={{ opacity: 1, width: l.w }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6, delay: i * 0.12 }}
+          className="flex items-center justify-between rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-2"
+        >
+          <div className="flex items-center gap-2">
+            <CheckCircle className="h-3 w-3 text-emerald-400" />
+            <span className="text-[11px] font-medium text-slate-300">{l.label}</span>
+          </div>
+          <Shield className="h-3 w-3 text-slate-600" />
+        </motion.div>
+      ))}
+    </div>
+  );
+}
+
+/* ── Wallet cards ─────────────────────────────────────────────────────── */
+function WalletVisual() {
+  const wallets = [
+    { name: "Phantom", icon: "/Phantom-Icon_Circle.svg", color: "#AB9FF2" },
+    { name: "Solflare", icon: "/solflare-logo.svg", color: "#FC8C1C" },
+    { name: "Backpack", icon: "https://backpack.app/favicon.ico", color: "#E33E3F" },
+    { name: "Glow", icon: "/glow-logo.svg", color: "#B0D94C" },
+  ];
+
+  return (
+    <div className="flex gap-2">
+      {wallets.map((w, i) => (
+        <motion.div
+          key={w.name}
+          initial={{ opacity: 0, y: 8 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={{
-            duration: 0.8,
-            type: "spring",
-            damping: 20,
-          }}
-          className="text-center mb-20"
+          transition={{ delay: i * 0.08 }}
+          whileHover={{ y: -3 }}
+          className="flex flex-1 flex-col items-center gap-1.5 rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 transition-colors hover:bg-white/[0.05]"
         >
-          <span className="px-4 py-2 rounded-full bg-purple-900/20 text-purple-400 text-sm font-medium inline-block mb-6">
-            POWERFUL TOOLKIT
-          </span>
-          <h2 className="font-space text-4xl md:text-5xl font-bold gradient-text mb-6 leading-tight">
-            Everything You Need for <br className="hidden md:block" /> Seamless
-            Payment Automation
-          </h2>
-          <p className="text-white/70 max-w-2xl mx-auto text-lg md:text-xl">
-            AutoSOL provides a comprehensive suite of tools to automate and
-            manage recurring payments on Solana&apos;s lightning-fast
-            blockchain.
-          </p>
+          <div className="h-6 w-6 overflow-hidden rounded-lg">
+            {w.icon ? (
+              <img src={w.icon} alt={w.name} className="h-full w-full object-contain" />
+            ) : (
+              <div className="h-full w-full" style={{ backgroundColor: w.color + "30" }} />
+            )}
+          </div>
+          <span className="text-[10px] text-slate-500">{w.name}</span>
         </motion.div>
+      ))}
+    </div>
+  );
+}
 
+/* ── Features section ─────────────────────────────────────────────────── */
+export default function Features() {
+  const sectionRef = useRef<HTMLDivElement>(null);
+  const mouseX = useMotionValue(0);
+  const mouseY = useMotionValue(0);
+  const [hasMouse, setHasMouse] = useState(false);
+  const spotX = useTransform(mouseX, (v) => v - 300);
+  const spotY = useTransform(mouseY, (v) => v - 300);
+
+  useEffect(() => {
+    const el = sectionRef.current;
+    if (!el) return;
+    const h = (e: MouseEvent) => {
+      const r = el.getBoundingClientRect();
+      mouseX.set(e.clientX - r.left);
+      mouseY.set(e.clientY - r.top);
+      setHasMouse(true);
+    };
+    el.addEventListener("mousemove", h);
+    return () => el.removeEventListener("mousemove", h);
+  }, [mouseX, mouseY]);
+
+  return (
+    <section ref={sectionRef} id="features" className="relative overflow-hidden py-12 lg:py-16">
+      {hasMouse && (
         <motion.div
-          variants={containerVariants}
-          initial="hidden"
-          animate={controls}
-          className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8"
-        >
-          {features.map((feature, index) => (
-            <motion.div
-              key={index}
-              variants={featureVariants}
-              onMouseMove={(e) => handleMouseMove(e, index)}
-              onMouseEnter={() => {
-                setHoveredIndex(index);
-                setTimeout(() => setActiveFeature(index), 100);
-              }}
-              onMouseLeave={() => {
-                setHoveredIndex(null);
-                setActiveFeature(null);
-              }}
-              className="relative glass p-8 rounded-2xl border border-white/5 hover:border-purple-500/30 transition-all duration-500 group"
-              style={{
-                background:
-                  hoveredIndex === index
-                    ? `radial-gradient(circle at ${mousePosition.x}px ${mousePosition.y}px, rgba(110, 86, 207, 0.15), rgba(25, 25, 35, 0.9) 70%)`
-                    : "",
-                transformStyle: "preserve-3d",
-                transform:
-                  hoveredIndex === index
-                    ? "perspective(1000px) rotateX(2deg) rotateY(2deg) scale(1.02)"
-                    : "perspective(1000px) rotateX(0) rotateY(0) scale(1)",
-                boxShadow:
-                  hoveredIndex === index
-                    ? "0 25px 50px -12px rgba(0, 0, 0, 0.4)"
-                    : "0 10px 30px -15px rgba(0, 0, 0, 0.3)",
-              }}
-            >
-              {/* Glow effect */}
-              <div
-                className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-                style={{
-                  background: `radial-gradient(circle at 50% 50%, ${feature.color}20 0%, transparent 70%)`,
-                  filter: "blur(20px)",
-                }}
-              />
+          className="pointer-events-none absolute z-0 h-[600px] w-[600px] rounded-full opacity-[0.025]"
+          style={{ x: spotX, y: spotY, background: "radial-gradient(circle, white 0%, transparent 70%)" }}
+        />
+      )}
 
-              <div
-                className="w-14 h-14 rounded-2xl flex items-center justify-center mb-6 transition-all duration-300"
-                style={{
-                  background: `linear-gradient(135deg, ${feature.color}30 0%, ${feature.color}10 100%)`,
-                  color: feature.color,
-                  transform:
-                    hoveredIndex === index
-                      ? "translateZ(30px)"
-                      : "translateZ(0)",
-                  boxShadow:
-                    hoveredIndex === index
-                      ? `0 10px 20px -10px ${feature.color}50`
-                      : "none",
-                }}
-              >
+      <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        {/* Bento grid */}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {/* Multi-Token — tall card with orbit */}
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.4 }}
+            className="group rounded-[22px] border border-white/[0.06] bg-white/[0.02] p-5 transition-colors hover:border-white/[0.12] hover:bg-white/[0.035] sm:col-span-2 lg:col-span-1 lg:row-span-2"
+          >
+            <TokenOrbit />
+            <h3 className="mt-4 text-lg font-semibold text-white">Multi-Token Support</h3>
+            <p className="mt-2 text-sm leading-relaxed text-slate-400">
+              Pay with SOL, USDC, USDT, BONK, JUP — any SPL token. Each schedule gets its own on-chain vault.
+            </p>
+          </motion.div>
+
+          {/* Flexible Scheduling */}
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.4, delay: 0.05 }}
+            className="group rounded-[22px] border border-white/[0.06] bg-white/[0.02] p-5 transition-colors hover:border-white/[0.12] hover:bg-white/[0.035] lg:col-span-2"
+          >
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.04] text-slate-300">
+                <Clock className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-white">Flexible Scheduling</h3>
+                <p className="mt-1 text-sm text-slate-400">
+                  Daily, weekly, monthly, or custom intervals. Up to 10 payments per schedule.
+                </p>
+              </div>
+            </div>
+            <div className="mt-4"><ScheduleTypesVisual /></div>
+          </motion.div>
+
+          {/* Real-time Execution */}
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.4, delay: 0.1 }}
+            className="group rounded-[22px] border border-white/[0.06] bg-white/[0.02] p-5 transition-colors hover:border-white/[0.12] hover:bg-white/[0.035]"
+          >
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.04] text-slate-300">
+                <Zap className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-white">Real-time Execution</h3>
+                <p className="mt-0.5 text-xs text-slate-500">Sub-second confirmation</p>
+              </div>
+            </div>
+            <ExecutionFeed />
+          </motion.div>
+
+          {/* Layered Security */}
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.4, delay: 0.15 }}
+            className="group rounded-[22px] border border-white/[0.06] bg-white/[0.02] p-5 transition-colors hover:border-white/[0.12] hover:bg-white/[0.035]"
+          >
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.04] text-slate-300">
+                <Shield className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-white">Layered Security</h3>
+                <p className="mt-0.5 text-xs text-slate-500">PDA vaults & authority gates</p>
+              </div>
+            </div>
+            <SecurityVisual />
+          </motion.div>
+
+          {/* Multi-Wallet */}
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.4, delay: 0.2 }}
+            className="group rounded-[22px] border border-white/[0.06] bg-white/[0.02] p-5 transition-colors hover:border-white/[0.12] hover:bg-white/[0.035] lg:col-span-2"
+          >
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.04] text-slate-300">
+                <Wallet className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-white">Multi-Wallet Integration</h3>
+                <p className="mt-0.5 text-xs text-slate-500">Connect with any Solana wallet</p>
+              </div>
+            </div>
+            <WalletVisual />
+          </motion.div>
+
+          {/* Analytics */}
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.4, delay: 0.25 }}
+            className="group rounded-[22px] border border-white/[0.06] bg-white/[0.02] p-5 transition-colors hover:border-white/[0.12] hover:bg-white/[0.035]"
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.04] text-slate-300">
+              <BarChart className="h-5 w-5" />
+            </div>
+            <h3 className="mt-4 text-base font-semibold text-white">Payment Analytics</h3>
+            <p className="mt-2 text-sm leading-relaxed text-slate-400">
+              Track history, token distribution, and schedule health from a real-time dashboard.
+            </p>
+            <div className="mt-4 flex items-end gap-1.5">
+              {[40, 65, 35, 80, 55, 70, 90, 45, 75, 60, 85, 50].map((h, i) => (
                 <motion.div
-                  animate={
-                    hoveredIndex === index ? { rotate: [0, 5, 0, -5, 0] } : {}
-                  }
-                  transition={{
-                    duration: 2,
-                    repeat: hoveredIndex === index ? Infinity : 0,
-                    repeatType: "reverse",
-                  }}
-                >
-                  {feature.icon}
-                </motion.div>
+                  key={i}
+                  initial={{ height: 0 }}
+                  whileInView={{ height: h * 0.4 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.04, duration: 0.4 }}
+                  className="w-full rounded-sm bg-primary/20"
+                />
+              ))}
+            </div>
+          </motion.div>
+
+          {/* Auto-Retry */}
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.4, delay: 0.3 }}
+            className="group rounded-[22px] border border-white/[0.06] bg-white/[0.02] p-5 transition-colors hover:border-white/[0.12] hover:bg-white/[0.035]"
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.04] text-slate-300">
+              <RefreshCcw className="h-5 w-5" />
+            </div>
+            <h3 className="mt-4 text-base font-semibold text-white">Auto-Retry</h3>
+            <p className="mt-2 text-sm leading-relaxed text-slate-400">
+              Failed payments automatically retry with configurable back-off to ensure delivery.
+            </p>
+            <div className="mt-4 flex items-center gap-2">
+              {["Attempt 1", "Retry", "Success"].map((s, i) => (
+                <div key={i} className="flex items-center gap-1.5">
+                  <div className={`h-2 w-2 rounded-full ${i === 2 ? "bg-emerald-400" : i === 1 ? "bg-amber-400" : "bg-red-400/60"}`} />
+                  <span className="text-[10px] text-slate-500">{s}</span>
+                  {i < 2 && <ArrowRight className="h-3 w-3 text-slate-700" />}
+                </div>
+              ))}
+            </div>
+          </motion.div>
+
+          {/* Fee Control */}
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.4, delay: 0.35 }}
+            className="group rounded-[22px] border border-white/[0.06] bg-white/[0.02] p-5 transition-colors hover:border-white/[0.12] hover:bg-white/[0.035]"
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.04] text-slate-300">
+              <Settings className="h-5 w-5" />
+            </div>
+            <h3 className="mt-4 text-base font-semibold text-white">Fee Control</h3>
+            <p className="mt-2 text-sm leading-relaxed text-slate-400">
+              On-chain fee settings with authority controls, token whitelisting, and a hard 5% cap.
+            </p>
+            <div className="mt-4 space-y-1">
+              <div className="flex items-center justify-between text-[10px]">
+                <span className="text-slate-500">Fee: 1.0%</span>
+                <span className="text-slate-600">Max 5%</span>
               </div>
-
-              <h3
-                className="text-2xl font-bold text-white mb-3 font-space tracking-tight transition-all duration-300"
-                style={{
-                  transform:
-                    hoveredIndex === index
-                      ? "translateZ(25px)"
-                      : "translateZ(0)",
-                  background:
-                    hoveredIndex === index
-                      ? `linear-gradient(to right, white, ${feature.color})`
-                      : "",
-                  WebkitBackgroundClip: hoveredIndex === index ? "text" : "",
-                  WebkitTextFillColor:
-                    hoveredIndex === index ? "transparent" : "",
-                }}
-              >
-                {feature.title}
-              </h3>
-
-              <p
-                className="text-white/70 text-lg transition-all duration-300"
-                style={{
-                  transform:
-                    hoveredIndex === index
-                      ? "translateZ(20px)"
-                      : "translateZ(0)",
-                }}
-              >
-                {feature.description}
-              </p>
-
-              {/* Subtle arrow indicator */}
-              <div
-                className={`absolute bottom-8 right-8 opacity-0 transform translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300`}
-                style={{
-                  color: feature.color,
-                  transform:
-                    hoveredIndex === index
-                      ? "translateZ(25px)"
-                      : "translateZ(0)",
-                }}
-              >
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    d="M5 12H19M19 12L12 5M19 12L12 19"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
+              <div className="h-1.5 w-full rounded-full bg-white/[0.06]">
+                <div className="h-full w-[20%] rounded-full bg-primary" />
               </div>
-            </motion.div>
-          ))}
-        </motion.div>
+            </div>
+          </motion.div>
+        </div>
       </div>
     </section>
   );

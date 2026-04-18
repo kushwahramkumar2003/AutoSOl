@@ -6,14 +6,16 @@ export async function middleware(req: NextRequest) {
   const token = await getToken({ req, secret: configs.nextAuthSecret });
   const { pathname } = req.nextUrl;
 
+  // SEC-002: Only explicitly listed routes are public.
+  // The previous blanket /api/.* exemption has been removed — API routes
+  // now require auth unless they match one of the patterns below.
   const publicRoutePatterns = [
-    /^\/$/,
-    /^\/auth$/,
-    /^\/apology\/[^/]+$/,
-    /^\/api\/auth\/.*/,
-    /^\/api\/.*/,
-    /^\/public\/.*/,
-    /^\/_next\/static\/.*/,
+    /^\/$/, // landing page
+    /^\/auth$/, // sign-in page
+    /^\/apology\/[^/]+$/, // error pages
+    /^\/api\/auth\/.*/, // next-auth internals (signin, callback, session…)
+    /^\/api\/auth\/challenge$/, // nonce challenge endpoint — must stay public
+    /^\/_next\/static\/.*/, // Next.js static assets
   ];
 
   const isPublicRoute = publicRoutePatterns.some((pattern) =>
@@ -34,7 +36,7 @@ export async function middleware(req: NextRequest) {
 
 export const config = {
   matcher: [
-    // Match all paths except these
+    // Match all paths except these static files
     "/((?!_next|favicon.ico|preview.jpeg|solana-powered.svg|public).*)",
   ],
 };

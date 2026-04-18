@@ -1,15 +1,23 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
-import { useWallet, useConnection } from "@solana/wallet-adapter-react";
-import { type Connection, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
+/**
+ * useFetchTokens — React hook for token balances and prices.
+ *
+ * Data is fetched from the AutoSOl HTTP backend when available, then falls
+ * back to direct RPC reads when the backend is unavailable. This keeps the
+ * payment flow usable during local backend outages.
+ *
+ * Backend endpoints used:
+ *   GET /api/v1/tokens/balances/:wallet  — SOL + SPL balances enriched with prices
+ *   GET /api/v1/tokens/supported         — canonical token list (for token selector)
+ */
 
-const USDC_MINT_ADDRESS = "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU";
-
-const USDT_MINT_MAINNET_ADDRESS =
-  "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB";
-const USDC_MINT_MAINNET_ADDRESS =
-  "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import {
+  useConnection,
+  useWallet,
+} from "@solana/wallet-adapter-react";
+import { fetchWalletTokensResilient } from "@/lib/resilient-data";
 
 export interface Token {
   symbol: string;
@@ -23,7 +31,7 @@ export interface Token {
 
 export function useFetchTokens(
   data: { token?: string; amount: number; symbol?: string },
-  /* eslint-disable  @typescript-eslint/no-explicit-any */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   updateData: (data: any) => void
 ) {
   const [availableTokens, setAvailableTokens] = useState<Token[]>([]);
@@ -33,13 +41,13 @@ export function useFetchTokens(
   const [sliderValue, setSliderValue] = useState(0);
   const [tokenInfoVisible, setTokenInfoVisible] = useState(false);
   const [inputError, setInputError] = useState<string | null>(null);
-  const [cachedTokens, setCachedTokens] = useState<{
-    tokens: Token[];
-    timestamp: number;
-  } | null>(null);
 
   const { publicKey, connected } = useWallet();
   const { connection } = useConnection();
+
+  // Keep a ref for the last fetch timestamp to implement client-side debounce
+  const lastFetchTs = useRef<number>(0);
+  const REFETCH_INTERVAL_MS = 30_000; // re-fetch every 30s while mounted
 
   const selectedToken = useMemo(() => {
     return (
@@ -48,145 +56,74 @@ export function useFetchTokens(
     );
   }, [availableTokens, data.token]);
 
-  const fetchSolBalance = async (
-    conn: Connection,
-    pubKey: PublicKey
-  ): Promise<Token> => {
-    const balance = await conn.getBalance(pubKey);
-    const solBalance = balance / LAMPORTS_PER_SOL;
-
-    return {
-      symbol: "SOL",
-      name: "Solana",
-      balance: solBalance,
-      iconUrl:
-        "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png",
-      dollarValue: 0,
-      mintAddress: "So11111111111111111111111111111111111111112",
-      decimals: 9,
-    };
-  };
-
-  const fetchUSDCBalance = async (
-    conn: Connection,
-    pubKey: PublicKey
-  ): Promise<Token> => {
-    try {
-      const response = await conn.getParsedTokenAccountsByOwner(pubKey, {
-        mint: new PublicKey(USDC_MINT_ADDRESS),
-      });
-
-      if (response.value.length > 0) {
-        const tokenAccount = response.value[0];
-        const tokenAmount = tokenAccount.account.data.parsed.info.tokenAmount;
-
-        return {
-          symbol: "USDC",
-          name: "USD Coin",
-          balance: tokenAmount.uiAmount || 0,
-          iconUrl:
-            "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png",
-          dollarValue: 1,
-          mintAddress: USDC_MINT_ADDRESS,
-          decimals: 6,
-        };
+  /**
+   * Fetch token balances with a backend-first, RPC-fallback strategy.
+   */
+  const fetchTokensFromBackend = useCallback(
+    async (force = false) => {
+      if (!connected || !publicKey) {
+        setTokenError("Wallet not connected");
+        setIsLoadingTokens(false);
+        return;
       }
 
-      return {
-        symbol: "USDC",
-        name: "USD Coin",
-        balance: 0,
-        iconUrl:
-          "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png",
-        dollarValue: 1,
-        mintAddress: USDC_MINT_ADDRESS,
-        decimals: 6,
-      };
-    } catch (error) {
-      console.error("Error fetching USDC balance:", error);
-
-      return {
-        symbol: "USDC",
-        name: "USD Coin",
-        balance: 0,
-        iconUrl:
-          "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png",
-        dollarValue: 1,
-        mintAddress: USDC_MINT_ADDRESS,
-        decimals: 6,
-      };
-    }
-  };
-
-  const fetchUserTokens = async () => {
-    if (!connected || !publicKey || !connection) {
-      setTokenError("Wallet not connected");
-      setIsLoadingTokens(false);
-      return;
-    }
-
-    const currentTime = Date.now();
-
-    if (cachedTokens && currentTime - cachedTokens.timestamp < 30000) {
-      setAvailableTokens(cachedTokens.tokens);
-      setIsLoadingTokens(false);
-      return;
-    }
-
-    setIsLoadingTokens(true);
-    setTokenError(null);
-
-    try {
-      const solToken = await fetchSolBalance(connection, publicKey);
-
-      const usdcToken = await fetchUSDCBalance(connection, publicKey);
-
-      let tokens = [solToken, usdcToken].filter(Boolean);
-
-      tokens = tokens.map((token) => ({
-        ...token,
-      }));
-
-      tokens = tokens.filter((token) => token.balance > 0);
-
-      tokens.sort((a, b) => {
-        const aValue = a.balance * a.dollarValue;
-        const bValue = b.balance * b.dollarValue;
-        return bValue - aValue;
-      });
-
-      setAvailableTokens(tokens);
-      setCachedTokens({
-        tokens,
-        timestamp: currentTime,
-      });
-
-      if (
-        tokens.length > 0 &&
-        (!data.token || !tokens.find((t) => t.mintAddress === data.token))
-      ) {
-        updateData({
-          ...data,
-          token: tokens[0].mintAddress,
-          amount: 0,
-          symbol: tokens[0].symbol,
-        });
+      const now = Date.now();
+      if (!force && now - lastFetchTs.current < REFETCH_INTERVAL_MS) {
+        // Still fresh enough — skip this call
+        return;
       }
-    } catch (error) {
-      console.error("Error fetching tokens:", error);
-      setTokenError(
-        error instanceof Error ? error.message : "Failed to load tokens"
-      );
-    } finally {
-      setIsLoadingTokens(false);
-    }
-  };
 
-  const refreshTokens = async () => {
-    setCachedTokens(null);
-    await fetchUserTokens();
-  };
+      setIsLoadingTokens(true);
+      setTokenError(null);
 
+      try {
+        const result = await fetchWalletTokensResilient(publicKey, connection);
+        const tokens = result.data;
+
+        lastFetchTs.current = Date.now();
+        setAvailableTokens(tokens);
+        setTokenError(result.notice);
+
+        // Auto-select first available token if none selected
+        if (
+          tokens.length > 0 &&
+          (!data.token || !tokens.find((t) => t.mintAddress === data.token))
+        ) {
+          updateData({
+            ...data,
+            token: tokens[0].mintAddress,
+            amount: 0,
+            symbol: tokens[0].symbol,
+            decimals: tokens[0].decimals,
+          });
+        }
+      } catch (err) {
+        console.error("[useFetchTokens] Failed to fetch from backend:", err);
+        setTokenError(
+          err instanceof Error
+            ? `Failed to load tokens: ${err.message}`
+            : "Failed to load tokens"
+        );
+      } finally {
+        setIsLoadingTokens(false);
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [connected, connection, publicKey]
+  );
+
+  // Initial load and periodic refetch
+  useEffect(() => {
+    fetchTokensFromBackend(true);
+
+    const interval = setInterval(() => {
+      fetchTokensFromBackend(false);
+    }, REFETCH_INTERVAL_MS);
+
+    return () => clearInterval(interval);
+  }, [fetchTokensFromBackend]);
+
+  // Keep slider in sync when amount / token changes
   useEffect(() => {
     if (selectedToken && data.amount > 0) {
       const percentage = Math.min(
@@ -201,7 +138,7 @@ export function useFetchTokens(
 
   const handleAmountChange = (value: string) => {
     setInputError(null);
-    let amount = Number.parseFloat(value) || 0;
+    let amount = parseFloat(value) || 0;
 
     if (selectedToken) {
       if (amount < 0) {
@@ -209,7 +146,7 @@ export function useFetchTokens(
         setInputError("Amount cannot be negative");
       } else if (amount > selectedToken.balance) {
         amount = selectedToken.balance;
-        setInputError("Amount exceeds balance");
+        setInputError("Amount exceeds your available balance");
       }
     }
 
@@ -219,9 +156,8 @@ export function useFetchTokens(
       symbol: selectedToken?.symbol,
     });
 
-    if (selectedToken) {
-      const percentage = Math.min((amount / selectedToken.balance) * 100, 100);
-      setSliderValue(percentage);
+    if (selectedToken && selectedToken.balance > 0) {
+      setSliderValue(Math.min((amount / selectedToken.balance) * 100, 100));
     }
   };
 
@@ -239,7 +175,7 @@ export function useFetchTokens(
 
   const getUSDValue = (amount: number, tokenMint: string): string => {
     const token = availableTokens.find((t) => t.mintAddress === tokenMint);
-    if (token && token.dollarValue) {
+    if (token && token.dollarValue > 0) {
       return (amount * token.dollarValue).toFixed(2);
     }
     return "0.00";
@@ -247,30 +183,28 @@ export function useFetchTokens(
 
   const formatTokenAmount = (amount: number, decimals: number): string => {
     if (decimals <= 2) return amount.toFixed(0);
-    if (amount < 0.01) return amount.toFixed(decimals);
+    if (amount < 0.01) return amount.toFixed(Math.min(decimals, 6));
     if (amount < 1) return amount.toFixed(4);
     return amount.toFixed(2);
   };
 
-  // Calculate transaction fee (1% in this example)
-  const calculateFee = (amount: number): number => {
-    return amount * 0.01;
-  };
+  /** Platform fee: 1% of payment amount */
+  const calculateFee = (amount: number): number => amount * 0.01;
 
-  const calculateTotal = (amount: number): number => {
-    return amount + calculateFee(amount);
-  };
+  const calculateTotal = (amount: number): number =>
+    amount + calculateFee(amount);
 
   const getStepSize = (tokenMint: string): number => {
     const token = availableTokens.find((t) => t.mintAddress === tokenMint);
     if (!token) return 0.01;
-
-    if (token.dollarValue && token.dollarValue < 0.0001) {
-      return 100;
-    }
-
+    if (token.dollarValue > 0 && token.dollarValue < 0.0001) return 100;
     return Math.pow(10, -Math.min(6, token.decimals));
   };
+
+  /** Force a cache-busting refresh from the backend */
+  const refreshTokens = useCallback(async () => {
+    await fetchTokensFromBackend(true);
+  }, [fetchTokensFromBackend]);
 
   return {
     availableTokens,

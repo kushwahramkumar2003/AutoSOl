@@ -5,7 +5,7 @@
  * IDL can be found at `target/idl/auto_sol.json`.
  */
 export type AutoSol = {
-  "address": "98g9uR7WZqinAnSeUgB5nUw3pbR6sNwFuYWW78yPHtva",
+  "address": "G4zWuZQ7SaP9VgE7bhucKgQ7MVWjLVBhL4wHK6ymVAQL",
   "metadata": {
     "name": "autoSol",
     "version": "0.1.0",
@@ -13,6 +13,189 @@ export type AutoSol = {
     "description": "Created with Anchor"
   },
   "instructions": [
+    {
+      "name": "addExecutor",
+      "discriminator": [
+        195,
+        90,
+        42,
+        209,
+        244,
+        246,
+        76,
+        18
+      ],
+      "accounts": [
+        {
+          "name": "feeSettings",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  95,
+                  102,
+                  101,
+                  101,
+                  95,
+                  115,
+                  101,
+                  116,
+                  116,
+                  105,
+                  110,
+                  103,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "feeSettings"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "executor",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "addFeeCollector",
+      "discriminator": [
+        232,
+        239,
+        208,
+        45,
+        79,
+        48,
+        18,
+        169
+      ],
+      "accounts": [
+        {
+          "name": "feeSettings",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  95,
+                  102,
+                  101,
+                  101,
+                  95,
+                  115,
+                  101,
+                  116,
+                  116,
+                  105,
+                  110,
+                  103,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "feeSettings"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "feeCollector",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "addWhitelistedMint",
+      "discriminator": [
+        197,
+        167,
+        100,
+        8,
+        245,
+        152,
+        234,
+        87
+      ],
+      "accounts": [
+        {
+          "name": "feeSettings",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  95,
+                  102,
+                  101,
+                  101,
+                  95,
+                  115,
+                  101,
+                  116,
+                  116,
+                  105,
+                  110,
+                  103,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "feeSettings"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "mint",
+          "type": "pubkey"
+        }
+      ]
+    },
     {
       "name": "cancelPaymentSchedule",
       "discriminator": [
@@ -64,6 +247,103 @@ export type AutoSol = {
         {
           "name": "systemProgram",
           "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "cancelSplPaymentSchedule",
+      "discriminator": [
+        156,
+        206,
+        163,
+        83,
+        188,
+        163,
+        64,
+        58
+      ],
+      "accounts": [
+        {
+          "name": "paymentSchedule",
+          "writable": true
+        },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "ownerTokenAccount",
+          "writable": true
+        },
+        {
+          "name": "paymentVault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  112,
+                  108,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "paymentSchedule"
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vaultAuthority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "paymentSchedule"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "tokenProgram",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         }
       ],
       "args": []
@@ -180,6 +460,223 @@ export type AutoSol = {
         {
           "name": "systemProgram",
           "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "paymentAmount",
+          "type": "u64"
+        },
+        {
+          "name": "recipient",
+          "type": "pubkey"
+        },
+        {
+          "name": "scheduleTimes",
+          "type": {
+            "vec": "i64"
+          }
+        },
+        {
+          "name": "memo",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "createSplPaymentSchedule",
+      "discriminator": [
+        91,
+        45,
+        70,
+        87,
+        103,
+        235,
+        249,
+        196
+      ],
+      "accounts": [
+        {
+          "name": "paymentSchedule",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "feeSettings",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  95,
+                  102,
+                  101,
+                  101,
+                  95,
+                  115,
+                  101,
+                  116,
+                  116,
+                  105,
+                  110,
+                  103,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "userTokenAccount",
+          "writable": true
+        },
+        {
+          "name": "paymentVault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  112,
+                  108,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "paymentSchedule"
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vaultAuthority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "paymentSchedule"
+              }
+            ]
+          }
+        },
+        {
+          "name": "feeVault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  112,
+                  108,
+                  95,
+                  102,
+                  101,
+                  101,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "feeVaultAuthority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "tokenProgram",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         },
         {
           "name": "rent",
@@ -303,6 +800,139 @@ export type AutoSol = {
       ]
     },
     {
+      "name": "executeSplPayment",
+      "discriminator": [
+        123,
+        191,
+        66,
+        237,
+        163,
+        25,
+        68,
+        172
+      ],
+      "accounts": [
+        {
+          "name": "paymentSchedule",
+          "writable": true
+        },
+        {
+          "name": "feeSettings",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  95,
+                  102,
+                  101,
+                  101,
+                  95,
+                  115,
+                  101,
+                  116,
+                  116,
+                  105,
+                  110,
+                  103,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "executor",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "recipientTokenAccount",
+          "writable": true
+        },
+        {
+          "name": "paymentVault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  112,
+                  108,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "paymentSchedule"
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vaultAuthority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "paymentSchedule"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "tokenProgram",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "paymentIndex",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "initialize",
       "discriminator": [
         175,
@@ -349,9 +979,6 @@ export type AutoSol = {
         },
         {
           "name": "solFeeVault",
-          "docs": [
-            "Simple PDA without data structure for easy SOL transfers"
-          ],
           "writable": true,
           "pda": {
             "seeds": [
@@ -390,6 +1017,189 @@ export type AutoSol = {
         }
       ],
       "args": []
+    },
+    {
+      "name": "removeExecutor",
+      "discriminator": [
+        220,
+        155,
+        16,
+        109,
+        21,
+        139,
+        129,
+        190
+      ],
+      "accounts": [
+        {
+          "name": "feeSettings",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  95,
+                  102,
+                  101,
+                  101,
+                  95,
+                  115,
+                  101,
+                  116,
+                  116,
+                  105,
+                  110,
+                  103,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "feeSettings"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "executor",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "removeFeeCollector",
+      "discriminator": [
+        244,
+        215,
+        198,
+        72,
+        40,
+        193,
+        29,
+        236
+      ],
+      "accounts": [
+        {
+          "name": "feeSettings",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  95,
+                  102,
+                  101,
+                  101,
+                  95,
+                  115,
+                  101,
+                  116,
+                  116,
+                  105,
+                  110,
+                  103,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "feeSettings"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "feeCollector",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "removeWhitelistedMint",
+      "discriminator": [
+        179,
+        228,
+        123,
+        93,
+        88,
+        212,
+        96,
+        186
+      ],
+      "accounts": [
+        {
+          "name": "feeSettings",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  95,
+                  102,
+                  101,
+                  101,
+                  95,
+                  115,
+                  101,
+                  116,
+                  116,
+                  105,
+                  110,
+                  103,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "feeSettings"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "mint",
+          "type": "pubkey"
+        }
+      ]
     },
     {
       "name": "updateFeePercentage",
@@ -503,9 +1313,6 @@ export type AutoSol = {
         },
         {
           "name": "solFeeVault",
-          "docs": [
-            "Simple PDA without data structure for easy SOL transfers"
-          ],
           "writable": true,
           "pda": {
             "seeds": [
@@ -536,6 +1343,139 @@ export type AutoSol = {
         {
           "name": "systemProgram",
           "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "withdrawSplFees",
+      "discriminator": [
+        67,
+        45,
+        141,
+        82,
+        211,
+        167,
+        149,
+        115
+      ],
+      "accounts": [
+        {
+          "name": "feeSettings",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  95,
+                  102,
+                  101,
+                  101,
+                  95,
+                  115,
+                  101,
+                  116,
+                  116,
+                  105,
+                  110,
+                  103,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "authorityTokenAccount",
+          "writable": true
+        },
+        {
+          "name": "feeVault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  112,
+                  108,
+                  95,
+                  102,
+                  101,
+                  101,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "feeVaultAuthority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "tokenProgram",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         }
       ],
       "args": [
@@ -645,7 +1585,7 @@ export type AutoSol = {
     {
       "code": 6000,
       "name": "emptySchedule",
-      "msg": "Payment schedule cannot be empty"
+      "msg": "Empty schedule"
     },
     {
       "code": 6001,
@@ -655,12 +1595,12 @@ export type AutoSol = {
     {
       "code": 6002,
       "name": "insufficientFunds",
-      "msg": "Insufficient funds for scheduled payments and fees"
+      "msg": "Insufficient funds"
     },
     {
       "code": 6003,
       "name": "invalidScheduleStatus",
-      "msg": "Payment schedule is not active"
+      "msg": "Schedule is not active"
     },
     {
       "code": 6004,
@@ -670,62 +1610,127 @@ export type AutoSol = {
     {
       "code": 6005,
       "name": "paymentAlreadyExecuted",
-      "msg": "Payment has already been executed"
+      "msg": "Payment already executed"
     },
     {
       "code": 6006,
       "name": "paymentNotDue",
-      "msg": "Payment is not due yet"
+      "msg": "Payment not due yet"
     },
     {
       "code": 6007,
       "name": "insufficientVaultFunds",
-      "msg": "Insufficient funds in payment vault"
+      "msg": "Insufficient vault funds"
     },
     {
       "code": 6008,
       "name": "noRemainingFunds",
-      "msg": "No remaining funds to refund"
+      "msg": "No remaining funds"
     },
     {
       "code": 6009,
       "name": "feeTooHigh",
-      "msg": "Fee percentage cannot exceed 5%"
+      "msg": "Fee > 5%"
     },
     {
       "code": 6010,
       "name": "unauthorizedExecutor",
-      "msg": "Only HTTP backend wallet can execute payments"
+      "msg": "Unauthorized executor"
     },
     {
       "code": 6011,
       "name": "unauthorizedFeeWithdrawal",
-      "msg": "Only authorized wallets can withdraw fees"
+      "msg": "Unauthorized fee withdrawal"
     },
     {
       "code": 6012,
       "name": "tooManyScheduleTimes",
-      "msg": "Too many schedule times provided"
+      "msg": "Too many schedule times (max 10)"
     },
     {
       "code": 6013,
-      "name": "programAlreadyInitialized",
-      "msg": "Program is already initialized"
+      "name": "invalidRecipient",
+      "msg": "Invalid recipient"
     },
     {
       "code": 6014,
-      "name": "invalidRecipient",
-      "msg": "Invalid recipient for payment"
+      "name": "unauthorizedCancellation",
+      "msg": "Unauthorized cancellation"
     },
     {
       "code": 6015,
-      "name": "unauthorizedCancellation",
-      "msg": "Unauthorized to cancel payment schedule"
+      "name": "unauthorized",
+      "msg": "unauthorized"
     },
     {
       "code": 6016,
-      "name": "unauthorized",
-      "msg": "Unauthorized access"
+      "name": "invalidPaymentType",
+      "msg": "Wrong payment type"
+    },
+    {
+      "code": 6017,
+      "name": "mintNotWhitelisted",
+      "msg": "Mint not whitelisted"
+    },
+    {
+      "code": 6018,
+      "name": "whitelistFull",
+      "msg": "Whitelist full"
+    },
+    {
+      "code": 6019,
+      "name": "mintAlreadyWhitelisted",
+      "msg": "Mint already whitelisted"
+    },
+    {
+      "code": 6020,
+      "name": "mintNotInWhitelist",
+      "msg": "Mint not in whitelist"
+    },
+    {
+      "code": 6021,
+      "name": "executorAllowlistFull",
+      "msg": "Executor allowlist full"
+    },
+    {
+      "code": 6022,
+      "name": "feeCollectorAllowlistFull",
+      "msg": "Fee collector allowlist full"
+    },
+    {
+      "code": 6023,
+      "name": "executorAlreadyAllowed",
+      "msg": "Executor already allowed"
+    },
+    {
+      "code": 6024,
+      "name": "feeCollectorAlreadyAllowed",
+      "msg": "Fee collector already allowed"
+    },
+    {
+      "code": 6025,
+      "name": "executorNotAllowed",
+      "msg": "Executor not allowed"
+    },
+    {
+      "code": 6026,
+      "name": "feeCollectorNotAllowed",
+      "msg": "Fee collector not allowed"
+    },
+    {
+      "code": 6027,
+      "name": "arithmeticOverflow",
+      "msg": "Arithmetic overflow"
+    },
+    {
+      "code": 6028,
+      "name": "zeroAmount",
+      "msg": "Zero amount"
+    },
+    {
+      "code": 6029,
+      "name": "memoTooLong",
+      "msg": "Memo too long"
     }
   ],
   "types": [
@@ -763,11 +1768,19 @@ export type AutoSol = {
             "type": "u16"
           },
           {
-            "name": "httpBackendWallet",
-            "type": "pubkey"
+            "name": "whitelistedMints",
+            "type": {
+              "vec": "pubkey"
+            }
           },
           {
-            "name": "feeWithdrawalAllowedKeys",
+            "name": "executorAllowedKeys",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "feeCollectorAllowedKeys",
             "type": {
               "vec": "pubkey"
             }
@@ -789,12 +1802,20 @@ export type AutoSol = {
             "type": "u64"
           },
           {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
             "name": "withdrawnBy",
             "type": "pubkey"
           },
           {
             "name": "withdrawnAt",
             "type": "i64"
+          },
+          {
+            "name": "isSol",
+            "type": "bool"
           }
         ]
       }
@@ -817,7 +1838,7 @@ export type AutoSol = {
             "type": "i64"
           },
           {
-            "name": "txSignature",
+            "name": "executedBy",
             "type": {
               "option": "pubkey"
             }
@@ -847,12 +1868,20 @@ export type AutoSol = {
             "type": "pubkey"
           },
           {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
             "name": "executedAt",
             "type": "i64"
           },
           {
             "name": "executedBy",
             "type": "pubkey"
+          },
+          {
+            "name": "isSol",
+            "type": "bool"
           }
         ]
       }
@@ -883,6 +1912,10 @@ export type AutoSol = {
             "type": "pubkey"
           },
           {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
             "name": "payments",
             "type": {
               "vec": {
@@ -905,8 +1938,20 @@ export type AutoSol = {
             }
           },
           {
+            "name": "paymentType",
+            "type": {
+              "defined": {
+                "name": "paymentType"
+              }
+            }
+          },
+          {
             "name": "memo",
             "type": "string"
+          },
+          {
+            "name": "vaultBump",
+            "type": "u8"
           }
         ]
       }
@@ -925,12 +1970,20 @@ export type AutoSol = {
             "type": "pubkey"
           },
           {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
             "name": "refundAmount",
             "type": "u64"
           },
           {
             "name": "cancelledAt",
             "type": "i64"
+          },
+          {
+            "name": "isSol",
+            "type": "bool"
           }
         ]
       }
@@ -953,11 +2006,19 @@ export type AutoSol = {
             "type": "pubkey"
           },
           {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
             "name": "totalAmount",
             "type": "u64"
           },
           {
             "name": "paymentAmount",
+            "type": "u64"
+          },
+          {
+            "name": "feeAmount",
             "type": "u64"
           },
           {
@@ -967,6 +2028,24 @@ export type AutoSol = {
           {
             "name": "createdAt",
             "type": "i64"
+          },
+          {
+            "name": "isSol",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "paymentType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "sol"
+          },
+          {
+            "name": "splToken"
           }
         ]
       }

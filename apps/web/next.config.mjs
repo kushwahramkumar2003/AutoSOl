@@ -6,6 +6,9 @@ const nextConfig = {
       "cdn.jsdelivr.net",
       "arweave.net",
       "cryptologos.cc",
+      "quei6zhlcfsxdn7bhjrpb6xafcivmntfzkthwcnycx25wzdwj5qa.arweave.net",
+      "s2.coinmarketcap.com",
+      "static.jup.ag",
     ],
   },
 };

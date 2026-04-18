@@ -1,706 +1,2065 @@
 export const idl = {
-  address: "98g9uR7WZqinAnSeUgB5nUw3pbR6sNwFuYWW78yPHtva",
-  metadata: {
-    name: "auto_sol",
-    version: "0.1.0",
-    spec: "0.1.0",
-    description: "Created with Anchor",
+  "address": "G4zWuZQ7SaP9VgE7bhucKgQ7MVWjLVBhL4wHK6ymVAQL",
+  "metadata": {
+    "name": "auto_sol",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
   },
-  instructions: [
+  "instructions": [
     {
-      name: "cancel_payment_schedule",
-      discriminator: [247, 11, 247, 22, 50, 82, 144, 58],
-      accounts: [
-        {
-          name: "payment_schedule",
-          writable: true,
-        },
-        {
-          name: "owner",
-          writable: true,
-          signer: true,
-        },
-        {
-          name: "sol_payment_vault",
-          writable: true,
-          pda: {
-            seeds: [
-              {
-                kind: "const",
-                value: [115, 111, 108, 95, 118, 97, 117, 108, 116],
-              },
-              {
-                kind: "account",
-                path: "payment_schedule",
-              },
-            ],
-          },
-        },
-        {
-          name: "system_program",
-          address: "11111111111111111111111111111111",
-        },
+      "name": "add_executor",
+      "discriminator": [
+        195,
+        90,
+        42,
+        209,
+        244,
+        246,
+        76,
+        18
       ],
-      args: [],
+      "accounts": [
+        {
+          "name": "fee_settings",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  95,
+                  102,
+                  101,
+                  101,
+                  95,
+                  115,
+                  101,
+                  116,
+                  116,
+                  105,
+                  110,
+                  103,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "fee_settings"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "executor",
+          "type": "pubkey"
+        }
+      ]
     },
     {
-      name: "create_payment_schedule",
-      discriminator: [2, 29, 246, 1, 117, 214, 46, 131],
-      accounts: [
-        {
-          name: "payment_schedule",
-          writable: true,
-          signer: true,
-        },
-        {
-          name: "fee_settings",
-          pda: {
-            seeds: [
-              {
-                kind: "const",
-                value: [
-                  103, 108, 111, 98, 97, 108, 95, 102, 101, 101, 95, 115, 101,
-                  116, 116, 105, 110, 103, 115,
-                ],
-              },
-            ],
-          },
-        },
-        {
-          name: "user",
-          writable: true,
-          signer: true,
-        },
-        {
-          name: "sol_payment_vault",
-          writable: true,
-          pda: {
-            seeds: [
-              {
-                kind: "const",
-                value: [115, 111, 108, 95, 118, 97, 117, 108, 116],
-              },
-              {
-                kind: "account",
-                path: "payment_schedule",
-              },
-            ],
-          },
-        },
-        {
-          name: "sol_fee_vault",
-          writable: true,
-          pda: {
-            seeds: [
-              {
-                kind: "const",
-                value: [
-                  103, 108, 111, 98, 97, 108, 95, 102, 101, 101, 95, 118, 97,
-                  117, 108, 116,
-                ],
-              },
-            ],
-          },
-        },
-        {
-          name: "system_program",
-          address: "11111111111111111111111111111111",
-        },
-        {
-          name: "rent",
-          address: "SysvarRent111111111111111111111111111111111",
-        },
+      "name": "add_fee_collector",
+      "discriminator": [
+        232,
+        239,
+        208,
+        45,
+        79,
+        48,
+        18,
+        169
       ],
-      args: [
+      "accounts": [
         {
-          name: "payment_amount",
-          type: "u64",
+          "name": "fee_settings",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  95,
+                  102,
+                  101,
+                  101,
+                  95,
+                  115,
+                  101,
+                  116,
+                  116,
+                  105,
+                  110,
+                  103,
+                  115
+                ]
+              }
+            ]
+          }
         },
         {
-          name: "recipient",
-          type: "pubkey",
-        },
-        {
-          name: "schedule_times",
-          type: {
-            vec: "i64",
-          },
-        },
-        {
-          name: "memo",
-          type: "string",
-        },
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "fee_settings"
+          ]
+        }
       ],
+      "args": [
+        {
+          "name": "fee_collector",
+          "type": "pubkey"
+        }
+      ]
     },
     {
-      name: "execute_payment",
-      discriminator: [86, 4, 7, 7, 120, 139, 232, 139],
-      accounts: [
-        {
-          name: "payment_schedule",
-          writable: true,
-        },
-        {
-          name: "fee_settings",
-          pda: {
-            seeds: [
-              {
-                kind: "const",
-                value: [
-                  103, 108, 111, 98, 97, 108, 95, 102, 101, 101, 95, 115, 101,
-                  116, 116, 105, 110, 103, 115,
-                ],
-              },
-            ],
-          },
-        },
-        {
-          name: "executor",
-          writable: true,
-          signer: true,
-        },
-        {
-          name: "recipient",
-          writable: true,
-        },
-        {
-          name: "sol_payment_vault",
-          writable: true,
-          pda: {
-            seeds: [
-              {
-                kind: "const",
-                value: [115, 111, 108, 95, 118, 97, 117, 108, 116],
-              },
-              {
-                kind: "account",
-                path: "payment_schedule",
-              },
-            ],
-          },
-        },
-        {
-          name: "system_program",
-          address: "11111111111111111111111111111111",
-        },
+      "name": "add_whitelisted_mint",
+      "discriminator": [
+        197,
+        167,
+        100,
+        8,
+        245,
+        152,
+        234,
+        87
       ],
-      args: [
+      "accounts": [
         {
-          name: "payment_index",
-          type: "u64",
+          "name": "fee_settings",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  95,
+                  102,
+                  101,
+                  101,
+                  95,
+                  115,
+                  101,
+                  116,
+                  116,
+                  105,
+                  110,
+                  103,
+                  115
+                ]
+              }
+            ]
+          }
         },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "fee_settings"
+          ]
+        }
       ],
+      "args": [
+        {
+          "name": "mint",
+          "type": "pubkey"
+        }
+      ]
     },
     {
-      name: "initialize",
-      discriminator: [175, 175, 109, 31, 13, 152, 155, 237],
-      accounts: [
-        {
-          name: "fee_settings",
-          writable: true,
-          pda: {
-            seeds: [
-              {
-                kind: "const",
-                value: [
-                  103, 108, 111, 98, 97, 108, 95, 102, 101, 101, 95, 115, 101,
-                  116, 116, 105, 110, 103, 115,
-                ],
-              },
-            ],
-          },
-        },
-        {
-          name: "sol_fee_vault",
-          docs: ["Simple PDA without data structure for easy SOL transfers"],
-          writable: true,
-          pda: {
-            seeds: [
-              {
-                kind: "const",
-                value: [
-                  103, 108, 111, 98, 97, 108, 95, 102, 101, 101, 95, 118, 97,
-                  117, 108, 116,
-                ],
-              },
-            ],
-          },
-        },
-        {
-          name: "authority",
-          writable: true,
-          signer: true,
-        },
-        {
-          name: "system_program",
-          address: "11111111111111111111111111111111",
-        },
+      "name": "cancel_payment_schedule",
+      "discriminator": [
+        247,
+        11,
+        247,
+        22,
+        50,
+        82,
+        144,
+        58
       ],
-      args: [],
+      "accounts": [
+        {
+          "name": "payment_schedule",
+          "writable": true
+        },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "sol_payment_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  111,
+                  108,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "payment_schedule"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
     },
     {
-      name: "update_fee_percentage",
-      discriminator: [102, 119, 197, 160, 139, 102, 182, 0],
-      accounts: [
+      "name": "cancel_spl_payment_schedule",
+      "discriminator": [
+        156,
+        206,
+        163,
+        83,
+        188,
+        163,
+        64,
+        58
+      ],
+      "accounts": [
         {
-          name: "fee_settings",
-          writable: true,
-          pda: {
-            seeds: [
+          "name": "payment_schedule",
+          "writable": true
+        },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "owner_token_account",
+          "writable": true
+        },
+        {
+          "name": "payment_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
               {
-                kind: "const",
-                value: [
-                  103, 108, 111, 98, 97, 108, 95, 102, 101, 101, 95, 115, 101,
-                  116, 116, 105, 110, 103, 115,
-                ],
+                "kind": "const",
+                "value": [
+                  115,
+                  112,
+                  108,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
               },
-            ],
-          },
+              {
+                "kind": "account",
+                "path": "payment_schedule"
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
         },
         {
-          name: "authority",
-          writable: true,
-          signer: true,
-          relations: ["fee_settings"],
+          "name": "vault_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "payment_schedule"
+              }
+            ]
+          }
         },
-      ],
-      args: [
         {
-          name: "new_fee_percentage",
-          type: "u16",
+          "name": "mint"
         },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
       ],
+      "args": []
     },
     {
-      name: "withdraw_fees",
-      discriminator: [198, 212, 171, 109, 144, 215, 174, 89],
-      accounts: [
-        {
-          name: "fee_settings",
-          pda: {
-            seeds: [
-              {
-                kind: "const",
-                value: [
-                  103, 108, 111, 98, 97, 108, 95, 102, 101, 101, 95, 115, 101,
-                  116, 116, 105, 110, 103, 115,
-                ],
-              },
-            ],
-          },
-        },
-        {
-          name: "authority",
-          writable: true,
-          signer: true,
-        },
-        {
-          name: "sol_fee_vault",
-          docs: ["Simple PDA without data structure for easy SOL transfers"],
-          writable: true,
-          pda: {
-            seeds: [
-              {
-                kind: "const",
-                value: [
-                  103, 108, 111, 98, 97, 108, 95, 102, 101, 101, 95, 118, 97,
-                  117, 108, 116,
-                ],
-              },
-            ],
-          },
-        },
-        {
-          name: "system_program",
-          address: "11111111111111111111111111111111",
-        },
+      "name": "create_payment_schedule",
+      "discriminator": [
+        2,
+        29,
+        246,
+        1,
+        117,
+        214,
+        46,
+        131
       ],
-      args: [
+      "accounts": [
         {
-          name: "amount",
-          type: "u64",
+          "name": "payment_schedule",
+          "writable": true,
+          "signer": true
         },
+        {
+          "name": "fee_settings",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  95,
+                  102,
+                  101,
+                  101,
+                  95,
+                  115,
+                  101,
+                  116,
+                  116,
+                  105,
+                  110,
+                  103,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "sol_payment_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  111,
+                  108,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "payment_schedule"
+              }
+            ]
+          }
+        },
+        {
+          "name": "sol_fee_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  95,
+                  102,
+                  101,
+                  101,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
       ],
+      "args": [
+        {
+          "name": "payment_amount",
+          "type": "u64"
+        },
+        {
+          "name": "recipient",
+          "type": "pubkey"
+        },
+        {
+          "name": "schedule_times",
+          "type": {
+            "vec": "i64"
+          }
+        },
+        {
+          "name": "memo",
+          "type": "string"
+        }
+      ]
     },
+    {
+      "name": "create_spl_payment_schedule",
+      "discriminator": [
+        91,
+        45,
+        70,
+        87,
+        103,
+        235,
+        249,
+        196
+      ],
+      "accounts": [
+        {
+          "name": "payment_schedule",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "fee_settings",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  95,
+                  102,
+                  101,
+                  101,
+                  95,
+                  115,
+                  101,
+                  116,
+                  116,
+                  105,
+                  110,
+                  103,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "user_token_account",
+          "writable": true
+        },
+        {
+          "name": "payment_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  112,
+                  108,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "payment_schedule"
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "payment_schedule"
+              }
+            ]
+          }
+        },
+        {
+          "name": "fee_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  112,
+                  108,
+                  95,
+                  102,
+                  101,
+                  101,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "fee_vault_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "rent",
+          "address": "SysvarRent111111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "payment_amount",
+          "type": "u64"
+        },
+        {
+          "name": "recipient",
+          "type": "pubkey"
+        },
+        {
+          "name": "schedule_times",
+          "type": {
+            "vec": "i64"
+          }
+        },
+        {
+          "name": "memo",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "execute_payment",
+      "discriminator": [
+        86,
+        4,
+        7,
+        7,
+        120,
+        139,
+        232,
+        139
+      ],
+      "accounts": [
+        {
+          "name": "payment_schedule",
+          "writable": true
+        },
+        {
+          "name": "fee_settings",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  95,
+                  102,
+                  101,
+                  101,
+                  95,
+                  115,
+                  101,
+                  116,
+                  116,
+                  105,
+                  110,
+                  103,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "executor",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "recipient",
+          "writable": true
+        },
+        {
+          "name": "sol_payment_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  111,
+                  108,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "payment_schedule"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "payment_index",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "execute_spl_payment",
+      "discriminator": [
+        123,
+        191,
+        66,
+        237,
+        163,
+        25,
+        68,
+        172
+      ],
+      "accounts": [
+        {
+          "name": "payment_schedule",
+          "writable": true
+        },
+        {
+          "name": "fee_settings",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  95,
+                  102,
+                  101,
+                  101,
+                  95,
+                  115,
+                  101,
+                  116,
+                  116,
+                  105,
+                  110,
+                  103,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "executor",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "recipient_token_account",
+          "writable": true
+        },
+        {
+          "name": "payment_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  112,
+                  108,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "payment_schedule"
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "payment_schedule"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "payment_index",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "initialize",
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "fee_settings",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  95,
+                  102,
+                  101,
+                  101,
+                  95,
+                  115,
+                  101,
+                  116,
+                  116,
+                  105,
+                  110,
+                  103,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "sol_fee_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  95,
+                  102,
+                  101,
+                  101,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "remove_executor",
+      "discriminator": [
+        220,
+        155,
+        16,
+        109,
+        21,
+        139,
+        129,
+        190
+      ],
+      "accounts": [
+        {
+          "name": "fee_settings",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  95,
+                  102,
+                  101,
+                  101,
+                  95,
+                  115,
+                  101,
+                  116,
+                  116,
+                  105,
+                  110,
+                  103,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "fee_settings"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "executor",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "remove_fee_collector",
+      "discriminator": [
+        244,
+        215,
+        198,
+        72,
+        40,
+        193,
+        29,
+        236
+      ],
+      "accounts": [
+        {
+          "name": "fee_settings",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  95,
+                  102,
+                  101,
+                  101,
+                  95,
+                  115,
+                  101,
+                  116,
+                  116,
+                  105,
+                  110,
+                  103,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "fee_settings"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "fee_collector",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "remove_whitelisted_mint",
+      "discriminator": [
+        179,
+        228,
+        123,
+        93,
+        88,
+        212,
+        96,
+        186
+      ],
+      "accounts": [
+        {
+          "name": "fee_settings",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  95,
+                  102,
+                  101,
+                  101,
+                  95,
+                  115,
+                  101,
+                  116,
+                  116,
+                  105,
+                  110,
+                  103,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "fee_settings"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "mint",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "update_fee_percentage",
+      "discriminator": [
+        102,
+        119,
+        197,
+        160,
+        139,
+        102,
+        182,
+        0
+      ],
+      "accounts": [
+        {
+          "name": "fee_settings",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  95,
+                  102,
+                  101,
+                  101,
+                  95,
+                  115,
+                  101,
+                  116,
+                  116,
+                  105,
+                  110,
+                  103,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "fee_settings"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "new_fee_percentage",
+          "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "withdraw_fees",
+      "discriminator": [
+        198,
+        212,
+        171,
+        109,
+        144,
+        215,
+        174,
+        89
+      ],
+      "accounts": [
+        {
+          "name": "fee_settings",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  95,
+                  102,
+                  101,
+                  101,
+                  95,
+                  115,
+                  101,
+                  116,
+                  116,
+                  105,
+                  110,
+                  103,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "sol_fee_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  95,
+                  102,
+                  101,
+                  101,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "withdraw_spl_fees",
+      "discriminator": [
+        67,
+        45,
+        141,
+        82,
+        211,
+        167,
+        149,
+        115
+      ],
+      "accounts": [
+        {
+          "name": "fee_settings",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  95,
+                  102,
+                  101,
+                  101,
+                  95,
+                  115,
+                  101,
+                  116,
+                  116,
+                  105,
+                  110,
+                  103,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "authority_token_account",
+          "writable": true
+        },
+        {
+          "name": "fee_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  112,
+                  108,
+                  95,
+                  102,
+                  101,
+                  101,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "fee_vault_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    }
   ],
-  accounts: [
+  "accounts": [
     {
-      name: "FeeSettings",
-      discriminator: [251, 152, 237, 9, 118, 2, 153, 254],
+      "name": "FeeSettings",
+      "discriminator": [
+        251,
+        152,
+        237,
+        9,
+        118,
+        2,
+        153,
+        254
+      ]
     },
     {
-      name: "PaymentSchedule",
-      discriminator: [220, 252, 154, 129, 139, 124, 204, 75],
-    },
+      "name": "PaymentSchedule",
+      "discriminator": [
+        220,
+        252,
+        154,
+        129,
+        139,
+        124,
+        204,
+        75
+      ]
+    }
   ],
-  events: [
+  "events": [
     {
-      name: "FeePercentageUpdatedEvent",
-      discriminator: [159, 56, 203, 216, 111, 194, 177, 206],
+      "name": "FeePercentageUpdatedEvent",
+      "discriminator": [
+        159,
+        56,
+        203,
+        216,
+        111,
+        194,
+        177,
+        206
+      ]
     },
     {
-      name: "FeesWithdrawnEvent",
-      discriminator: [93, 177, 0, 69, 15, 156, 73, 194],
+      "name": "FeesWithdrawnEvent",
+      "discriminator": [
+        93,
+        177,
+        0,
+        69,
+        15,
+        156,
+        73,
+        194
+      ]
     },
     {
-      name: "PaymentExecutedEvent",
-      discriminator: [71, 65, 49, 77, 198, 22, 227, 182],
+      "name": "PaymentExecutedEvent",
+      "discriminator": [
+        71,
+        65,
+        49,
+        77,
+        198,
+        22,
+        227,
+        182
+      ]
     },
     {
-      name: "PaymentScheduleCancelledEvent",
-      discriminator: [87, 114, 182, 97, 125, 1, 183, 110],
+      "name": "PaymentScheduleCancelledEvent",
+      "discriminator": [
+        87,
+        114,
+        182,
+        97,
+        125,
+        1,
+        183,
+        110
+      ]
     },
     {
-      name: "PaymentScheduleCreatedEvent",
-      discriminator: [43, 244, 87, 216, 27, 10, 99, 229],
-    },
+      "name": "PaymentScheduleCreatedEvent",
+      "discriminator": [
+        43,
+        244,
+        87,
+        216,
+        27,
+        10,
+        99,
+        229
+      ]
+    }
   ],
-  errors: [
+  "errors": [
     {
-      code: 6000,
-      name: "EmptySchedule",
-      msg: "Payment schedule cannot be empty",
+      "code": 6000,
+      "name": "EmptySchedule",
+      "msg": "Empty schedule"
     },
     {
-      code: 6001,
-      name: "InvalidScheduleTime",
-      msg: "Schedule time must be in the future",
+      "code": 6001,
+      "name": "InvalidScheduleTime",
+      "msg": "Schedule time must be in the future"
     },
     {
-      code: 6002,
-      name: "InsufficientFunds",
-      msg: "Insufficient funds for scheduled payments and fees",
+      "code": 6002,
+      "name": "InsufficientFunds",
+      "msg": "Insufficient funds"
     },
     {
-      code: 6003,
-      name: "InvalidScheduleStatus",
-      msg: "Payment schedule is not active",
+      "code": 6003,
+      "name": "InvalidScheduleStatus",
+      "msg": "Schedule is not active"
     },
     {
-      code: 6004,
-      name: "InvalidPaymentIndex",
-      msg: "Invalid payment index",
+      "code": 6004,
+      "name": "InvalidPaymentIndex",
+      "msg": "Invalid payment index"
     },
     {
-      code: 6005,
-      name: "PaymentAlreadyExecuted",
-      msg: "Payment has already been executed",
+      "code": 6005,
+      "name": "PaymentAlreadyExecuted",
+      "msg": "Payment already executed"
     },
     {
-      code: 6006,
-      name: "PaymentNotDue",
-      msg: "Payment is not due yet",
+      "code": 6006,
+      "name": "PaymentNotDue",
+      "msg": "Payment not due yet"
     },
     {
-      code: 6007,
-      name: "InsufficientVaultFunds",
-      msg: "Insufficient funds in payment vault",
+      "code": 6007,
+      "name": "InsufficientVaultFunds",
+      "msg": "Insufficient vault funds"
     },
     {
-      code: 6008,
-      name: "NoRemainingFunds",
-      msg: "No remaining funds to refund",
+      "code": 6008,
+      "name": "NoRemainingFunds",
+      "msg": "No remaining funds"
     },
     {
-      code: 6009,
-      name: "FeeTooHigh",
-      msg: "Fee percentage cannot exceed 5%",
+      "code": 6009,
+      "name": "FeeTooHigh",
+      "msg": "Fee > 5%"
     },
     {
-      code: 6010,
-      name: "UnauthorizedExecutor",
-      msg: "Only HTTP backend wallet can execute payments",
+      "code": 6010,
+      "name": "UnauthorizedExecutor",
+      "msg": "Unauthorized executor"
     },
     {
-      code: 6011,
-      name: "UnauthorizedFeeWithdrawal",
-      msg: "Only authorized wallets can withdraw fees",
+      "code": 6011,
+      "name": "UnauthorizedFeeWithdrawal",
+      "msg": "Unauthorized fee withdrawal"
     },
     {
-      code: 6012,
-      name: "TooManyScheduleTimes",
-      msg: "Too many schedule times provided",
+      "code": 6012,
+      "name": "TooManyScheduleTimes",
+      "msg": "Too many schedule times (max 10)"
     },
     {
-      code: 6013,
-      name: "ProgramAlreadyInitialized",
-      msg: "Program is already initialized",
+      "code": 6013,
+      "name": "InvalidRecipient",
+      "msg": "Invalid recipient"
     },
     {
-      code: 6014,
-      name: "InvalidRecipient",
-      msg: "Invalid recipient for payment",
+      "code": 6014,
+      "name": "UnauthorizedCancellation",
+      "msg": "Unauthorized cancellation"
     },
     {
-      code: 6015,
-      name: "UnauthorizedCancellation",
-      msg: "Unauthorized to cancel payment schedule",
+      "code": 6015,
+      "name": "Unauthorized",
+      "msg": "Unauthorized"
     },
     {
-      code: 6016,
-      name: "Unauthorized",
-      msg: "Unauthorized access",
+      "code": 6016,
+      "name": "InvalidPaymentType",
+      "msg": "Wrong payment type"
     },
+    {
+      "code": 6017,
+      "name": "MintNotWhitelisted",
+      "msg": "Mint not whitelisted"
+    },
+    {
+      "code": 6018,
+      "name": "WhitelistFull",
+      "msg": "Whitelist full"
+    },
+    {
+      "code": 6019,
+      "name": "MintAlreadyWhitelisted",
+      "msg": "Mint already whitelisted"
+    },
+    {
+      "code": 6020,
+      "name": "MintNotInWhitelist",
+      "msg": "Mint not in whitelist"
+    },
+    {
+      "code": 6021,
+      "name": "ExecutorAllowlistFull",
+      "msg": "Executor allowlist full"
+    },
+    {
+      "code": 6022,
+      "name": "FeeCollectorAllowlistFull",
+      "msg": "Fee collector allowlist full"
+    },
+    {
+      "code": 6023,
+      "name": "ExecutorAlreadyAllowed",
+      "msg": "Executor already allowed"
+    },
+    {
+      "code": 6024,
+      "name": "FeeCollectorAlreadyAllowed",
+      "msg": "Fee collector already allowed"
+    },
+    {
+      "code": 6025,
+      "name": "ExecutorNotAllowed",
+      "msg": "Executor not allowed"
+    },
+    {
+      "code": 6026,
+      "name": "FeeCollectorNotAllowed",
+      "msg": "Fee collector not allowed"
+    },
+    {
+      "code": 6027,
+      "name": "ArithmeticOverflow",
+      "msg": "Arithmetic overflow"
+    },
+    {
+      "code": 6028,
+      "name": "ZeroAmount",
+      "msg": "Zero amount"
+    },
+    {
+      "code": 6029,
+      "name": "MemoTooLong",
+      "msg": "Memo too long"
+    }
   ],
-  types: [
+  "types": [
     {
-      name: "FeePercentageUpdatedEvent",
-      type: {
-        kind: "struct",
-        fields: [
+      "name": "FeePercentageUpdatedEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
           {
-            name: "old_percentage",
-            type: "u16",
+            "name": "old_percentage",
+            "type": "u16"
           },
           {
-            name: "new_percentage",
-            type: "u16",
+            "name": "new_percentage",
+            "type": "u16"
           },
           {
-            name: "updated_at",
-            type: "i64",
-          },
-        ],
-      },
+            "name": "updated_at",
+            "type": "i64"
+          }
+        ]
+      }
     },
     {
-      name: "FeeSettings",
-      type: {
-        kind: "struct",
-        fields: [
+      "name": "FeeSettings",
+      "type": {
+        "kind": "struct",
+        "fields": [
           {
-            name: "authority",
-            type: "pubkey",
+            "name": "authority",
+            "type": "pubkey"
           },
           {
-            name: "fee_percentage",
-            type: "u16",
+            "name": "fee_percentage",
+            "type": "u16"
           },
           {
-            name: "http_backend_wallet",
-            type: "pubkey",
+            "name": "whitelisted_mints",
+            "type": {
+              "vec": "pubkey"
+            }
           },
           {
-            name: "fee_withdrawal_allowed_keys",
-            type: {
-              vec: "pubkey",
-            },
+            "name": "executor_allowed_keys",
+            "type": {
+              "vec": "pubkey"
+            }
           },
           {
-            name: "initialized",
-            type: "bool",
+            "name": "fee_collector_allowed_keys",
+            "type": {
+              "vec": "pubkey"
+            }
           },
-        ],
-      },
+          {
+            "name": "initialized",
+            "type": "bool"
+          }
+        ]
+      }
     },
     {
-      name: "FeesWithdrawnEvent",
-      type: {
-        kind: "struct",
-        fields: [
+      "name": "FeesWithdrawnEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
           {
-            name: "amount",
-            type: "u64",
+            "name": "amount",
+            "type": "u64"
           },
           {
-            name: "withdrawn_by",
-            type: "pubkey",
+            "name": "mint",
+            "type": "pubkey"
           },
           {
-            name: "withdrawn_at",
-            type: "i64",
+            "name": "withdrawn_by",
+            "type": "pubkey"
           },
-        ],
-      },
+          {
+            "name": "withdrawn_at",
+            "type": "i64"
+          },
+          {
+            "name": "is_sol",
+            "type": "bool"
+          }
+        ]
+      }
     },
     {
-      name: "Payment",
-      type: {
-        kind: "struct",
-        fields: [
+      "name": "Payment",
+      "type": {
+        "kind": "struct",
+        "fields": [
           {
-            name: "scheduled_time",
-            type: "i64",
+            "name": "scheduled_time",
+            "type": "i64"
           },
           {
-            name: "executed",
-            type: "bool",
+            "name": "executed",
+            "type": "bool"
           },
           {
-            name: "execution_time",
-            type: "i64",
+            "name": "execution_time",
+            "type": "i64"
           },
           {
-            name: "tx_signature",
-            type: {
-              option: "pubkey",
-            },
-          },
-        ],
-      },
+            "name": "executed_by",
+            "type": {
+              "option": "pubkey"
+            }
+          }
+        ]
+      }
     },
     {
-      name: "PaymentExecutedEvent",
-      type: {
-        kind: "struct",
-        fields: [
+      "name": "PaymentExecutedEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
           {
-            name: "schedule_id",
-            type: "pubkey",
+            "name": "schedule_id",
+            "type": "pubkey"
           },
           {
-            name: "payment_index",
-            type: "u64",
+            "name": "payment_index",
+            "type": "u64"
           },
           {
-            name: "amount",
-            type: "u64",
+            "name": "amount",
+            "type": "u64"
           },
           {
-            name: "recipient",
-            type: "pubkey",
+            "name": "recipient",
+            "type": "pubkey"
           },
           {
-            name: "executed_at",
-            type: "i64",
+            "name": "mint",
+            "type": "pubkey"
           },
           {
-            name: "executed_by",
-            type: "pubkey",
+            "name": "executed_at",
+            "type": "i64"
           },
-        ],
-      },
+          {
+            "name": "executed_by",
+            "type": "pubkey"
+          },
+          {
+            "name": "is_sol",
+            "type": "bool"
+          }
+        ]
+      }
     },
     {
-      name: "PaymentSchedule",
-      type: {
-        kind: "struct",
-        fields: [
+      "name": "PaymentSchedule",
+      "type": {
+        "kind": "struct",
+        "fields": [
           {
-            name: "owner",
-            type: "pubkey",
+            "name": "owner",
+            "type": "pubkey"
           },
           {
-            name: "total_amount",
-            type: "u64",
+            "name": "total_amount",
+            "type": "u64"
           },
           {
-            name: "remaining_amount",
-            type: "u64",
+            "name": "remaining_amount",
+            "type": "u64"
           },
           {
-            name: "payment_amount",
-            type: "u64",
+            "name": "payment_amount",
+            "type": "u64"
           },
           {
-            name: "recipient",
-            type: "pubkey",
+            "name": "recipient",
+            "type": "pubkey"
           },
           {
-            name: "payments",
-            type: {
-              vec: {
-                defined: {
-                  name: "Payment",
-                },
-              },
-            },
+            "name": "mint",
+            "type": "pubkey"
           },
           {
-            name: "created_at",
-            type: "i64",
+            "name": "payments",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "Payment"
+                }
+              }
+            }
           },
           {
-            name: "status",
-            type: {
-              defined: {
-                name: "ScheduleStatus",
-              },
-            },
+            "name": "created_at",
+            "type": "i64"
           },
           {
-            name: "memo",
-            type: "string",
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "ScheduleStatus"
+              }
+            }
           },
-        ],
-      },
+          {
+            "name": "payment_type",
+            "type": {
+              "defined": {
+                "name": "PaymentType"
+              }
+            }
+          },
+          {
+            "name": "memo",
+            "type": "string"
+          },
+          {
+            "name": "vault_bump",
+            "type": "u8"
+          }
+        ]
+      }
     },
     {
-      name: "PaymentScheduleCancelledEvent",
-      type: {
-        kind: "struct",
-        fields: [
+      "name": "PaymentScheduleCancelledEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
           {
-            name: "schedule_id",
-            type: "pubkey",
+            "name": "schedule_id",
+            "type": "pubkey"
           },
           {
-            name: "owner",
-            type: "pubkey",
+            "name": "owner",
+            "type": "pubkey"
           },
           {
-            name: "refund_amount",
-            type: "u64",
+            "name": "mint",
+            "type": "pubkey"
           },
           {
-            name: "cancelled_at",
-            type: "i64",
+            "name": "refund_amount",
+            "type": "u64"
           },
-        ],
-      },
+          {
+            "name": "cancelled_at",
+            "type": "i64"
+          },
+          {
+            "name": "is_sol",
+            "type": "bool"
+          }
+        ]
+      }
     },
     {
-      name: "PaymentScheduleCreatedEvent",
-      type: {
-        kind: "struct",
-        fields: [
+      "name": "PaymentScheduleCreatedEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
           {
-            name: "schedule_id",
-            type: "pubkey",
+            "name": "schedule_id",
+            "type": "pubkey"
           },
           {
-            name: "owner",
-            type: "pubkey",
+            "name": "owner",
+            "type": "pubkey"
           },
           {
-            name: "recipient",
-            type: "pubkey",
+            "name": "recipient",
+            "type": "pubkey"
           },
           {
-            name: "total_amount",
-            type: "u64",
+            "name": "mint",
+            "type": "pubkey"
           },
           {
-            name: "payment_amount",
-            type: "u64",
+            "name": "total_amount",
+            "type": "u64"
           },
           {
-            name: "payment_count",
-            type: "u64",
+            "name": "payment_amount",
+            "type": "u64"
           },
           {
-            name: "created_at",
-            type: "i64",
+            "name": "fee_amount",
+            "type": "u64"
           },
-        ],
-      },
+          {
+            "name": "payment_count",
+            "type": "u64"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "is_sol",
+            "type": "bool"
+          }
+        ]
+      }
     },
     {
-      name: "ScheduleStatus",
-      type: {
-        kind: "enum",
-        variants: [
+      "name": "PaymentType",
+      "type": {
+        "kind": "enum",
+        "variants": [
           {
-            name: "Active",
+            "name": "Sol"
           },
           {
-            name: "Completed",
-          },
-          {
-            name: "Cancelled",
-          },
-        ],
-      },
+            "name": "SplToken"
+          }
+        ]
+      }
     },
-  ],
-};
+    {
+      "name": "ScheduleStatus",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Active"
+          },
+          {
+            "name": "Completed"
+          },
+          {
+            "name": "Cancelled"
+          }
+        ]
+      }
+    }
+  ]
+} as const;
