@@ -6,7 +6,7 @@ export interface Payment {
   scheduledTime: BN;
   executed: boolean;
   executionTime: BN;
-  txSignature: PublicKey | null;
+  executedBy: PublicKey | null;
 }
 
 // ScheduleStatus enum from IDL
@@ -32,8 +32,8 @@ export interface PaymentScheduleData {
 export interface FeeSettingsData {
   authority: PublicKey;
   feePercentage: number;
-  httpBackendWallet: PublicKey;
-  feeWithdrawalAllowedKeys: PublicKey[];
+  executorAllowedKeys: PublicKey[];
+  feeCollectorAllowedKeys: PublicKey[];
   initialized: boolean;
 }
 

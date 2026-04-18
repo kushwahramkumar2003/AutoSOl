@@ -7,35 +7,46 @@ import {
   SystemProgram,
   LAMPORTS_PER_SOL,
 } from "@solana/web3.js";
+import {
+  TOKEN_PROGRAM_ID,
+  getAssociatedTokenAddress,
+  getOrCreateAssociatedTokenAccount,
+} from "@solana/spl-token";
 import * as schedule from "node-schedule";
 import * as fs from "fs";
 import * as path from "path";
 import * as winston from "winston";
-import type { PaymentScheduleData } from "./types/auto_sol";
-import type { AutoSol } from "./types";
+import type { AutoSol } from "./types/auto_sol";
 
-// Configuration
+// ─── Configuration ───────────────────────────────────────────────────────────
 const PROGRAM_ID = new PublicKey(
-  "98g9uR7WZqinAnSeUgB5nUw3pbR6sNwFuYWW78yPHtva"
+  "G4zWuZQ7SaP9VgE7bhucKgQ7MVWjLVBhL4wHK6ymVAQL"
 );
-const HTTP_BACKEND_WALLET = "G8UmesEhavARgE6xTWbDq6iHvdp8W2yo4pbrW4jLsHxh";
-const DEFAULT_EXECUTION_TIMES = ["0 0 0 * * *", "0 0 12 * * *"]; // 12:00 AM and 12:00 PM daily
+const DEFAULT_EXECUTION_TIMES = ["0 0 0 * * *", "0 0 12 * * *"]; // midnight & noon
 const CONFIG_FILE = path.join(process.cwd(), "executor-config.json");
 const LOG_FILE = path.join(process.cwd(), "executor.log");
 
-// Custom error class
+// PDA seed constants (must match on-chain program)
+const SEEDS = {
+  FEE_SETTINGS: "global_fee_settings",
+  SOL_VAULT: "sol_vault",
+  SPL_VAULT: "spl_vault",
+  VAULT_AUTHORITY: "vault_authority",
+} as const;
+
+// ─── Custom error ────────────────────────────────────────────────────────────
 class ExecutorError extends Error {
   constructor(
     message: string,
     public code: string,
-    public details?: any
+    public details?: unknown
   ) {
     super(message);
     this.name = "ExecutorError";
   }
 }
 
-// Logger setup
+// ─── Logger ──────────────────────────────────────────────────────────────────
 const logger = winston.createLogger({
   level: "info",
   format: winston.format.combine(
@@ -48,7 +59,42 @@ const logger = winston.createLogger({
   ],
 });
 
-// AutoSol Backend class (adapted from index.ts)
+// ─── Type helpers ────────────────────────────────────────────────────────────
+
+interface PaymentEntry {
+  scheduledTime: BN;
+  executed: boolean;
+  executionTime: BN;
+  executedBy: PublicKey | null;
+}
+
+interface PaymentScheduleData {
+  owner: PublicKey;
+  totalAmount: BN;
+  remainingAmount: BN;
+  paymentAmount: BN;
+  recipient: PublicKey;
+  mint: PublicKey;
+  payments: PaymentEntry[];
+  createdAt: BN;
+  status: { active?: object; completed?: object; cancelled?: object };
+  paymentType: { sol?: object; splToken?: object };
+  memo: string;
+  vaultBump: number;
+}
+
+interface ExecutionResult {
+  scheduleAddress: string;
+  paymentIndex: number;
+  success: boolean;
+  txSignature?: string;
+  error?: string;
+  amount?: number;
+  isSplToken?: boolean;
+  mint?: string;
+}
+
+// ─── AutoSol Backend ─────────────────────────────────────────────────────────
 class AutoSolBackend {
   private connection: Connection;
   private wallet: anchor.Wallet;
@@ -59,7 +105,7 @@ class AutoSolBackend {
   constructor(
     connection: Connection,
     wallet: anchor.Wallet,
-    network: "devnet" | "mainnet-beta" = "devnet"
+    network: "devnet" | "mainnet-beta" | "localnet" = "localnet"
   ) {
     this.connection = connection;
     this.wallet = wallet;
@@ -86,85 +132,130 @@ class AutoSolBackend {
     }
   }
 
+  // ─── PDA derivations ────────────────────────────────────────────────────
+  private getFeeSettingsPDA(): PublicKey {
+    return PublicKey.findProgramAddressSync(
+      [Buffer.from(SEEDS.FEE_SETTINGS)],
+      PROGRAM_ID
+    )[0];
+  }
+
+  private getSolVaultPDA(schedule: PublicKey): PublicKey {
+    return PublicKey.findProgramAddressSync(
+      [Buffer.from(SEEDS.SOL_VAULT), schedule.toBuffer()],
+      PROGRAM_ID
+    )[0];
+  }
+
+  private getSplVaultPDA(schedule: PublicKey, mint: PublicKey): PublicKey {
+    return PublicKey.findProgramAddressSync(
+      [Buffer.from(SEEDS.SPL_VAULT), schedule.toBuffer(), mint.toBuffer()],
+      PROGRAM_ID
+    )[0];
+  }
+
+  private getVaultAuthorityPDA(schedule: PublicKey): PublicKey {
+    return PublicKey.findProgramAddressSync(
+      [Buffer.from(SEEDS.VAULT_AUTHORITY), schedule.toBuffer()],
+      PROGRAM_ID
+    )[0];
+  }
+
+  // ─── Check executor authorisation ───────────────────────────────────────
+  private async assertAuthorised(): Promise<void> {
+    const feeSettings = await this.program.account.feeSettings.fetch(
+      this.getFeeSettingsPDA()
+    );
+    if (
+      !feeSettings.executorAllowedKeys.some((key: PublicKey) =>
+        key.equals(this.wallet.publicKey)
+      )
+    ) {
+      throw new ExecutorError(
+        "Unauthorized executor",
+        "UNAUTHORIZED_EXECUTOR"
+      );
+    }
+  }
+
+  // ─── Bulk execute ───────────────────────────────────────────────────────
   async executePendingPayments(): Promise<{
     totalExecuted: number;
     totalFailed: number;
-    results: Array<{
-      scheduleAddress: string;
-      paymentIndex: number;
-      success: boolean;
-      txSignature?: string;
-      error?: string;
-      amount?: number;
-    }>;
+    results: ExecutionResult[];
   }> {
     try {
       logger.info("Scanning for pending payments");
+      await this.assertAuthorised();
+
       const schedules = await this.program.account.paymentSchedule.all();
       const currentTime = Math.floor(Date.now() / 1000);
-      const results: Array<{
-        scheduleAddress: string;
-        paymentIndex: number;
-        success: boolean;
-        txSignature?: string;
-        error?: string;
-        amount?: number;
-      }> = [];
+      const results: ExecutionResult[] = [];
 
       let totalExecuted = 0;
       let totalFailed = 0;
 
-      for (const schedule of schedules) {
-        const scheduleData = schedule.account as PaymentScheduleData;
-        const scheduleAddress = schedule.publicKey;
+      for (const scheduleAccount of schedules) {
+        const data = scheduleAccount.account as unknown as PaymentScheduleData;
+        const addr = scheduleAccount.publicKey;
 
-        if ("active" in scheduleData.status === false) {
-          logger.warn("Skipping non-active schedule", {
-            scheduleAddress: scheduleAddress.toString(),
-          });
+        // Skip non-active
+        if (!("active" in data.status) || !data.status.active) {
           continue;
         }
 
-        for (let i = 0; i < scheduleData.payments.length; i++) {
-          const payment = scheduleData.payments[i];
+        const isSpl = "splToken" in data.paymentType && !!data.paymentType.splToken;
+
+        for (let i = 0; i < data.payments.length; i++) {
+          const payment = data.payments[i];
           if (
-            payment &&
-            !payment.executed &&
-            currentTime >= payment.scheduledTime.toNumber()
+            !payment ||
+            payment.executed ||
+            currentTime < payment.scheduledTime.toNumber()
           ) {
-            logger.info(`Executing payment ${i} for schedule`, {
-              scheduleAddress: scheduleAddress.toString(),
-            });
-            try {
-              const result = await this.executePayment(scheduleAddress, i);
-              results.push({
-                scheduleAddress: scheduleAddress.toString(),
-                paymentIndex: i,
-                success: true,
-                txSignature: result.txSignature,
-                amount: result.amount,
-              });
-              totalExecuted++;
-            } catch (error: any) {
-              const errorMessage =
-                error instanceof ExecutorError
-                  ? error.message
-                  : "Unknown error";
-              logger.error(`Failed to execute payment ${i}`, {
-                scheduleAddress: scheduleAddress.toString(),
-                error: errorMessage,
-                details: error.details,
-              });
-              results.push({
-                scheduleAddress: scheduleAddress.toString(),
-                paymentIndex: i,
-                success: false,
-                error: errorMessage,
-              });
-              totalFailed++;
-            }
-            await new Promise((resolve) => setTimeout(resolve, 1000)); // Avoid rate limits
+            continue;
           }
+
+          logger.info(
+            `Executing ${isSpl ? "SPL" : "SOL"} payment ${i} for schedule`,
+            { scheduleAddress: addr.toString(), mint: data.mint.toString() }
+          );
+
+          try {
+            const result = isSpl
+              ? await this.executeSplPayment(addr, i, data)
+              : await this.executeSolPayment(addr, i, data);
+
+            results.push({
+              scheduleAddress: addr.toString(),
+              paymentIndex: i,
+              success: true,
+              txSignature: result.txSignature,
+              amount: result.amount,
+              isSplToken: isSpl,
+              mint: data.mint.toString(),
+            });
+            totalExecuted++;
+          } catch (error: any) {
+            const errorMessage =
+              error instanceof ExecutorError
+                ? error.message
+                : error?.message || "Unknown error";
+            logger.error(`Failed to execute payment ${i}`, {
+              scheduleAddress: addr.toString(),
+              error: errorMessage,
+            });
+            results.push({
+              scheduleAddress: addr.toString(),
+              paymentIndex: i,
+              success: false,
+              error: errorMessage,
+            });
+            totalFailed++;
+          }
+
+          // Avoid rate limits
+          await new Promise((r) => setTimeout(r, 1000));
         }
       }
 
@@ -179,60 +270,13 @@ class AutoSolBackend {
     }
   }
 
-  private async executePayment(
+  // ─── SOL payment execution ──────────────────────────────────────────────
+  private async executeSolPayment(
     scheduleAddress: PublicKey,
-    paymentIndex: number
+    paymentIndex: number,
+    scheduleData: PaymentScheduleData
   ): Promise<{ txSignature: string; amount: number }> {
     try {
-      const scheduleData = (await this.program.account.paymentSchedule.fetch(
-        scheduleAddress
-      )) as PaymentScheduleData;
-      if (paymentIndex >= scheduleData.payments.length) {
-        throw new ExecutorError(
-          `Invalid payment index: ${paymentIndex}`,
-          "INVALID_PAYMENT_INDEX"
-        );
-      }
-
-      const payment = scheduleData.payments[paymentIndex];
-      const currentTime = Math.floor(Date.now() / 1000);
-      if (!payment) {
-        throw new ExecutorError(
-          `Payment at index ${paymentIndex} is undefined`,
-          "PAYMENT_UNDEFINED"
-        );
-      }
-      if (payment.executed) {
-        throw new ExecutorError(
-          `Payment ${paymentIndex} already executed`,
-          "PAYMENT_ALREADY_EXECUTED"
-        );
-      }
-      if (currentTime < payment.scheduledTime.toNumber()) {
-        throw new ExecutorError(
-          `Payment ${paymentIndex} not due yet`,
-          "PAYMENT_NOT_DUE"
-        );
-      }
-
-      const feeSettings = await this.program.account.feeSettings.fetch(
-        PublicKey.findProgramAddressSync(
-          [Buffer.from("global_fee_settings")],
-          PROGRAM_ID
-        )[0]
-      );
-      if (!feeSettings.httpBackendWallet.equals(this.wallet.publicKey)) {
-        throw new ExecutorError(
-          "Unauthorized executor",
-          "UNAUTHORIZED_EXECUTOR"
-        );
-      }
-
-      const [solPaymentVault] = PublicKey.findProgramAddressSync(
-        [Buffer.from("sol_vault"), scheduleAddress.toBuffer()],
-        PROGRAM_ID
-      );
-
       const txSignature = await this.program.methods
         .executePayment(new BN(paymentIndex))
         .accounts({
@@ -244,7 +288,7 @@ class AutoSolBackend {
         .rpc();
 
       const amount = scheduleData.paymentAmount.toNumber() / LAMPORTS_PER_SOL;
-      logger.info(`Payment ${paymentIndex} executed`, {
+      logger.info(`SOL payment ${paymentIndex} executed`, {
         scheduleAddress: scheduleAddress.toString(),
         amount,
         recipient: scheduleData.recipient.toString(),
@@ -254,8 +298,64 @@ class AutoSolBackend {
       return { txSignature, amount };
     } catch (error) {
       throw new ExecutorError(
-        `Failed to execute payment ${paymentIndex}`,
-        "PAYMENT_EXECUTION_ERROR",
+        `Failed to execute SOL payment ${paymentIndex}`,
+        "SOL_PAYMENT_EXECUTION_ERROR",
+        error
+      );
+    }
+  }
+
+  // ─── SPL token payment execution ───────────────────────────────────────
+  private async executeSplPayment(
+    scheduleAddress: PublicKey,
+    paymentIndex: number,
+    scheduleData: PaymentScheduleData
+  ): Promise<{ txSignature: string; amount: number }> {
+    try {
+      const mint = scheduleData.mint;
+
+      // Ensure recipient has an ATA (executor pays rent if needed)
+      const recipientAta = await getOrCreateAssociatedTokenAccount(
+        this.connection,
+        this.wallet.payer,
+        mint,
+        scheduleData.recipient
+      );
+
+      logger.info(`Recipient ATA ensured: ${recipientAta.address.toString()}`);
+
+      const paymentVault = this.getSplVaultPDA(scheduleAddress, mint);
+      const vaultAuthority = this.getVaultAuthorityPDA(scheduleAddress);
+
+      const txSignature = await this.program.methods
+        .executeSplPayment(new BN(paymentIndex))
+        .accounts({
+          paymentSchedule: scheduleAddress,
+          executor: this.wallet.publicKey,
+          recipientTokenAccount: recipientAta.address,
+          paymentVault,
+          vaultAuthority,
+          mint,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        })
+        .signers([this.wallet.payer])
+        .rpc();
+
+      const amount = scheduleData.paymentAmount.toNumber();
+      logger.info(`SPL payment ${paymentIndex} executed`, {
+        scheduleAddress: scheduleAddress.toString(),
+        amount,
+        mint: mint.toString(),
+        recipient: scheduleData.recipient.toString(),
+        recipientAta: recipientAta.address.toString(),
+        txSignature,
+      });
+
+      return { txSignature, amount };
+    } catch (error) {
+      throw new ExecutorError(
+        `Failed to execute SPL payment ${paymentIndex}`,
+        "SPL_PAYMENT_EXECUTION_ERROR",
         error
       );
     }
@@ -275,7 +375,7 @@ class AutoSolBackend {
   }
 }
 
-// Executor Service
+// ─── Executor Service ────────────────────────────────────────────────────────
 class ExecutorService {
   private backend: AutoSolBackend;
   private executionTimes!: string[];
@@ -292,7 +392,8 @@ class ExecutorService {
     this.backend = new AutoSolBackend(
       this.connection,
       this.wallet,
-      (process.env.NETWORK as "devnet" | "mainnet-beta") || "devnet"
+      (process.env.NETWORK as "devnet" | "mainnet-beta" | "localnet") ||
+        "localnet"
     );
   }
 
@@ -336,12 +437,6 @@ class ExecutorService {
       const walletKeypair = Keypair.fromSecretKey(
         new Uint8Array(JSON.parse(fs.readFileSync(walletPath, "utf-8")))
       );
-      if (walletKeypair.publicKey.toString() !== HTTP_BACKEND_WALLET) {
-        throw new ExecutorError(
-          "Wallet does not match HTTP backend wallet",
-          "INVALID_WALLET"
-        );
-      }
       return new anchor.Wallet(walletKeypair);
     } catch (error) {
       throw new ExecutorError(
@@ -379,6 +474,7 @@ class ExecutorService {
                 schedule: r.scheduleAddress.slice(0, 8) + "...",
                 index: r.paymentIndex,
                 success: r.success,
+                isSpl: r.isSplToken || false,
                 tx: r.txSignature?.slice(0, 8) + "..." || r.error,
               })),
             });
@@ -395,7 +491,7 @@ class ExecutorService {
       logger.info("Executor service started", {
         executionTimes: this.executionTimes,
       });
-    } catch (error) {
+    } catch (error: any) {
       logger.error("Failed to start executor service", {
         error: error.message,
         code: error.code || "UNKNOWN",
@@ -430,7 +526,7 @@ class ExecutorService {
   }
 }
 
-// Main execution
+// ─── Main ────────────────────────────────────────────────────────────────────
 async function main() {
   try {
     const service = new ExecutorService();
