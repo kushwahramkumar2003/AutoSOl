@@ -10,7 +10,7 @@ interface PaymentData {
   scheduledTime: BN;
   executed: boolean;
   executionTime: BN;
-  txSignature: PublicKey | null;
+  executedBy: PublicKey | null;
 }
 
 interface PaymentScheduleData {
@@ -28,12 +28,12 @@ interface PaymentScheduleData {
 interface FeeSettingsData {
   authority: PublicKey;
   feePercentage: number;
-  httpBackendWallet: PublicKey;
-  feeWithdrawalAllowedKeys: PublicKey[];
+  executorAllowedKeys: PublicKey[];
+  feeCollectorAllowedKeys: PublicKey[];
 }
 
 // Program configuration
-const PROGRAM_ID = new PublicKey("98g9uR7WZqinAnSeUgB5nUw3pbR6sNwFuYWW78yPHtva");
+const PROGRAM_ID = new PublicKey("G4zWuZQ7SaP9VgE7bhucKgQ7MVWjLVBhL4wHK6ymVAQL");
 const GLOBAL_FEE_SETTINGS_SEED = "global_fee_settings";
 const GLOBAL_FEE_VAULT_SEED = "global_fee_vault";
 
@@ -204,8 +204,8 @@ class AutoSolBackend {
       return {
         authority: feeSettings.authority,
         feePercentage: feeSettings.feePercentage,
-        httpBackendWallet: feeSettings.httpBackendWallet,
-        feeWithdrawalAllowedKeys: feeSettings.feeWithdrawalAllowedKeys
+        executorAllowedKeys: feeSettings.executorAllowedKeys,
+        feeCollectorAllowedKeys: feeSettings.feeCollectorAllowedKeys
       };
     } catch (error) {
       throw new AutoSolBackendError(
@@ -365,9 +365,13 @@ class AutoSolBackend {
 
       // Verify executor is authorized
       const feeSettings = await this.getFeeSettings();
-      if (!feeSettings.httpBackendWallet.equals(this.wallet.publicKey)) {
+      if (
+        !feeSettings.executorAllowedKeys.some((key) =>
+          key.equals(this.wallet.publicKey)
+        )
+      ) {
         throw new AutoSolBackendError(
-          "Unauthorized: Only HTTP backend wallet can execute payments",
+          "Unauthorized: Wallet is not in the executor allowlist",
           "UNAUTHORIZED_EXECUTOR"
         );
       }
@@ -630,7 +634,7 @@ async function main() {
   cli.name("autosol-backend").description("AutoSol Backend Executor CLI").version("1.0.0");
 
   // Global options
-  cli.option("-n, --network <network>", "Solana network", "devnet");
+  cli.option("-n, --network <network>", "Solana network", "localnet");
   cli.option("-r, --rpc <url>", "Custom RPC URL");
 
   // Initialize backend instance
@@ -638,13 +642,18 @@ async function main() {
 
   cli.hook("preAction", async (thisCommand) => {
     const options = thisCommand.opts();
-    const network = options.network as "devnet" | "mainnet-beta";
+    const network = options.network as "devnet" | "mainnet-beta" | "localnet";
     
     let connection: Connection;
     if (options.rpc) {
       connection = new Connection(options.rpc, "confirmed");
+    } else if (network === "localnet") {
+      connection = new Connection("http://127.0.0.1:8899", "confirmed");
     } else {
-      connection = new Connection(web3.clusterApiUrl(network), "confirmed");
+      connection = new Connection(
+        web3.clusterApiUrl(network as "devnet" | "mainnet-beta"),
+        "confirmed"
+      );
     }
 
     const wallet = loadWallet();

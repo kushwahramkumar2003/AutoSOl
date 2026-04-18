@@ -7,7 +7,6 @@ use solana_sdk::{
 use solana_transaction_status::UiTransactionEncoding;
 use serde::{Deserialize, Serialize};
 use borsh::{BorshDeserialize, BorshSerialize};
-use redis::Commands;
 use std::str::FromStr;
 use std::sync::Arc;
 use tokio::time::{sleep, Duration};
@@ -17,11 +16,13 @@ use std::collections::HashSet;
 use sha2::{Sha256, Digest};
 use dotenv::dotenv;
 use std::env;
-use bs58;
 
-const PROGRAM_ID: &str = "98g9uR7WZqinAnSeUgB5nUw3pbR6sNwFuYWW78yPHtva";
+const PROGRAM_ID: &str = "G4zWuZQ7SaP9VgE7bhucKgQ7MVWjLVBhL4wHK6ymVAQL";
 
+const DEFAULT_REDIS_URL: &str = "redis://127.0.0.1:6379";
 const DEFAULT_REDIS_QUEUE: &str = "solana_auto_sol_events";
+const DEFAULT_REDIS_STREAM: &str = "solana_auto_sol_events_stream";
+const DEFAULT_REDIS_STREAM_MAXLEN: usize = 10_000;
 const DEFAULT_SOLANA_RPC_URL: &str = "http://127.0.0.1:8899";
 const DEFAULT_POLL_INTERVAL_MS: u64 = 1000;
 
@@ -35,6 +36,8 @@ const FEE_PERCENTAGE_UPDATED_DISCRIMINATOR: [u8; 8] = [159, 56, 203, 216, 111, 1
 pub struct Config {
     pub redis_url: String,
     pub redis_queue: String,
+    pub redis_stream: String,
+    pub redis_stream_maxlen: usize,
     pub solana_rpc_url: String,
     pub poll_interval_ms: u64,
 }
@@ -45,10 +48,18 @@ impl Config {
         dotenv().ok(); 
         
         let redis_url = env::var("REDIS_URL")
-            .map_err(|_| anyhow!("REDIS_URL environment variable is required"))?;
+            .unwrap_or_else(|_| DEFAULT_REDIS_URL.to_string());
         
         let redis_queue = env::var("REDIS_QUEUE")
             .unwrap_or_else(|_| DEFAULT_REDIS_QUEUE.to_string());
+
+        let redis_stream = env::var("REDIS_STREAM")
+            .unwrap_or_else(|_| DEFAULT_REDIS_STREAM.to_string());
+
+        let redis_stream_maxlen = env::var("REDIS_STREAM_MAXLEN")
+            .unwrap_or_else(|_| DEFAULT_REDIS_STREAM_MAXLEN.to_string())
+            .parse::<usize>()
+            .map_err(|_| anyhow!("REDIS_STREAM_MAXLEN must be a valid number"))?;
         
         let solana_rpc_url = env::var("SOLANA_RPC_URL")
             .unwrap_or_else(|_| DEFAULT_SOLANA_RPC_URL.to_string());
@@ -61,6 +72,8 @@ impl Config {
         Ok(Self {
             redis_url,
             redis_queue,
+            redis_stream,
+            redis_stream_maxlen,
             solana_rpc_url,
             poll_interval_ms,
         })
@@ -94,10 +107,14 @@ pub struct PaymentScheduleCreatedEvent {
     pub owner: Pubkey,
     #[serde(serialize_with = "pubkey_as_base58")]
     pub recipient: Pubkey,
+    #[serde(serialize_with = "pubkey_as_base58")]
+    pub mint: Pubkey,
     pub total_amount: u64,
     pub payment_amount: u64,
+    pub fee_amount: u64,
     pub payment_count: u64,
     pub created_at: i64,
+    pub is_sol: bool,
 }
 
 #[derive(Serialize, Deserialize, BorshDeserialize, BorshSerialize, Clone, Debug)]
@@ -108,9 +125,12 @@ pub struct PaymentExecutedEvent {
     pub amount: u64,
     #[serde(serialize_with = "pubkey_as_base58")]
     pub recipient: Pubkey,
+    #[serde(serialize_with = "pubkey_as_base58")]
+    pub mint: Pubkey,
     pub executed_at: i64,
     #[serde(serialize_with = "pubkey_as_base58")]
     pub executed_by: Pubkey,
+    pub is_sol: bool,
 }
 
 #[derive(Serialize, Deserialize, BorshDeserialize, BorshSerialize, Clone, Debug)]
@@ -119,16 +139,22 @@ pub struct PaymentScheduleCancelledEvent {
     pub schedule_id: Pubkey,
     #[serde(serialize_with = "pubkey_as_base58")]
     pub owner: Pubkey,
+    #[serde(serialize_with = "pubkey_as_base58")]
+    pub mint: Pubkey,
     pub refund_amount: u64,
     pub cancelled_at: i64,
+    pub is_sol: bool,
 }
 
 #[derive(Serialize, Deserialize, BorshDeserialize, BorshSerialize, Clone, Debug)]
 pub struct FeesWithdrawnEvent {
     pub amount: u64,
     #[serde(serialize_with = "pubkey_as_base58")]
+    pub mint: Pubkey,
+    #[serde(serialize_with = "pubkey_as_base58")]
     pub withdrawn_by: Pubkey,
     pub withdrawn_at: i64,
+    pub is_sol: bool,
 }
 
 #[derive(Serialize, Deserialize, BorshDeserialize, BorshSerialize, Clone, Debug)]
@@ -181,6 +207,8 @@ impl BlockchainMonitor {
         println!("Starting blockchain monitor for program: {}", PROGRAM_ID);
         println!("Redis URL: {}", self.config.redis_url);
         println!("Redis Queue: {}", self.config.redis_queue);
+        println!("Redis Stream: {}", self.config.redis_stream);
+        println!("Redis Stream Max Length: {}", self.config.redis_stream_maxlen);
         println!("Solana RPC URL: {}", self.config.solana_rpc_url);
         println!("Monitoring interval: {}ms", self.config.poll_interval_ms);
         
@@ -192,6 +220,19 @@ impl BlockchainMonitor {
         
         let _: String = redis::cmd("PING").query(&mut redis_con)
             .map_err(|e| anyhow!("Redis ping failed: {}", e))?;
+
+        let removed_legacy_queue_items: usize = redis::cmd("DEL")
+            .arg(&self.config.redis_queue)
+            .query(&mut redis_con)
+            .map_err(|e| anyhow!("Failed to clean legacy Redis queue: {}", e))?;
+
+        if removed_legacy_queue_items > 0 {
+            println!(
+                "Removed {} items from legacy Redis queue {}",
+                removed_legacy_queue_items,
+                self.config.redis_queue
+            );
+        }
         
         println!("Connected to Redis successfully");
         
@@ -415,10 +456,21 @@ impl BlockchainMonitor {
         if let Some(wrapper) = event_wrapper {
             let json_data = serde_json::to_string(&wrapper)?;
             println!("json_data: {}", json_data);
-            let _: () = redis_con.lpush(&self.config.redis_queue, json_data)
-                .map_err(|e| anyhow!("Failed to push to Redis: {}", e))?;
+            let _: String = redis::cmd("XADD")
+                .arg(&self.config.redis_stream)
+                .arg("MAXLEN")
+                .arg("~")
+                .arg(self.config.redis_stream_maxlen)
+                .arg("*")
+                .arg("payload")
+                .arg(&json_data)
+                .query(&mut redis_con)
+                .map_err(|e| anyhow!("Failed to append to Redis stream: {}", e))?;
             
-            println!("Event pushed to Redis queue: {}", self.config.redis_queue);
+            println!(
+                "Event appended to Redis stream: {}",
+                self.config.redis_stream
+            );
             return Ok(true);
         }
         
@@ -434,8 +486,16 @@ async fn main() -> Result<()> {
     let config = Config::from_env().map_err(|e| {
         eprintln!("Configuration error: {}", e);
         eprintln!("Please ensure the following environment variables are set:");
-        eprintln!("  REDIS_URL (required)");
-        eprintln!("  REDIS_QUEUE (optional, defaults to '{}')", DEFAULT_REDIS_QUEUE);
+        eprintln!("  REDIS_URL (optional, defaults to '{}')", DEFAULT_REDIS_URL);
+        eprintln!(
+            "  REDIS_QUEUE (legacy cleanup target, defaults to '{}')",
+            DEFAULT_REDIS_QUEUE
+        );
+        eprintln!("  REDIS_STREAM (optional, defaults to '{}')", DEFAULT_REDIS_STREAM);
+        eprintln!(
+            "  REDIS_STREAM_MAXLEN (optional, defaults to {})",
+            DEFAULT_REDIS_STREAM_MAXLEN
+        );
         eprintln!("  SOLANA_RPC_URL (optional, defaults to '{}')", DEFAULT_SOLANA_RPC_URL);
         eprintln!("  POLL_INTERVAL_MS (optional, defaults to {})", DEFAULT_POLL_INTERVAL_MS);
         e

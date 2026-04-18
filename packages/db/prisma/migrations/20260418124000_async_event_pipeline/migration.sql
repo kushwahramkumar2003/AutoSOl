@@ -1,0 +1,33 @@
+ALTER TYPE "EventStatus" ADD VALUE IF NOT EXISTS 'PROCESSING';
+ALTER TYPE "EventStatus" ADD VALUE IF NOT EXISTS 'RETRYING';
+ALTER TYPE "EventStatus" ADD VALUE IF NOT EXISTS 'DEAD_LETTER';
+
+ALTER TABLE "payment_schedules"
+  ADD COLUMN "mint" TEXT NOT NULL DEFAULT '11111111111111111111111111111111',
+  ADD COLUMN "fee_amount" BIGINT NOT NULL DEFAULT 0,
+  ADD COLUMN "is_sol" BOOLEAN NOT NULL DEFAULT TRUE;
+
+ALTER TABLE "payments"
+  ADD COLUMN "mint" TEXT NOT NULL DEFAULT '11111111111111111111111111111111',
+  ADD COLUMN "is_sol" BOOLEAN NOT NULL DEFAULT TRUE;
+
+ALTER TABLE "fee_withdrawals"
+  ADD COLUMN "mint" TEXT NOT NULL DEFAULT '11111111111111111111111111111111',
+  ADD COLUMN "is_sol" BOOLEAN NOT NULL DEFAULT TRUE;
+
+ALTER TABLE "event_logs"
+  ADD COLUMN "event_key" TEXT,
+  ADD COLUMN "stream_id" TEXT,
+  ADD COLUMN "last_attempt_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  ADD COLUMN "processed_at" TIMESTAMP(3);
+
+UPDATE "event_logs"
+SET "event_key" = CONCAT("event_type", ':', "signature")
+WHERE "event_key" IS NULL;
+
+ALTER TABLE "event_logs"
+  ALTER COLUMN "event_key" SET NOT NULL;
+
+DROP INDEX IF EXISTS "event_logs_signature_key";
+CREATE UNIQUE INDEX "event_logs_event_key_key" ON "event_logs"("event_key");
+CREATE INDEX "event_logs_signature_idx" ON "event_logs"("signature");

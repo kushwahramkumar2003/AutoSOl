@@ -1,8 +1,14 @@
 {
   "name": "worker",
+  "version": "1.0.0",
   "module": "index.ts",
   "type": "module",
   "private": true,
+  "scripts": {
+    "dev": "bun --watch index.ts",
+    "start": "bun index.ts",
+    "check-types": "tsc --noEmit"
+  },
   "devDependencies": {
     "@types/bun": "latest"
   },
@@ -10,7 +16,9 @@
     "typescript": "^5"
   },
   "dependencies": {
-    "@prisma/client": "^6.11.0",
+    "@autosol/db": "workspace:*",
+    "@autosol/event-contract": "workspace:*",
+    "bs58": "^5.0.0",
     "ioredis": "^5.6.1"
   }
 }

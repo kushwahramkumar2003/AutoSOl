@@ -1,172 +1,109 @@
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient, getPrismaClient } from "@autosol/db";
 import Redis from "ioredis";
-import { z } from "zod";
+import {
+  DEFAULT_REDIS_CONSUMER_GROUP,
+  DEFAULT_REDIS_DEAD_LETTER_STREAM,
+  DEFAULT_REDIS_DEAD_LETTER_STREAM_MAXLEN,
+  DEFAULT_REDIS_STREAM,
+  DEFAULT_REDIS_STREAM_MAXLEN,
+  FeePercentageUpdatedEventSchema,
+  FeesWithdrawnEventSchema,
+  PaymentExecutedEventSchema,
+  PaymentScheduleCancelledEventSchema,
+  PaymentScheduleCreatedEventSchema,
+  buildEventKey,
+  parseStreamPayload,
+} from "@autosol/event-contract";
+import type { EventWrapper } from "@autosol/event-contract";
 
-// Environment configuration
 const config = {
-  redisUrl: process.env.REDIS_URL || "redis://localhost:6379",
-  redisQueue: process.env.REDIS_QUEUE || "solana_auto_sol_events",
+  redisUrl: process.env.REDIS_URL || "redis://127.0.0.1:6379",
+  redisStream: process.env.REDIS_STREAM || DEFAULT_REDIS_STREAM,
+  redisDeadLetterStream:
+    process.env.REDIS_DEAD_LETTER_STREAM || DEFAULT_REDIS_DEAD_LETTER_STREAM,
+  redisConsumerGroup:
+    process.env.REDIS_CONSUMER_GROUP || DEFAULT_REDIS_CONSUMER_GROUP,
   databaseUrl:
     process.env.DATABASE_URL || "postgresql://localhost:5432/autosol",
-  workerConcurrency: parseInt(process.env.WORKER_CONCURRENCY || "5"),
-  maxRetries: parseInt(process.env.MAX_RETRIES || "3"),
-  retryDelay: parseInt(process.env.RETRY_DELAY || "5000"), // 5 seconds
+  workerConcurrency: parseInt(process.env.WORKER_CONCURRENCY || "5", 10),
+  maxRetries: parseInt(process.env.MAX_RETRIES || "3", 10),
+  readCount: parseInt(process.env.REDIS_READ_COUNT || "10", 10),
+  blockMs: parseInt(process.env.REDIS_BLOCK_MS || "10000", 10),
+  claimIdleMs: parseInt(process.env.REDIS_CLAIM_IDLE_MS || "30000", 10),
+  redisDeadLetterStreamMaxLen: parseInt(
+    process.env.REDIS_DEAD_LETTER_STREAM_MAXLEN ||
+      String(DEFAULT_REDIS_DEAD_LETTER_STREAM_MAXLEN),
+    10
+  ),
 };
 
-// Helper function to convert Pubkey array to base58 string
-const pubkeyArrayToString = (arr: number[]): string => {
-  // Convert number array to Uint8Array and then to base58 string
-  const uint8Array = new Uint8Array(arr);
-  return Buffer.from(uint8Array).toString("base64"); // Using base64 for now, you might want to use base58
+type StreamEntry = {
+  id: string;
+  payload: string;
 };
 
-// Zod schemas for event validation - Updated to handle array inputs
-const PaymentScheduleCreatedEventSchema = z.object({
-  schedule_id: z.union([
-    z.string(),
-    z.array(z.number()).transform(pubkeyArrayToString),
-  ]),
-  owner: z.union([
-    z.string(),
-    z.array(z.number()).transform(pubkeyArrayToString),
-  ]),
-  recipient: z.union([
-    z.string(),
-    z.array(z.number()).transform(pubkeyArrayToString),
-  ]),
-  total_amount: z.union([
-    z.string().transform((val) => BigInt(val)),
-    z.number().transform((val) => BigInt(val)),
-  ]),
-  payment_amount: z.union([
-    z.string().transform((val) => BigInt(val)),
-    z.number().transform((val) => BigInt(val)),
-  ]),
-  payment_count: z.union([
-    z.string().transform((val) => parseInt(val)),
-    z.number(),
-  ]),
-  created_at: z.union([
-    z.string().transform((val) => new Date(parseInt(val) * 1000)),
-    z.number().transform((val) => new Date(val * 1000)),
-  ]),
-});
+const sleep = (ms: number) =>
+  new Promise((resolve) => setTimeout(resolve, ms));
 
-const PaymentExecutedEventSchema = z.object({
-  schedule_id: z.union([
-    z.string(),
-    z.array(z.number()).transform(pubkeyArrayToString),
-  ]),
-  payment_index: z.union([
-    z.string().transform((val) => parseInt(val)),
-    z.number(),
-  ]),
-  amount: z.union([
-    z.string().transform((val) => BigInt(val)),
-    z.number().transform((val) => BigInt(val)),
-  ]),
-  recipient: z.union([
-    z.string(),
-    z.array(z.number()).transform(pubkeyArrayToString),
-  ]),
-  executed_at: z.union([
-    z.string().transform((val) => new Date(parseInt(val) * 1000)),
-    z.number().transform((val) => new Date(val * 1000)),
-  ]),
-  executed_by: z.union([
-    z.string(),
-    z.array(z.number()).transform(pubkeyArrayToString),
-  ]),
-});
+const EVENT_PRIORITY: Record<string, number> = {
+  PaymentScheduleCreatedEvent: 0,
+  PaymentExecutedEvent: 1,
+  PaymentScheduleCancelledEvent: 1,
+  FeesWithdrawnEvent: 2,
+  FeePercentageUpdatedEvent: 3,
+};
 
-const PaymentScheduleCancelledEventSchema = z.object({
-  schedule_id: z.union([
-    z.string(),
-    z.array(z.number()).transform(pubkeyArrayToString),
-  ]),
-  owner: z.union([
-    z.string(),
-    z.array(z.number()).transform(pubkeyArrayToString),
-  ]),
-  refund_amount: z.union([
-    z.string().transform((val) => BigInt(val)),
-    z.number().transform((val) => BigInt(val)),
-  ]),
-  cancelled_at: z.union([
-    z.string().transform((val) => new Date(parseInt(val) * 1000)),
-    z.number().transform((val) => new Date(val * 1000)),
-  ]),
-});
-
-const FeesWithdrawnEventSchema = z.object({
-  amount: z.union([
-    z.string().transform((val) => BigInt(val)),
-    z.number().transform((val) => BigInt(val)),
-  ]),
-  withdrawn_by: z.union([
-    z.string(),
-    z.array(z.number()).transform(pubkeyArrayToString),
-  ]),
-  withdrawn_at: z.union([
-    z.string().transform((val) => new Date(parseInt(val) * 1000)),
-    z.number().transform((val) => new Date(val * 1000)),
-  ]),
-});
-
-const FeePercentageUpdatedEventSchema = z.object({
-  old_percentage: z.number(),
-  new_percentage: z.number(),
-  updated_at: z.union([
-    z.string().transform((val) => new Date(parseInt(val) * 1000)),
-    z.number().transform((val) => new Date(val * 1000)),
-  ]),
-});
-
-const EventWrapperSchema = z.object({
-  event_type: z.string(),
-  event_data: z.record(z.any()),
-  signature: z.string(),
-  slot: z.number().transform((val) => BigInt(val)),
-  timestamp: z.number().transform((val) => new Date(val * 1000)),
-});
-
-type EventWrapper = z.infer<typeof EventWrapperSchema>;
+class RetryableOrderingError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RetryableOrderingError";
+  }
+}
 
 class AutoSolWorkerService {
   private prisma: PrismaClient;
   private redis: Redis;
+  private redisBlocking: Redis;
   private isShuttingDown = false;
   private activeJobs = new Set<Promise<void>>();
 
   constructor() {
-    this.prisma = new PrismaClient();
+    this.prisma = getPrismaClient();
     this.redis = new Redis(config.redisUrl);
+    this.redisBlocking = new Redis(config.redisUrl);
 
-    // Handle graceful shutdown
-    process.on("SIGINT", () => this.shutdown());
-    process.on("SIGTERM", () => this.shutdown());
+    process.on("SIGINT", () => void this.shutdown());
+    process.on("SIGTERM", () => void this.shutdown());
   }
 
   async start() {
     console.log("🚀 AutoSol Worker Service Starting...");
-    console.log(`📊 Configuration:`);
-    console.log(`   Redis Queue: ${config.redisQueue}`);
+    console.log(`   Redis Stream: ${config.redisStream}`);
+    console.log(`   Dead Letter Stream: ${config.redisDeadLetterStream}`);
+    console.log(
+      `   Dead Letter Stream Max Length: ${config.redisDeadLetterStreamMaxLen}`
+    );
+    console.log(`   Consumer Group: ${config.redisConsumerGroup}`);
     console.log(`   Worker Concurrency: ${config.workerConcurrency}`);
     console.log(`   Max Retries: ${config.maxRetries}`);
 
     try {
       await this.redis.ping();
-      console.log("✅ Redis connection established");
+      await this.redisBlocking.ping();
+      console.log("✅ Redis connections established");
 
       await this.prisma.$connect();
       console.log("✅ Database connection established");
 
-      // Start worker processes
+      await this.ensureDatabaseCompatibility();
+      console.log("✅ Database schema is compatible");
+
+      await this.ensureConsumerGroup();
+      console.log("✅ Redis consumer group ready");
+
       const workers = Array.from({ length: config.workerConcurrency }, (_, i) =>
         this.startWorker(i + 1)
       );
-
-      console.log(`🔄 Started ${config.workerConcurrency} worker processes`);
 
       await Promise.all(workers);
     } catch (error) {
@@ -175,171 +112,350 @@ class AutoSolWorkerService {
     }
   }
 
+  private async ensureConsumerGroup() {
+    try {
+      await this.redis.call(
+        "XGROUP",
+        "CREATE",
+        config.redisStream,
+        config.redisConsumerGroup,
+        "0",
+        "MKSTREAM"
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!message.includes("BUSYGROUP")) {
+        throw error;
+      }
+    }
+  }
+
+  private async ensureDatabaseCompatibility() {
+    const requiredColumns: Array<[tableName: string, columnName: string]> = [
+      ["event_logs", "event_key"],
+      ["event_logs", "stream_id"],
+      ["event_logs", "last_attempt_at"],
+      ["event_logs", "processed_at"],
+      ["payment_schedules", "mint"],
+      ["payment_schedules", "fee_amount"],
+      ["payment_schedules", "is_sol"],
+      ["payments", "mint"],
+      ["payments", "is_sol"],
+      ["fee_withdrawals", "mint"],
+      ["fee_withdrawals", "is_sol"],
+    ];
+
+    const missingColumns: string[] = [];
+
+    for (const [tableName, columnName] of requiredColumns) {
+      const rows = await this.prisma.$queryRaw<
+        Array<{ exists: boolean }>
+      >`SELECT EXISTS (
+          SELECT 1
+          FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = ${tableName}
+            AND column_name = ${columnName}
+        ) AS "exists"`;
+
+      if (!rows[0]?.exists) {
+        missingColumns.push(`${tableName}.${columnName}`);
+      }
+    }
+
+    if (missingColumns.length > 0) {
+      throw new Error(
+        [
+          "Database schema is behind the worker code.",
+          `Missing columns: ${missingColumns.join(", ")}`,
+          "Run the worker Prisma migration before starting the consumer:",
+          "  cd packages/db",
+          "  ../../node_modules/.bin/prisma migrate deploy --schema ./prisma/schema.prisma",
+        ].join("\n")
+      );
+    }
+  }
+
   private async startWorker(workerId: number): Promise<void> {
-    console.log(`👷 Worker ${workerId} started`);
+    const consumerName = `worker-${workerId}`;
+    console.log(`👷 ${consumerName} started`);
 
     while (!this.isShuttingDown) {
       try {
-        // Block and wait for new events
-        const result = await this.redis.brpop(config.redisQueue, 10); // 10 second timeout
+        await this.reclaimPendingMessages(consumerName);
+        const entries = await this.readNewMessages(consumerName);
 
-        if (!result) {
-          continue; // Timeout, continue polling
+        if (entries.length === 0) {
+          continue;
         }
 
-        const [_, eventData] = result;
-        const job = this.processEvent(workerId, eventData);
-        this.activeJobs.add(job);
+        for (const entry of entries) {
+          const job = this.processStreamEntry(consumerName, entry);
+          this.activeJobs.add(job);
 
-        job.finally(() => {
-          this.activeJobs.delete(job);
-        });
+          job.finally(() => {
+            this.activeJobs.delete(job);
+          });
+
+          await job;
+        }
       } catch (error) {
-        console.error(`❌ Worker ${workerId} error:`, error);
-        await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait 1 second before retrying
+        console.error(`❌ ${consumerName} loop error:`, error);
+        await sleep(1000);
       }
     }
 
-    console.log(`👷 Worker ${workerId} stopped`);
+    console.log(`👷 ${consumerName} stopped`);
   }
 
-  private async processEvent(
-    workerId: number,
-    eventData: string
+  private async reclaimPendingMessages(consumerName: string) {
+    const result = (await this.redis.call(
+      "XAUTOCLAIM",
+      config.redisStream,
+      config.redisConsumerGroup,
+      consumerName,
+      String(config.claimIdleMs),
+      "0-0",
+      "COUNT",
+      String(config.readCount)
+    )) as [string, Array<[string, string[]]>, string[]];
+
+    const entries = this.sortStreamEntries(
+      this.normalizeStreamEntries(result?.[1] || [])
+    );
+
+    for (const entry of entries) {
+      await this.processStreamEntry(consumerName, entry);
+    }
+  }
+
+  private async readNewMessages(consumerName: string): Promise<StreamEntry[]> {
+    const result = (await this.redisBlocking.call(
+      "XREADGROUP",
+      "GROUP",
+      config.redisConsumerGroup,
+      consumerName,
+      "COUNT",
+      String(config.readCount),
+      "BLOCK",
+      String(config.blockMs),
+      "STREAMS",
+      config.redisStream,
+      ">"
+    )) as Array<[string, Array<[string, string[]]>]> | null;
+
+    if (!result || result.length === 0) {
+      return [];
+    }
+
+    return this.sortStreamEntries(
+      this.normalizeStreamEntries(result[0]?.[1] || [])
+    );
+  }
+
+  private normalizeStreamEntries(
+    entries: Array<[string, string[]]>
+  ): StreamEntry[] {
+    return entries
+      .map(([id, fieldList]) => {
+        const fields: Record<string, string> = {};
+        for (let i = 0; i < fieldList.length; i += 2) {
+          const key = fieldList[i];
+          const value = fieldList[i + 1];
+          if (key && value) {
+            fields[key] = value;
+          }
+        }
+
+        if (!fields.payload) {
+          return null;
+        }
+
+        return { id, payload: fields.payload };
+      })
+      .filter((entry): entry is StreamEntry => entry !== null);
+  }
+
+  private sortStreamEntries(entries: StreamEntry[]): StreamEntry[] {
+    return [...entries].sort((left, right) => {
+      const leftPriority = this.getEventPriority(left);
+      const rightPriority = this.getEventPriority(right);
+
+      if (leftPriority !== rightPriority) {
+        return leftPriority - rightPriority;
+      }
+
+      return left.id.localeCompare(right.id);
+    });
+  }
+
+  private getEventPriority(entry: StreamEntry): number {
+    try {
+      const event = parseStreamPayload(entry.payload);
+      return EVENT_PRIORITY[event.event_type] ?? Number.MAX_SAFE_INTEGER;
+    } catch {
+      return Number.MAX_SAFE_INTEGER;
+    }
+  }
+
+  private async processStreamEntry(
+    consumerName: string,
+    entry: StreamEntry
   ): Promise<void> {
-    let eventLog = null;
+    let eventLog:
+      | {
+        id: string;
+        retryCount: number;
+      }
+      | null = null;
 
     try {
-      // Parse and validate event
-      const rawEvent = JSON.parse(eventData);
-      const event = EventWrapperSchema.parse(rawEvent);
+      const event = parseStreamPayload(entry.payload);
+      const eventKey = buildEventKey(event);
 
-      console.log(
-        `🔄 Worker ${workerId} processing: ${event.event_type} (${event.signature})`
-      );
-
-      // Check if event already exists to prevent duplicates
-      const existingEvent = await this.prisma.eventLog.findUnique({
-        where: { signature: event.signature },
+      const existing = await this.prisma.eventLog.findUnique({
+        where: { eventKey },
+        select: { id: true, retryCount: true, status: true },
       });
 
-      if (existingEvent) {
-        console.log(
-          `⏭️ Worker ${workerId} skipping duplicate event: ${event.signature}`
-        );
+      if (existing?.status === "PROCESSED") {
+        await this.acknowledge(entry.id);
         return;
       }
 
-      // Create event log entry
-      eventLog = await this.prisma.eventLog.create({
+      if (existing) {
+        eventLog = await this.prisma.eventLog.update({
+          where: { eventKey },
+          data: {
+            eventType: event.event_type,
+            signature: event.signature,
+            slot: event.slot,
+            streamId: entry.id,
+            status: "PROCESSING",
+            error: null,
+            eventData: event.event_data as Prisma.InputJsonValue,
+            lastAttemptAt: new Date(),
+          },
+          select: { id: true, retryCount: true },
+        });
+      } else {
+        eventLog = await this.prisma.eventLog.create({
+          data: {
+            eventKey,
+            eventType: event.event_type,
+            signature: event.signature,
+            slot: event.slot,
+            streamId: entry.id,
+            status: "PROCESSING",
+            eventData: event.event_data as Prisma.InputJsonValue,
+            lastAttemptAt: new Date(),
+          },
+          select: { id: true, retryCount: true },
+        });
+      }
+
+      if (!eventLog) {
+        throw new Error(`Failed to persist event log for ${eventKey}`);
+      }
+
+      console.log(`🔄 ${consumerName} processing ${eventKey}`);
+      await this.handleEventByType(event);
+
+      await this.prisma.eventLog.update({
+        where: { id: eventLog.id },
         data: {
-          eventType: event.event_type,
-          signature: event.signature,
-          slot: event.slot,
-          eventData: event.event_data,
-          status: "PENDING",
+          status: "PROCESSED",
+          processedAt: new Date(),
+          error: null,
         },
       });
 
-      // Process based on event type
-      await this.handleEventByType(event);
+      await this.acknowledge(entry.id);
+      console.log(`✅ ${consumerName} processed ${eventKey}`);
+    } catch (error) {
+      console.error(`❌ ${consumerName} failed to process ${entry.id}:`, error);
 
-      // Mark as processed
+      if (!eventLog) {
+        return;
+      }
+
+      const retryCount = eventLog.retryCount + 1;
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+
+      if (retryCount > config.maxRetries) {
+        await this.prisma.eventLog.update({
+          where: { id: eventLog.id },
+          data: {
+            retryCount,
+            status: "DEAD_LETTER",
+            error: errorMessage,
+            lastAttemptAt: new Date(),
+          },
+        });
+
+        await this.redis.call(
+          "XADD",
+          config.redisDeadLetterStream,
+          "MAXLEN",
+          "~",
+          String(config.redisDeadLetterStreamMaxLen),
+          "*",
+          "payload",
+          entry.payload,
+          "stream_id",
+          entry.id,
+          "error",
+          errorMessage
+        );
+        await this.acknowledge(entry.id);
+        return;
+      }
+
       await this.prisma.eventLog.update({
         where: { id: eventLog.id },
-        data: { status: "PROCESSED" },
+        data: {
+          retryCount,
+          status: "RETRYING",
+          error: errorMessage,
+          lastAttemptAt: new Date(),
+        },
       });
-
-      console.log(
-        `✅ Worker ${workerId} completed: ${event.event_type} (${event.signature})`
-      );
-    } catch (error) {
-      console.error(`❌ Worker ${workerId} failed to process event:`, error);
-
-      if (eventLog) {
-        const retryCount = eventLog.retryCount + 1;
-
-        if (retryCount <= config.maxRetries) {
-          // Schedule retry
-          await this.prisma.eventLog.update({
-            where: { id: eventLog.id },
-            data: {
-              retryCount,
-              error: error instanceof Error ? error.message : "Unknown error",
-            },
-          });
-
-          // Re-queue with delay
-          setTimeout(async () => {
-            await this.redis.lpush(config.redisQueue, eventData);
-            console.log(
-              `🔄 Requeued event for retry ${retryCount}/${config.maxRetries}`
-            );
-          }, config.retryDelay);
-        } else {
-          // Mark as failed
-          await this.prisma.eventLog.update({
-            where: { id: eventLog.id },
-            data: {
-              status: "FAILED",
-              error: error instanceof Error ? error.message : "Unknown error",
-            },
-          });
-
-          console.error(
-            `💀 Event processing failed permanently after ${config.maxRetries} retries`
-          );
-        }
-      } else {
-        // If event creation failed due to unique constraint, just log and continue
-        if (
-          error instanceof Error &&
-          error.message.includes("Unique constraint failed")
-        ) {
-          console.log(
-            `⏭️ Worker ${workerId} skipping duplicate event (constraint error)`
-          );
-          return;
-        }
-
-        // For other errors during event log creation, we can't retry
-        console.error(
-          `💀 Failed to create event log, cannot retry: ${error instanceof Error ? error.message : "Unknown error"}`
-        );
-      }
     }
+  }
+
+  private async acknowledge(streamId: string) {
+    await this.redis.call(
+      "XACK",
+      config.redisStream,
+      config.redisConsumerGroup,
+      streamId
+    );
   }
 
   private async handleEventByType(event: EventWrapper): Promise<void> {
     switch (event.event_type) {
       case "PaymentScheduleCreatedEvent":
         await this.handlePaymentScheduleCreated(event);
-        break;
-
+        return;
       case "PaymentExecutedEvent":
         await this.handlePaymentExecuted(event);
-        break;
-
+        return;
       case "PaymentScheduleCancelledEvent":
         await this.handlePaymentScheduleCancelled(event);
-        break;
-
+        return;
       case "FeesWithdrawnEvent":
         await this.handleFeesWithdrawn(event);
-        break;
-
+        return;
       case "FeePercentageUpdatedEvent":
         await this.handleFeePercentageUpdated(event);
-        break;
-
+        return;
       default:
         throw new Error(`Unknown event type: ${event.event_type}`);
     }
   }
 
-  private async handlePaymentScheduleCreated(
-    event: EventWrapper
-  ): Promise<void> {
+  private async handlePaymentScheduleCreated(event: EventWrapper) {
     const data = PaymentScheduleCreatedEventSchema.parse(event.event_data);
 
     await this.prisma.paymentSchedule.upsert({
@@ -347,32 +463,46 @@ class AutoSolWorkerService {
       update: {
         owner: data.owner,
         recipient: data.recipient,
+        mint: data.mint,
         totalAmount: data.total_amount,
         paymentAmount: data.payment_amount,
+        feeAmount: data.fee_amount,
         paymentCount: data.payment_count,
         status: "ACTIVE",
         createdAt: data.created_at,
+        isSol: data.is_sol,
       },
       create: {
         id: data.schedule_id,
         owner: data.owner,
         recipient: data.recipient,
+        mint: data.mint,
         totalAmount: data.total_amount,
         paymentAmount: data.payment_amount,
+        feeAmount: data.fee_amount,
         paymentCount: data.payment_count,
         status: "ACTIVE",
         createdAt: data.created_at,
+        isSol: data.is_sol,
       },
     });
-
-    console.log(`📅 Created payment schedule: ${data.schedule_id}`);
   }
 
-  private async handlePaymentExecuted(event: EventWrapper): Promise<void> {
+  private async handlePaymentExecuted(event: EventWrapper) {
     const data = PaymentExecutedEventSchema.parse(event.event_data);
 
-    await this.prisma.$transaction(async (tx) => {
-      // Create payment record
+    await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const schedule = await tx.paymentSchedule.findUnique({
+        where: { id: data.schedule_id },
+        select: { id: true, paymentCount: true },
+      });
+
+      if (!schedule) {
+        throw new RetryableOrderingError(
+          `Schedule ${data.schedule_id} is not indexed yet; retry after PaymentScheduleCreatedEvent is processed`
+        );
+      }
+
       await tx.payment.upsert({
         where: { signature: event.signature },
         update: {
@@ -380,6 +510,8 @@ class AutoSolWorkerService {
           paymentIndex: data.payment_index,
           amount: data.amount,
           recipient: data.recipient,
+          mint: data.mint,
+          isSol: data.is_sol,
           executedAt: data.executed_at,
           executedBy: data.executed_by,
           signature: event.signature,
@@ -390,6 +522,8 @@ class AutoSolWorkerService {
           paymentIndex: data.payment_index,
           amount: data.amount,
           recipient: data.recipient,
+          mint: data.mint,
+          isSol: data.is_sol,
           executedAt: data.executed_at,
           executedBy: data.executed_by,
           signature: event.signature,
@@ -397,57 +531,51 @@ class AutoSolWorkerService {
         },
       });
 
-      // Update payment schedule
-      const schedule = await tx.paymentSchedule.findUnique({
-        where: { id: data.schedule_id },
-        include: { payments: true },
+      const paymentsExecuted = await tx.payment.count({
+        where: { scheduleId: data.schedule_id },
       });
 
-      if (schedule) {
-        const paymentsExecuted = schedule.payments.length;
-        const isCompleted = paymentsExecuted >= schedule.paymentCount;
-
-        await tx.paymentSchedule.update({
-          where: { id: data.schedule_id },
-          data: {
-            paymentsExecuted,
-            status: isCompleted ? "COMPLETED" : "ACTIVE",
-          },
-        });
-
-        if (isCompleted) {
-          console.log(`🎉 Payment schedule completed: ${data.schedule_id}`);
-        }
-      }
+      await tx.paymentSchedule.update({
+        where: { id: data.schedule_id },
+        data: {
+          paymentsExecuted,
+          status:
+            paymentsExecuted >= schedule.paymentCount
+              ? "COMPLETED"
+              : "ACTIVE",
+        },
+      });
     });
-
-    console.log(
-      `💰 Payment executed: ${data.schedule_id} [${data.payment_index}]`
-    );
   }
 
-  private async handlePaymentScheduleCancelled(
-    event: EventWrapper
-  ): Promise<void> {
+  private async handlePaymentScheduleCancelled(event: EventWrapper) {
     const data = PaymentScheduleCancelledEventSchema.parse(event.event_data);
 
-    await this.prisma.paymentSchedule.update({
+    const updated = await this.prisma.paymentSchedule.updateMany({
       where: { id: data.schedule_id },
       data: {
         status: "CANCELLED",
+        mint: data.mint,
+        isSol: data.is_sol,
       },
     });
 
-    console.log(`❌ Payment schedule cancelled: ${data.schedule_id}`);
+    if (updated.count === 0) {
+      throw new RetryableOrderingError(
+        `Schedule ${data.schedule_id} is not indexed yet; retry after PaymentScheduleCreatedEvent is processed`
+      );
+    }
   }
 
-  private async handleFeesWithdrawn(event: EventWrapper): Promise<void> {
+  private async handleFeesWithdrawn(event: EventWrapper) {
     const data = FeesWithdrawnEventSchema.parse(event.event_data);
 
     await this.prisma.feeWithdrawal.upsert({
       where: { signature: event.signature },
       update: {
         amount: data.amount,
+        mint: data.mint,
+        isSol: data.is_sol,
         withdrawnBy: data.withdrawn_by,
         withdrawnAt: data.withdrawn_at,
         signature: event.signature,
@@ -455,17 +583,17 @@ class AutoSolWorkerService {
       },
       create: {
         amount: data.amount,
+        mint: data.mint,
+        isSol: data.is_sol,
         withdrawnBy: data.withdrawn_by,
         withdrawnAt: data.withdrawn_at,
         signature: event.signature,
         slot: event.slot,
       },
     });
-
-    console.log(`💸 Fees withdrawn: ${data.amount} by ${data.withdrawn_by}`);
   }
 
-  private async handleFeePercentageUpdated(event: EventWrapper): Promise<void> {
+  private async handleFeePercentageUpdated(event: EventWrapper) {
     const data = FeePercentageUpdatedEventSchema.parse(event.event_data);
 
     await this.prisma.feePercentageUpdate.upsert({
@@ -485,36 +613,27 @@ class AutoSolWorkerService {
         slot: event.slot,
       },
     });
-
-    console.log(
-      `⚙️ Fee percentage updated: ${data.old_percentage}% → ${data.new_percentage}%`
-    );
   }
 
   private async shutdown(): Promise<void> {
-    if (this.isShuttingDown) return;
+    if (this.isShuttingDown) {
+      return;
+    }
 
     console.log("🛑 Shutting down worker service...");
     this.isShuttingDown = true;
 
-    // Wait for active jobs to complete
     if (this.activeJobs.size > 0) {
-      console.log(
-        `⏳ Waiting for ${this.activeJobs.size} active jobs to complete...`
-      );
-      await Promise.all(this.activeJobs);
+      await Promise.allSettled(this.activeJobs);
     }
 
-    // Close connections
-    await this.redis.disconnect();
+    this.redis.disconnect();
+    this.redisBlocking.disconnect();
     await this.prisma.$disconnect();
-
-    console.log("✅ Worker service shut down gracefully");
     process.exit(0);
   }
 }
 
-// Start the service
 const service = new AutoSolWorkerService();
 service.start().catch((error) => {
   console.error("💥 Worker service crashed:", error);
