@@ -8,6 +8,357 @@
   },
   "instructions": [
     {
+      "name": "accept_payment_commitment_proposal",
+      "discriminator": [
+        184,
+        69,
+        232,
+        197,
+        131,
+        123,
+        35,
+        39
+      ],
+      "accounts": [
+        {
+          "name": "payment_commitment_proposal",
+          "writable": true
+        },
+        {
+          "name": "recipient",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "activate_payment_commitment",
+      "discriminator": [
+        138,
+        107,
+        50,
+        184,
+        233,
+        47,
+        149,
+        82
+      ],
+      "accounts": [
+        {
+          "name": "payment_commitment_proposal",
+          "writable": true
+        },
+        {
+          "name": "payment_schedule",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "fee_settings",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  95,
+                  102,
+                  101,
+                  101,
+                  95,
+                  115,
+                  101,
+                  116,
+                  116,
+                  105,
+                  110,
+                  103,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "sol_payment_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  111,
+                  108,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "payment_schedule"
+              }
+            ]
+          }
+        },
+        {
+          "name": "sol_fee_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  95,
+                  102,
+                  101,
+                  101,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "activate_spl_payment_commitment",
+      "discriminator": [
+        241,
+        133,
+        62,
+        217,
+        155,
+        62,
+        39,
+        91
+      ],
+      "accounts": [
+        {
+          "name": "payment_commitment_proposal",
+          "writable": true
+        },
+        {
+          "name": "payment_schedule",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "fee_settings",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  95,
+                  102,
+                  101,
+                  101,
+                  95,
+                  115,
+                  101,
+                  116,
+                  116,
+                  105,
+                  110,
+                  103,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "user_token_account",
+          "writable": true
+        },
+        {
+          "name": "payment_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  112,
+                  108,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "payment_schedule"
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "payment_schedule"
+              }
+            ]
+          }
+        },
+        {
+          "name": "fee_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  112,
+                  108,
+                  95,
+                  102,
+                  101,
+                  101,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "fee_vault_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "rent",
+          "address": "SysvarRent111111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "add_executor",
       "discriminator": [
         195,
@@ -343,6 +694,90 @@
       "args": []
     },
     {
+      "name": "create_payment_commitment_proposal",
+      "discriminator": [
+        37,
+        11,
+        52,
+        220,
+        176,
+        30,
+        51,
+        230
+      ],
+      "accounts": [
+        {
+          "name": "payment_commitment_proposal",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "fee_settings",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  95,
+                  102,
+                  101,
+                  101,
+                  95,
+                  115,
+                  101,
+                  116,
+                  116,
+                  105,
+                  110,
+                  103,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "payment_amount",
+          "type": "u64"
+        },
+        {
+          "name": "recipient",
+          "type": "pubkey"
+        },
+        {
+          "name": "schedule_times",
+          "type": {
+            "vec": "i64"
+          }
+        },
+        {
+          "name": "memo",
+          "type": "string"
+        },
+        {
+          "name": "note_uri",
+          "type": "string"
+        }
+      ]
+    },
+    {
       "name": "create_payment_schedule",
       "discriminator": [
         2,
@@ -473,6 +908,93 @@
         },
         {
           "name": "memo",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "create_spl_payment_commitment_proposal",
+      "discriminator": [
+        252,
+        209,
+        86,
+        255,
+        194,
+        162,
+        123,
+        34
+      ],
+      "accounts": [
+        {
+          "name": "payment_commitment_proposal",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "fee_settings",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  95,
+                  102,
+                  101,
+                  101,
+                  95,
+                  115,
+                  101,
+                  116,
+                  116,
+                  105,
+                  110,
+                  103,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "payment_amount",
+          "type": "u64"
+        },
+        {
+          "name": "recipient",
+          "type": "pubkey"
+        },
+        {
+          "name": "schedule_times",
+          "type": {
+            "vec": "i64"
+          }
+        },
+        {
+          "name": "memo",
+          "type": "string"
+        },
+        {
+          "name": "note_uri",
           "type": "string"
         }
       ]
@@ -1495,6 +2017,19 @@
       ]
     },
     {
+      "name": "PaymentCommitmentProposal",
+      "discriminator": [
+        94,
+        198,
+        151,
+        188,
+        46,
+        116,
+        33,
+        119
+      ]
+    },
+    {
       "name": "PaymentSchedule",
       "discriminator": [
         220,
@@ -1533,6 +2068,45 @@
         156,
         73,
         194
+      ]
+    },
+    {
+      "name": "PaymentCommitmentAcceptedEvent",
+      "discriminator": [
+        227,
+        191,
+        110,
+        8,
+        216,
+        54,
+        71,
+        227
+      ]
+    },
+    {
+      "name": "PaymentCommitmentActivatedEvent",
+      "discriminator": [
+        11,
+        40,
+        25,
+        234,
+        198,
+        225,
+        208,
+        197
+      ]
+    },
+    {
+      "name": "PaymentCommitmentProposedEvent",
+      "discriminator": [
+        137,
+        40,
+        62,
+        83,
+        251,
+        153,
+        255,
+        142
       ]
     },
     {
@@ -1725,6 +2299,46 @@
       "code": 6029,
       "name": "MemoTooLong",
       "msg": "Memo too long"
+    },
+    {
+      "code": 6030,
+      "name": "NoteUriTooLong",
+      "msg": "Note URI too long"
+    },
+    {
+      "code": 6031,
+      "name": "ProposalNotAccepted",
+      "msg": "Proposal must be accepted before activation"
+    },
+    {
+      "code": 6032,
+      "name": "ProposalAlreadyAccepted",
+      "msg": "Proposal has already been accepted"
+    },
+    {
+      "code": 6033,
+      "name": "ProposalAlreadyActivated",
+      "msg": "Proposal has already been activated"
+    },
+    {
+      "code": 6034,
+      "name": "InvalidProposalStatus",
+      "msg": "Proposal is in an invalid state"
+    },
+    {
+      "code": 6035,
+      "name": "UnauthorizedProposalAcceptance",
+      "msg": "Unauthorized proposal acceptance"
+    },
+    {
+      "code": 6036,
+      "name": "UnauthorizedProposalActivation",
+      "msg": "Unauthorized proposal activation"
+    },
+    {
+      "code": 6037,
+      "name": "CommitmentScheduleIrrevocable",
+      "msg": "Commitment schedules cannot be cancelled"
     }
   ],
   "types": [
@@ -1841,6 +2455,209 @@
       }
     },
     {
+      "name": "PaymentCommitmentAcceptedEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "proposal_id",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "recipient",
+            "type": "pubkey"
+          },
+          {
+            "name": "accepted_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PaymentCommitmentActivatedEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "proposal_id",
+            "type": "pubkey"
+          },
+          {
+            "name": "schedule_id",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "recipient",
+            "type": "pubkey"
+          },
+          {
+            "name": "activated_at",
+            "type": "i64"
+          },
+          {
+            "name": "is_sol",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PaymentCommitmentProposal",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "recipient",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "payment_amount",
+            "type": "u64"
+          },
+          {
+            "name": "schedule_times",
+            "type": {
+              "vec": "i64"
+            }
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "accepted_at",
+            "type": {
+              "option": "i64"
+            }
+          },
+          {
+            "name": "activated_at",
+            "type": {
+              "option": "i64"
+            }
+          },
+          {
+            "name": "payment_type",
+            "type": {
+              "defined": {
+                "name": "PaymentType"
+              }
+            }
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "PaymentCommitmentStatus"
+              }
+            }
+          },
+          {
+            "name": "memo",
+            "type": "string"
+          },
+          {
+            "name": "note_uri",
+            "type": "string"
+          },
+          {
+            "name": "activated_schedule",
+            "type": {
+              "option": "pubkey"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "PaymentCommitmentProposedEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "proposal_id",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "recipient",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "payment_amount",
+            "type": "u64"
+          },
+          {
+            "name": "payment_count",
+            "type": "u64"
+          },
+          {
+            "name": "schedule_times",
+            "type": {
+              "vec": "i64"
+            }
+          },
+          {
+            "name": "memo",
+            "type": "string"
+          },
+          {
+            "name": "note_uri",
+            "type": "string"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "is_sol",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PaymentCommitmentStatus",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Proposed"
+          },
+          {
+            "name": "Accepted"
+          },
+          {
+            "name": "Activated"
+          }
+        ]
+      }
+    },
+    {
       "name": "PaymentExecutedEvent",
       "type": {
         "kind": "struct",
@@ -1946,6 +2763,20 @@
           {
             "name": "vault_bump",
             "type": "u8"
+          },
+          {
+            "name": "schedule_policy",
+            "type": {
+              "defined": {
+                "name": "SchedulePolicy"
+              }
+            }
+          },
+          {
+            "name": "proposal_id",
+            "type": {
+              "option": "pubkey"
+            }
           }
         ]
       }
@@ -1992,6 +2823,10 @@
             "type": "pubkey"
           },
           {
+            "name": "proposal_id",
+            "type": "pubkey"
+          },
+          {
             "name": "owner",
             "type": "pubkey"
           },
@@ -2026,6 +2861,10 @@
           {
             "name": "is_sol",
             "type": "bool"
+          },
+          {
+            "name": "is_commitment",
+            "type": "bool"
           }
         ]
       }
@@ -2040,6 +2879,20 @@
           },
           {
             "name": "SplToken"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SchedulePolicy",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Standard"
+          },
+          {
+            "name": "Commitment"
           }
         ]
       }

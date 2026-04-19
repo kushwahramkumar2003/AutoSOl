@@ -14,6 +14,357 @@ export type AutoSol = {
   },
   "instructions": [
     {
+      "name": "acceptPaymentCommitmentProposal",
+      "discriminator": [
+        184,
+        69,
+        232,
+        197,
+        131,
+        123,
+        35,
+        39
+      ],
+      "accounts": [
+        {
+          "name": "paymentCommitmentProposal",
+          "writable": true
+        },
+        {
+          "name": "recipient",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "activatePaymentCommitment",
+      "discriminator": [
+        138,
+        107,
+        50,
+        184,
+        233,
+        47,
+        149,
+        82
+      ],
+      "accounts": [
+        {
+          "name": "paymentCommitmentProposal",
+          "writable": true
+        },
+        {
+          "name": "paymentSchedule",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "feeSettings",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  95,
+                  102,
+                  101,
+                  101,
+                  95,
+                  115,
+                  101,
+                  116,
+                  116,
+                  105,
+                  110,
+                  103,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "solPaymentVault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  111,
+                  108,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "paymentSchedule"
+              }
+            ]
+          }
+        },
+        {
+          "name": "solFeeVault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  95,
+                  102,
+                  101,
+                  101,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "activateSplPaymentCommitment",
+      "discriminator": [
+        241,
+        133,
+        62,
+        217,
+        155,
+        62,
+        39,
+        91
+      ],
+      "accounts": [
+        {
+          "name": "paymentCommitmentProposal",
+          "writable": true
+        },
+        {
+          "name": "paymentSchedule",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "feeSettings",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  95,
+                  102,
+                  101,
+                  101,
+                  95,
+                  115,
+                  101,
+                  116,
+                  116,
+                  105,
+                  110,
+                  103,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "userTokenAccount",
+          "writable": true
+        },
+        {
+          "name": "paymentVault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  112,
+                  108,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "paymentSchedule"
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vaultAuthority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "paymentSchedule"
+              }
+            ]
+          }
+        },
+        {
+          "name": "feeVault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  112,
+                  108,
+                  95,
+                  102,
+                  101,
+                  101,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "feeVaultAuthority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "tokenProgram",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "rent",
+          "address": "SysvarRent111111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "addExecutor",
       "discriminator": [
         195,
@@ -349,6 +700,90 @@ export type AutoSol = {
       "args": []
     },
     {
+      "name": "createPaymentCommitmentProposal",
+      "discriminator": [
+        37,
+        11,
+        52,
+        220,
+        176,
+        30,
+        51,
+        230
+      ],
+      "accounts": [
+        {
+          "name": "paymentCommitmentProposal",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "feeSettings",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  95,
+                  102,
+                  101,
+                  101,
+                  95,
+                  115,
+                  101,
+                  116,
+                  116,
+                  105,
+                  110,
+                  103,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "paymentAmount",
+          "type": "u64"
+        },
+        {
+          "name": "recipient",
+          "type": "pubkey"
+        },
+        {
+          "name": "scheduleTimes",
+          "type": {
+            "vec": "i64"
+          }
+        },
+        {
+          "name": "memo",
+          "type": "string"
+        },
+        {
+          "name": "noteUri",
+          "type": "string"
+        }
+      ]
+    },
+    {
       "name": "createPaymentSchedule",
       "discriminator": [
         2,
@@ -479,6 +914,93 @@ export type AutoSol = {
         },
         {
           "name": "memo",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "createSplPaymentCommitmentProposal",
+      "discriminator": [
+        252,
+        209,
+        86,
+        255,
+        194,
+        162,
+        123,
+        34
+      ],
+      "accounts": [
+        {
+          "name": "paymentCommitmentProposal",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "feeSettings",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  95,
+                  102,
+                  101,
+                  101,
+                  95,
+                  115,
+                  101,
+                  116,
+                  116,
+                  105,
+                  110,
+                  103,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "paymentAmount",
+          "type": "u64"
+        },
+        {
+          "name": "recipient",
+          "type": "pubkey"
+        },
+        {
+          "name": "scheduleTimes",
+          "type": {
+            "vec": "i64"
+          }
+        },
+        {
+          "name": "memo",
+          "type": "string"
+        },
+        {
+          "name": "noteUri",
           "type": "string"
         }
       ]
@@ -1501,6 +2023,19 @@ export type AutoSol = {
       ]
     },
     {
+      "name": "paymentCommitmentProposal",
+      "discriminator": [
+        94,
+        198,
+        151,
+        188,
+        46,
+        116,
+        33,
+        119
+      ]
+    },
+    {
       "name": "paymentSchedule",
       "discriminator": [
         220,
@@ -1539,6 +2074,45 @@ export type AutoSol = {
         156,
         73,
         194
+      ]
+    },
+    {
+      "name": "paymentCommitmentAcceptedEvent",
+      "discriminator": [
+        227,
+        191,
+        110,
+        8,
+        216,
+        54,
+        71,
+        227
+      ]
+    },
+    {
+      "name": "paymentCommitmentActivatedEvent",
+      "discriminator": [
+        11,
+        40,
+        25,
+        234,
+        198,
+        225,
+        208,
+        197
+      ]
+    },
+    {
+      "name": "paymentCommitmentProposedEvent",
+      "discriminator": [
+        137,
+        40,
+        62,
+        83,
+        251,
+        153,
+        255,
+        142
       ]
     },
     {
@@ -1731,6 +2305,46 @@ export type AutoSol = {
       "code": 6029,
       "name": "memoTooLong",
       "msg": "Memo too long"
+    },
+    {
+      "code": 6030,
+      "name": "noteUriTooLong",
+      "msg": "Note URI too long"
+    },
+    {
+      "code": 6031,
+      "name": "proposalNotAccepted",
+      "msg": "Proposal must be accepted before activation"
+    },
+    {
+      "code": 6032,
+      "name": "proposalAlreadyAccepted",
+      "msg": "Proposal has already been accepted"
+    },
+    {
+      "code": 6033,
+      "name": "proposalAlreadyActivated",
+      "msg": "Proposal has already been activated"
+    },
+    {
+      "code": 6034,
+      "name": "invalidProposalStatus",
+      "msg": "Proposal is in an invalid state"
+    },
+    {
+      "code": 6035,
+      "name": "unauthorizedProposalAcceptance",
+      "msg": "Unauthorized proposal acceptance"
+    },
+    {
+      "code": 6036,
+      "name": "unauthorizedProposalActivation",
+      "msg": "Unauthorized proposal activation"
+    },
+    {
+      "code": 6037,
+      "name": "commitmentScheduleIrrevocable",
+      "msg": "Commitment schedules cannot be cancelled"
     }
   ],
   "types": [
@@ -1847,6 +2461,209 @@ export type AutoSol = {
       }
     },
     {
+      "name": "paymentCommitmentAcceptedEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "proposalId",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "recipient",
+            "type": "pubkey"
+          },
+          {
+            "name": "acceptedAt",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "paymentCommitmentActivatedEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "proposalId",
+            "type": "pubkey"
+          },
+          {
+            "name": "scheduleId",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "recipient",
+            "type": "pubkey"
+          },
+          {
+            "name": "activatedAt",
+            "type": "i64"
+          },
+          {
+            "name": "isSol",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "paymentCommitmentProposal",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "recipient",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "paymentAmount",
+            "type": "u64"
+          },
+          {
+            "name": "scheduleTimes",
+            "type": {
+              "vec": "i64"
+            }
+          },
+          {
+            "name": "createdAt",
+            "type": "i64"
+          },
+          {
+            "name": "acceptedAt",
+            "type": {
+              "option": "i64"
+            }
+          },
+          {
+            "name": "activatedAt",
+            "type": {
+              "option": "i64"
+            }
+          },
+          {
+            "name": "paymentType",
+            "type": {
+              "defined": {
+                "name": "paymentType"
+              }
+            }
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "paymentCommitmentStatus"
+              }
+            }
+          },
+          {
+            "name": "memo",
+            "type": "string"
+          },
+          {
+            "name": "noteUri",
+            "type": "string"
+          },
+          {
+            "name": "activatedSchedule",
+            "type": {
+              "option": "pubkey"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "paymentCommitmentProposedEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "proposalId",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "recipient",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "paymentAmount",
+            "type": "u64"
+          },
+          {
+            "name": "paymentCount",
+            "type": "u64"
+          },
+          {
+            "name": "scheduleTimes",
+            "type": {
+              "vec": "i64"
+            }
+          },
+          {
+            "name": "memo",
+            "type": "string"
+          },
+          {
+            "name": "noteUri",
+            "type": "string"
+          },
+          {
+            "name": "createdAt",
+            "type": "i64"
+          },
+          {
+            "name": "isSol",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "paymentCommitmentStatus",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "proposed"
+          },
+          {
+            "name": "accepted"
+          },
+          {
+            "name": "activated"
+          }
+        ]
+      }
+    },
+    {
       "name": "paymentExecutedEvent",
       "type": {
         "kind": "struct",
@@ -1952,6 +2769,20 @@ export type AutoSol = {
           {
             "name": "vaultBump",
             "type": "u8"
+          },
+          {
+            "name": "schedulePolicy",
+            "type": {
+              "defined": {
+                "name": "schedulePolicy"
+              }
+            }
+          },
+          {
+            "name": "proposalId",
+            "type": {
+              "option": "pubkey"
+            }
           }
         ]
       }
@@ -1998,6 +2829,10 @@ export type AutoSol = {
             "type": "pubkey"
           },
           {
+            "name": "proposalId",
+            "type": "pubkey"
+          },
+          {
             "name": "owner",
             "type": "pubkey"
           },
@@ -2032,6 +2867,10 @@ export type AutoSol = {
           {
             "name": "isSol",
             "type": "bool"
+          },
+          {
+            "name": "isCommitment",
+            "type": "bool"
           }
         ]
       }
@@ -2046,6 +2885,20 @@ export type AutoSol = {
           },
           {
             "name": "splToken"
+          }
+        ]
+      }
+    },
+    {
+      "name": "schedulePolicy",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "standard"
+          },
+          {
+            "name": "commitment"
           }
         ]
       }
