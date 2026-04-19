@@ -9,6 +9,11 @@ import { AutoSolProgram } from "@/lib/program";
 import { useFeeSettings } from "@/hooks/use-fee-settings";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { renderMarkdownPreview } from "@/components/shared/markdown-contract-preview";
+import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { uploadMarkdownToPinata } from "@/lib/ipfs";
 
 import RecipientSection from "./sections/recipient-section";
 import PaymentSection from "./sections/payment-section";
@@ -31,6 +36,10 @@ export interface PaymentScheduleFormData {
     endDate?: Date;
     repeatCount?: number;
   };
+  workflow: {
+    mode: "standard" | "commitment";
+    noteMarkdown: string;
+  };
 }
 
 const reveal = {
@@ -52,6 +61,7 @@ export default function NewPaymentForm() {
     recipient: { address: "", name: "" },
     payment: { amount: 0, token: "So11111111111111111111111111111111111111112", memo: "", symbol: "SOL", decimals: 9 },
     schedule: { scheduleTimes: [], selectedDates: [], frequency: "once", repeatCount: 12 },
+    workflow: { mode: "standard", noteMarkdown: "" },
   });
 
   // Progressive disclosure flags
@@ -88,6 +98,44 @@ export default function NewPaymentForm() {
       if (amount <= 0) throw new Error("Amount must be > 0");
 
       const isSol = AutoSolProgram.isNativeSol(formData.payment.token);
+      if (formData.workflow.mode === "commitment") {
+        const noteMarkdown =
+          formData.workflow.noteMarkdown.trim() ||
+          [
+            `# Payment Commitment`,
+            ``,
+            `Recipient: ${formData.recipient.name}`,
+            `Wallet: ${formData.recipient.address}`,
+            `Token: ${formData.payment.symbol}`,
+            `Amount per payment: ${formData.payment.amount}`,
+            `Payments: ${formData.schedule.selectedDates.length}`,
+            ``,
+            formData.payment.memo || "Created via AutoSol commitment flow.",
+          ].join("\n");
+
+        const noteUri = await uploadMarkdownToPinata(noteMarkdown);
+        const result = isSol
+          ? await program.createPaymentCommitmentProposal({
+              paymentAmount: amount,
+              recipientAddress: recipientPk,
+              scheduleTimes: formData.schedule.scheduleTimes,
+              memo: formData.payment.memo,
+              noteUri,
+            })
+          : await program.createSplPaymentCommitmentProposal({
+              paymentAmount: amount,
+              recipientAddress: recipientPk,
+              scheduleTimes: formData.schedule.scheduleTimes,
+              memo: formData.payment.memo,
+              noteUri,
+              mint: new PublicKey(formData.payment.token),
+            });
+
+        toast.success("Payment commitment proposal created!");
+        router.push("/dashboard/commitments");
+        return;
+      }
+
       const result = isSol
         ? await program.createPaymentSchedule({
             paymentAmount: amount,
@@ -164,6 +212,95 @@ export default function NewPaymentForm() {
       <AnimatePresence>
         {scheduleValid && (
           <motion.div key="summary" variants={reveal} initial="hidden" animate="visible" exit="hidden" transition={{ duration: 0.3 }}>
+            <div className="mb-4 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 sm:p-5">
+              <div className="mb-3 flex items-center justify-between">
+                <div className="text-xs font-medium uppercase tracking-wider text-slate-500">
+                  Workflow
+                </div>
+                <div className="rounded-full border border-white/[0.06] bg-black/30 p-1">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={formData.workflow.mode === "standard" ? "default" : "ghost"}
+                    className="h-8 rounded-full text-xs"
+                    onClick={() =>
+                      update({
+                        workflow: { ...formData.workflow, mode: "standard" },
+                      })
+                    }
+                  >
+                    Standard
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={formData.workflow.mode === "commitment" ? "default" : "ghost"}
+                    className="h-8 rounded-full text-xs"
+                    onClick={() =>
+                      update({
+                        workflow: { ...formData.workflow, mode: "commitment" },
+                      })
+                    }
+                  >
+                    Commitment
+                  </Button>
+                </div>
+              </div>
+
+              <p className="text-sm text-slate-400">
+                {formData.workflow.mode === "standard"
+                  ? "Standard schedules can still be cancelled by the sender while active."
+                  : "Commitments require recipient acceptance and become non-cancellable after activation."}
+              </p>
+
+              {formData.workflow.mode === "commitment" && (
+                <div className="mt-4 space-y-2">
+                  <label className="text-xs font-medium uppercase tracking-wider text-slate-500">
+                    Commitment Note (Markdown)
+                  </label>
+                  <Tabs defaultValue="write" className="w-full">
+                    <TabsList className="grid w-full grid-cols-2 rounded-xl border border-white/[0.06] bg-black/30">
+                      <TabsTrigger
+                        value="write"
+                        className="rounded-lg text-xs data-[state=active]:bg-white/[0.08] data-[state=active]:text-white"
+                      >
+                        Write
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="preview"
+                        className="rounded-lg text-xs data-[state=active]:bg-white/[0.08] data-[state=active]:text-white"
+                      >
+                        Preview
+                      </TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="write">
+                      <Textarea
+                        value={formData.workflow.noteMarkdown}
+                        onChange={(event) =>
+                          update({
+                            workflow: {
+                              ...formData.workflow,
+                              noteMarkdown: event.target.value,
+                            },
+                          })
+                        }
+                        rows={8}
+                        placeholder={"# Scope\n\nDescribe the purpose, service terms, and why this payment commitment exists."}
+                        className="min-h-[220px] border-white/[0.08] bg-black/20 text-sm text-white"
+                      />
+                    </TabsContent>
+                    <TabsContent value="preview">
+                      <div className="min-h-[220px] space-y-4 rounded-xl border border-white/[0.08] bg-black/20 p-4">
+                        {renderMarkdownPreview(formData.workflow.noteMarkdown)}
+                      </div>
+                    </TabsContent>
+                  </Tabs>
+                  <p className="text-xs text-slate-500">
+                    AutoSol uploads this markdown note to IPFS through Pinata before creating the proposal.
+                  </p>
+                </div>
+              )}
+            </div>
             <SummarySection
               data={formData}
               isSubmitting={isSubmitting}

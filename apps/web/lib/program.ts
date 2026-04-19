@@ -40,6 +40,8 @@ export interface PaymentScheduleData {
   paymentType: PaymentType;
   memo: string;
   vaultBump: number;
+  schedulePolicy: SchedulePolicy;
+  proposalId: PublicKey | null;
 }
 
 export interface Payment {
@@ -69,6 +71,33 @@ export enum PaymentType {
   SplToken = "SplToken",
 }
 
+export enum SchedulePolicy {
+  Standard = "Standard",
+  Commitment = "Commitment",
+}
+
+export enum PaymentCommitmentStatus {
+  Proposed = "Proposed",
+  Accepted = "Accepted",
+  Activated = "Activated",
+}
+
+export interface PaymentCommitmentProposalData {
+  owner: PublicKey;
+  recipient: PublicKey;
+  mint: PublicKey;
+  paymentAmount: anchor.BN;
+  scheduleTimes: anchor.BN[];
+  createdAt: anchor.BN;
+  acceptedAt: anchor.BN | null;
+  activatedAt: anchor.BN | null;
+  paymentType: PaymentType;
+  status: PaymentCommitmentStatus;
+  memo: string;
+  noteUri: string;
+  activatedSchedule: PublicKey | null;
+}
+
 export interface CreateScheduleParams {
   paymentAmount: number; // in lamports or smallest token unit
   recipientAddress: PublicKey;
@@ -80,9 +109,23 @@ export interface CreateSplScheduleParams extends CreateScheduleParams {
   mint: PublicKey;
 }
 
+export interface CreateCommitmentProposalParams extends CreateScheduleParams {
+  noteUri: string;
+}
+
+export interface CreateSplCommitmentProposalParams
+  extends CreateCommitmentProposalParams {
+  mint: PublicKey;
+}
+
 export interface ScheduleWithAddress {
   address: PublicKey;
   data: PaymentScheduleData;
+}
+
+export interface CommitmentProposalWithAddress {
+  address: PublicKey;
+  data: PaymentCommitmentProposalData;
 }
 
 export class AutoSolError extends Error {
@@ -261,6 +304,26 @@ export class AutoSolProgram {
       paymentType: this.mapPaymentType(schedule.paymentType),
       memo: schedule.memo,
       vaultBump: schedule.vaultBump,
+      schedulePolicy: this.mapSchedulePolicy(schedule.schedulePolicy),
+      proposalId: schedule.proposalId ?? null,
+    };
+  }
+
+  private mapCommitmentProposalData(proposal: any): PaymentCommitmentProposalData {
+    return {
+      owner: proposal.owner,
+      recipient: proposal.recipient,
+      mint: proposal.mint,
+      paymentAmount: proposal.paymentAmount,
+      scheduleTimes: proposal.scheduleTimes,
+      createdAt: proposal.createdAt,
+      acceptedAt: proposal.acceptedAt ?? null,
+      activatedAt: proposal.activatedAt ?? null,
+      paymentType: this.mapPaymentType(proposal.paymentType),
+      status: this.mapCommitmentStatus(proposal.status),
+      memo: proposal.memo,
+      noteUri: proposal.noteUri,
+      activatedSchedule: proposal.activatedSchedule ?? null,
     };
   }
 
@@ -281,6 +344,26 @@ export class AutoSolProgram {
   }): PaymentType {
     if (paymentType.splToken) return PaymentType.SplToken;
     return PaymentType.Sol;
+  }
+
+  private mapSchedulePolicy(schedulePolicy: {
+    standard?: Record<string, never>;
+    commitment?: Record<string, never>;
+  }): SchedulePolicy {
+    if (schedulePolicy?.commitment) {
+      return SchedulePolicy.Commitment;
+    }
+    return SchedulePolicy.Standard;
+  }
+
+  private mapCommitmentStatus(status: {
+    proposed?: Record<string, never>;
+    accepted?: Record<string, never>;
+    activated?: Record<string, never>;
+  }): PaymentCommitmentStatus {
+    if (status?.accepted) return PaymentCommitmentStatus.Accepted;
+    if (status?.activated) return PaymentCommitmentStatus.Activated;
+    return PaymentCommitmentStatus.Proposed;
   }
 
   // ─── Cost calculation ─────────────────────────────────────────────────
@@ -493,6 +576,204 @@ export class AutoSolProgram {
     }
   }
 
+  public async createPaymentCommitmentProposal(
+    params: CreateCommitmentProposalParams,
+    proposalKeypair: Keypair = Keypair.generate()
+  ): Promise<{ proposalAddress: PublicKey; txSignature: string }> {
+    try {
+      if (!this.program.provider.publicKey) {
+        throw new AutoSolError("Wallet not connected", "WALLET_NOT_CONNECTED");
+      }
+
+      const { paymentAmount, recipientAddress, scheduleTimes, memo, noteUri } =
+        params;
+      this.validateScheduleTimes(scheduleTimes);
+
+      const txSignature = await this.program.methods
+        .createPaymentCommitmentProposal(
+          new anchor.BN(paymentAmount),
+          recipientAddress,
+          scheduleTimes.map((time) => new anchor.BN(time)),
+          memo,
+          noteUri
+        )
+        .accounts({
+          paymentCommitmentProposal: proposalKeypair.publicKey,
+          user: this.program.provider.publicKey,
+        })
+        .signers([proposalKeypair])
+        .rpc({ skipPreflight: false, maxRetries: 1, commitment: "confirmed" });
+
+      return {
+        proposalAddress: proposalKeypair.publicKey,
+        txSignature,
+      };
+    } catch (error) {
+      this.logger("Error creating payment commitment proposal:", error);
+      throw this.wrapTransactionError(
+        error,
+        "CREATE_PAYMENT_COMMITMENT_PROPOSAL_ERROR"
+      );
+    }
+  }
+
+  public async createSplPaymentCommitmentProposal(
+    params: CreateSplCommitmentProposalParams,
+    proposalKeypair: Keypair = Keypair.generate()
+  ): Promise<{ proposalAddress: PublicKey; txSignature: string }> {
+    try {
+      if (!this.program.provider.publicKey) {
+        throw new AutoSolError("Wallet not connected", "WALLET_NOT_CONNECTED");
+      }
+
+      const {
+        paymentAmount,
+        recipientAddress,
+        scheduleTimes,
+        memo,
+        noteUri,
+        mint,
+      } = params;
+      this.validateScheduleTimes(scheduleTimes);
+
+      const txSignature = await this.program.methods
+        .createSplPaymentCommitmentProposal(
+          new anchor.BN(paymentAmount),
+          recipientAddress,
+          scheduleTimes.map((time) => new anchor.BN(time)),
+          memo,
+          noteUri
+        )
+        .accounts({
+          paymentCommitmentProposal: proposalKeypair.publicKey,
+          user: this.program.provider.publicKey,
+          mint,
+        })
+        .signers([proposalKeypair])
+        .rpc({ skipPreflight: false, maxRetries: 1, commitment: "confirmed" });
+
+      return {
+        proposalAddress: proposalKeypair.publicKey,
+        txSignature,
+      };
+    } catch (error) {
+      this.logger("Error creating SPL payment commitment proposal:", error);
+      throw this.wrapTransactionError(
+        error,
+        "CREATE_SPL_PAYMENT_COMMITMENT_PROPOSAL_ERROR"
+      );
+    }
+  }
+
+  public async acceptPaymentCommitmentProposal(
+    proposalAddress: PublicKey
+  ): Promise<string> {
+    try {
+      if (!this.program.provider.publicKey) {
+        throw new AutoSolError("Wallet not connected", "WALLET_NOT_CONNECTED");
+      }
+
+      return await this.program.methods
+        .acceptPaymentCommitmentProposal()
+        .accounts({
+          paymentCommitmentProposal: proposalAddress,
+          recipient: this.program.provider.publicKey,
+        })
+        .rpc({ skipPreflight: false, maxRetries: 1, commitment: "confirmed" });
+    } catch (error) {
+      this.logger("Error accepting payment commitment proposal:", error);
+      throw this.wrapTransactionError(
+        error,
+        "ACCEPT_PAYMENT_COMMITMENT_PROPOSAL_ERROR"
+      );
+    }
+  }
+
+  public async activatePaymentCommitment(
+    proposalAddress: PublicKey,
+    paymentScheduleKeypair: Keypair = Keypair.generate()
+  ): Promise<{ scheduleAddress: PublicKey; txSignature: string }> {
+    try {
+      if (!this.program.provider.publicKey) {
+        throw new AutoSolError("Wallet not connected", "WALLET_NOT_CONNECTED");
+      }
+
+      const txSignature = await this.program.methods
+        .activatePaymentCommitment()
+        .accounts({
+          paymentCommitmentProposal: proposalAddress,
+          paymentSchedule: paymentScheduleKeypair.publicKey,
+          user: this.program.provider.publicKey,
+        })
+        .signers([paymentScheduleKeypair])
+        .rpc({ skipPreflight: false, maxRetries: 1, commitment: "confirmed" });
+
+      return {
+        scheduleAddress: paymentScheduleKeypair.publicKey,
+        txSignature,
+      };
+    } catch (error) {
+      this.logger("Error activating SOL commitment:", error);
+      throw this.wrapTransactionError(error, "ACTIVATE_PAYMENT_COMMITMENT_ERROR");
+    }
+  }
+
+  public async activateSplPaymentCommitment(
+    proposalAddress: PublicKey,
+    mint: PublicKey,
+    paymentScheduleKeypair: Keypair = Keypair.generate()
+  ): Promise<{ scheduleAddress: PublicKey; txSignature: string }> {
+    try {
+      if (!this.program.provider.publicKey) {
+        throw new AutoSolError("Wallet not connected", "WALLET_NOT_CONNECTED");
+      }
+
+      const userTokenAccount = await getAssociatedTokenAddress(
+        mint,
+        this.program.provider.publicKey
+      );
+      const [paymentVault] = this.getSplVaultPDA(
+        paymentScheduleKeypair.publicKey,
+        mint
+      );
+      const [vaultAuthority] = this.getVaultAuthorityPDA(
+        paymentScheduleKeypair.publicKey
+      );
+      const [feeVault] = this.getSplFeeVaultPDA(mint);
+      const [feeVaultAuthority] = this.getFeeVaultAuthorityPDA(mint);
+
+      const txSignature = await this.program.methods
+        .activateSplPaymentCommitment()
+        .accounts({
+          paymentCommitmentProposal: proposalAddress,
+          paymentSchedule: paymentScheduleKeypair.publicKey,
+          user: this.program.provider.publicKey,
+          userTokenAccount,
+          paymentVault,
+          vaultAuthority,
+          feeVault,
+          feeVaultAuthority,
+          mint,
+          systemProgram: anchor.web3.SystemProgram.programId,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+        } as any)
+        .signers([paymentScheduleKeypair])
+        .rpc({ skipPreflight: false, maxRetries: 1, commitment: "confirmed" });
+
+      return {
+        scheduleAddress: paymentScheduleKeypair.publicKey,
+        txSignature,
+      };
+    } catch (error) {
+      this.logger("Error activating SPL commitment:", error);
+      throw this.wrapTransactionError(
+        error,
+        "ACTIVATE_SPL_PAYMENT_COMMITMENT_ERROR"
+      );
+    }
+  }
+
   // ─── Cancel SOL payment schedule ──────────────────────────────────────
 
   public async cancelPaymentSchedule(
@@ -515,6 +796,13 @@ export class AutoSolProgram {
         throw new AutoSolError(
           "Payment schedule is not active",
           "INVALID_SCHEDULE_STATUS"
+        );
+      }
+
+      if (scheduleData.schedulePolicy === SchedulePolicy.Commitment) {
+        throw new AutoSolError(
+          "Commitment-backed schedules cannot be cancelled",
+          "COMMITMENT_SCHEDULE_IRREVOCABLE"
         );
       }
 
@@ -563,6 +851,13 @@ export class AutoSolProgram {
         throw new AutoSolError(
           "Payment schedule is not active",
           "INVALID_SCHEDULE_STATUS"
+        );
+      }
+
+      if (scheduleData.schedulePolicy === SchedulePolicy.Commitment) {
+        throw new AutoSolError(
+          "Commitment-backed schedules cannot be cancelled",
+          "COMMITMENT_SCHEDULE_IRREVOCABLE"
         );
       }
 
@@ -642,6 +937,95 @@ export class AutoSolProgram {
       throw new AutoSolError(
         "Failed to fetch payment schedules",
         "SCHEDULES_FETCH_ERROR",
+        error as Error
+      );
+    }
+  }
+
+  public async getPaymentCommitmentProposal(
+    proposalAddress: PublicKey
+  ): Promise<PaymentCommitmentProposalData> {
+    try {
+      const proposal =
+        await this.program.account.paymentCommitmentProposal.fetch(
+          proposalAddress
+        );
+      return this.mapCommitmentProposalData(proposal);
+    } catch (error) {
+      this.logger("Error fetching payment commitment proposal:", error);
+      throw new AutoSolError(
+        "Failed to fetch payment commitment proposal",
+        "PAYMENT_COMMITMENT_PROPOSAL_FETCH_ERROR",
+        error as Error
+      );
+    }
+  }
+
+  public async getCommitmentProposalsForOwner(
+    ownerAddress: PublicKey
+  ): Promise<CommitmentProposalWithAddress[]> {
+    try {
+      const proposals =
+        await this.program.account.paymentCommitmentProposal.all([
+          {
+            memcmp: {
+              offset: 8,
+              bytes: ownerAddress.toBase58(),
+            },
+          },
+        ]);
+
+      return proposals.map((proposal) => ({
+        address: proposal.publicKey,
+        data: this.mapCommitmentProposalData(proposal.account),
+      }));
+    } catch (error) {
+      this.logger("Error fetching commitment proposals for owner:", error);
+      throw new AutoSolError(
+        "Failed to fetch sent payment commitments",
+        "PAYMENT_COMMITMENT_OWNER_FETCH_ERROR",
+        error as Error
+      );
+    }
+  }
+
+  public async getCommitmentProposalsForRecipient(
+    recipientAddress: PublicKey
+  ): Promise<CommitmentProposalWithAddress[]> {
+    try {
+      let proposals;
+
+      try {
+        proposals = await this.program.account.paymentCommitmentProposal.all([
+          {
+            memcmp: {
+              offset: 8 + 32,
+              bytes: recipientAddress.toBase58(),
+            },
+          },
+        ]);
+      } catch (memcmpError) {
+        this.logger(
+          "Recipient commitment memcmp lookup failed, falling back to full scan:",
+          memcmpError
+        );
+
+        const allProposals =
+          await this.program.account.paymentCommitmentProposal.all();
+        proposals = allProposals.filter((proposal) =>
+          proposal.account.recipient.equals(recipientAddress)
+        );
+      }
+
+      return proposals.map((proposal) => ({
+        address: proposal.publicKey,
+        data: this.mapCommitmentProposalData(proposal.account),
+      }));
+    } catch (error) {
+      this.logger("Error fetching commitment proposals for recipient:", error);
+      throw new AutoSolError(
+        "Failed to fetch incoming payment commitments",
+        "PAYMENT_COMMITMENT_RECIPIENT_FETCH_ERROR",
         error as Error
       );
     }
@@ -851,20 +1235,43 @@ export class AutoSolProgram {
 
   private wrapTransactionError(error: unknown, defaultCode: string): AutoSolError {
     const errMsg = error instanceof Error ? error.message : String(error);
+
+    const anchorMessageMatch = errMsg.match(/Error Message:\s*([^:\n]+(?:\.[^:\n]+)?)/i);
+    const anchorMessage = anchorMessageMatch?.[1]?.trim();
+
+    const actionLabelByCode: Record<string, string> = {
+      CREATE_SCHEDULE_ERROR: "create payment schedule",
+      CREATE_SPL_SCHEDULE_ERROR: "create SPL payment schedule",
+      CREATE_PAYMENT_COMMITMENT_PROPOSAL_ERROR:
+        "create payment commitment proposal",
+      CREATE_SPL_PAYMENT_COMMITMENT_PROPOSAL_ERROR:
+        "create SPL payment commitment proposal",
+      ACCEPT_PAYMENT_COMMITMENT_PROPOSAL_ERROR:
+        "accept payment commitment proposal",
+      ACTIVATE_PAYMENT_COMMITMENT_ERROR: "activate payment commitment",
+      ACTIVATE_SPL_PAYMENT_COMMITMENT_ERROR: "activate SPL payment commitment",
+    };
+
+    const actionLabel = actionLabelByCode[defaultCode] ?? "submit transaction";
+
     if (
       errMsg.toLowerCase().includes("already been processed") ||
-      errMsg.toLowerCase().includes("blockhash not found") ||
-      errMsg.toLowerCase().includes("transaction simulation failed")
+      errMsg.toLowerCase().includes("already submitted") ||
+      errMsg.toLowerCase().includes("this transaction has already been processed")
     ) {
       return new AutoSolError(
-        "This transaction was already submitted. Please check your Payments page — your schedule may have been created successfully.",
+        `This transaction was already submitted. Please check whether the ${actionLabel} already succeeded.`,
         "DUPLICATE_TRANSACTION",
         error as Error
       );
     }
 
+    if (anchorMessage) {
+      return new AutoSolError(anchorMessage, defaultCode, error as Error);
+    }
+
     return new AutoSolError(
-      "Failed to create payment schedule",
+      `Failed to ${actionLabel}`,
       defaultCode,
       error as Error
     );

@@ -1,7 +1,13 @@
 import { LAMPORTS_PER_SOL, PublicKey, type Connection } from "@solana/web3.js";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { DashboardService, type DashboardData } from "@/lib/dashboard-service";
-import { AutoSolProgram, PaymentType, ScheduleStatus } from "@/lib/program";
+import {
+  AutoSolProgram,
+  PaymentCommitmentStatus,
+  PaymentType,
+  SchedulePolicy,
+  ScheduleStatus,
+} from "@/lib/program";
 import {
   getTokenDecimals,
   getTokenLabel,
@@ -34,8 +40,28 @@ export interface WalletSchedule {
   paymentsExecuted: number;
   remainingAmount: number;
   status: string;
+  schedulePolicy: string;
+  proposalId: string | null;
   createdAt: string;
   memo: string;
+}
+
+export interface CommitmentProposal {
+  id: string;
+  owner: string;
+  recipient: string;
+  mint: string;
+  isSol: boolean;
+  paymentAmount: number;
+  paymentCount: number;
+  scheduleTimes: string[];
+  memo: string;
+  noteUri: string;
+  status: string;
+  acceptedAt: string | null;
+  activatedAt: string | null;
+  createdAt: string;
+  scheduleId: string | null;
 }
 
 export interface WalletTransaction {
@@ -190,6 +216,11 @@ function mapRpcSchedule(
     paymentsExecuted,
     remainingAmount: scheduleWithAddress.data.remainingAmount.toNumber(),
     status: mapScheduleStatus(scheduleWithAddress.data.status),
+    schedulePolicy:
+      scheduleWithAddress.data.schedulePolicy === SchedulePolicy.Commitment
+        ? "commitment"
+        : "standard",
+    proposalId: scheduleWithAddress.data.proposalId?.toBase58() ?? null,
     createdAt: toIsoDate(scheduleWithAddress.data.createdAt.toNumber()),
     memo: scheduleWithAddress.data.memo || "",
   };
@@ -269,6 +300,62 @@ async function fetchTransactionsFromRpc(
   return Array.from(transactions.values()).sort(
     (left, right) =>
       new Date(right.executedAt).getTime() - new Date(left.executedAt).getTime()
+  );
+}
+
+function mapCommitmentStatus(status: PaymentCommitmentStatus): string {
+  switch (status) {
+    case PaymentCommitmentStatus.Accepted:
+      return "accepted";
+    case PaymentCommitmentStatus.Activated:
+      return "activated";
+    case PaymentCommitmentStatus.Proposed:
+    default:
+      return "proposed";
+  }
+}
+
+async function fetchCommitmentsFromRpc(
+  address: PublicKey,
+  program: AutoSolProgram
+): Promise<CommitmentProposal[]> {
+  const [sent, received] = await Promise.all([
+    program.getCommitmentProposalsForOwner(address),
+    program.getCommitmentProposalsForRecipient(address),
+  ]);
+
+  const proposals = new Map<string, CommitmentProposal>();
+
+  [...sent, ...received].forEach((proposalWithAddress) => {
+    const proposal = proposalWithAddress.data;
+    proposals.set(proposalWithAddress.address.toBase58(), {
+      id: proposalWithAddress.address.toBase58(),
+      owner: proposal.owner.toBase58(),
+      recipient: proposal.recipient.toBase58(),
+      mint: proposal.mint.toBase58(),
+      isSol: proposal.paymentType === PaymentType.Sol,
+      paymentAmount: proposal.paymentAmount.toNumber(),
+      paymentCount: proposal.scheduleTimes.length,
+      scheduleTimes: proposal.scheduleTimes.map((time) =>
+        toIsoDate(time.toNumber())
+      ),
+      memo: proposal.memo,
+      noteUri: proposal.noteUri,
+      status: mapCommitmentStatus(proposal.status),
+      acceptedAt: proposal.acceptedAt
+        ? toIsoDate(proposal.acceptedAt.toNumber())
+        : null,
+      activatedAt: proposal.activatedAt
+        ? toIsoDate(proposal.activatedAt.toNumber())
+        : null,
+      createdAt: toIsoDate(proposal.createdAt.toNumber()),
+      scheduleId: proposal.activatedSchedule?.toBase58() ?? null,
+    });
+  });
+
+  return Array.from(proposals.values()).sort(
+    (left, right) =>
+      new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
   );
 }
 
@@ -575,6 +662,50 @@ export async function fetchWalletTokensResilient(
     const tokens = await fetchWalletTokensFromRpc(address, connection);
     return {
       data: tokens,
+      source: "rpc",
+      notice: getBackendFallbackNotice(error),
+    };
+  }
+}
+
+export async function fetchCommitmentsResilient(
+  address: PublicKey,
+  program: AutoSolProgram | null
+): Promise<ResilientResult<CommitmentProposal[]>> {
+  try {
+    const [sent, received] = await Promise.all([
+      fetchBackendJson<{ commitments: CommitmentProposal[] }>(
+        `/commitments/sent/${address.toBase58()}`
+      ),
+      fetchBackendJson<{ commitments: CommitmentProposal[] }>(
+        `/commitments/received/${address.toBase58()}`
+      ),
+    ]);
+
+    const combined = new Map<string, CommitmentProposal>();
+    [...(sent.commitments || []), ...(received.commitments || [])].forEach(
+      (proposal) => {
+        combined.set(proposal.id, proposal);
+      }
+    );
+
+    return {
+      data: Array.from(combined.values()).sort(
+        (left, right) =>
+          new Date(right.createdAt).getTime() -
+          new Date(left.createdAt).getTime()
+      ),
+      source: "backend",
+      notice: null,
+    };
+  } catch (error) {
+    if (!program) {
+      throw error;
+    }
+
+    const commitments = await fetchCommitmentsFromRpc(address, program);
+    return {
+      data: commitments,
       source: "rpc",
       notice: getBackendFallbackNotice(error),
     };

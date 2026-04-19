@@ -55,6 +55,8 @@ interface Schedule {
   paymentsExecuted: number;
   remainingAmount: number;
   status: string;
+  schedulePolicy: string;
+  proposalId: string | null;
   createdAt: string;
   memo: string;
 }
@@ -270,7 +272,14 @@ export default function PaymentsPage() {
                     <TableRow key={p.id} className="border-white/[0.04] transition-colors hover:bg-white/[0.02]">
                       <TableCell>
                         <div className="font-medium text-sm text-white">{truncAddr(p.recipient)}</div>
-                        <div className="text-[11px] text-slate-500">{truncAddr(p.id)}</div>
+                        <div className="mt-1 flex flex-wrap items-center gap-2">
+                          <div className="text-[11px] text-slate-500">{truncAddr(p.id)}</div>
+                          {p.schedulePolicy === "commitment" && (
+                            <Badge variant="outline" className="border-primary/20 text-[10px] text-primary">
+                              Commitment
+                            </Badge>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="text-sm font-medium text-white">{formatAmount(p.totalAmount, p)} {p.token}</div>
@@ -311,7 +320,7 @@ export default function PaymentsPage() {
                             <DropdownMenuItem className="text-xs cursor-pointer hover:bg-white/[0.06]" onClick={() => copyTo(p.recipient)}>
                               <Copy className="h-3.5 w-3.5 mr-2" /> Copy Recipient
                             </DropdownMenuItem>
-                            {p.status === "active" && (
+                            {p.status === "active" && p.schedulePolicy !== "commitment" && (
                               <>
                                 <DropdownMenuSeparator className="bg-white/[0.06]" />
                                 <DropdownMenuItem className="text-xs cursor-pointer text-red-400 hover:bg-red-500/10" onClick={() => setCancelingPayment(p)}>

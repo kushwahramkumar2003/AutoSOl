@@ -24,6 +24,7 @@ interface Props {
 export default function SummarySection({ data, isSubmitting, error, onSubmit, isSuccess, txSignature, scheduleAddress, onDone }: Props) {
   const { getFeePercentage, calculateFee } = useFeeSettings();
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const isCommitment = data.workflow.mode === "commitment";
 
   const fee = calculateFee(data.payment.amount);
   const perPayment = data.payment.amount + fee;
@@ -118,7 +119,9 @@ export default function SummarySection({ data, isSubmitting, error, onSubmit, is
           <span className="text-slate-300">{fee.toFixed(4)} {data.payment.symbol}</span>
         </div>
         <div className="flex items-center justify-between border-t border-white/[0.06] pt-2.5">
-          <span className="text-slate-400">Total Locked</span>
+          <span className="text-slate-400">
+            {isCommitment ? "Activation Deposit" : "Total Locked"}
+          </span>
           <div className="flex items-center gap-1.5">
             <TokenAvatar
               symbol={data.payment.symbol}
@@ -133,6 +136,11 @@ export default function SummarySection({ data, isSubmitting, error, onSubmit, is
         {data.payment.memo && (
           <div className="text-xs text-slate-500">Memo: {data.payment.memo}</div>
         )}
+        {isCommitment && (
+          <div className="text-xs text-amber-300/80">
+            Recipient must accept this proposal before funds are locked.
+          </div>
+        )}
         <div className="text-[11px] text-slate-500">
           {data.schedule.selectedDates.slice(0, 3).map((d) => format(d, "MMM d")).join(", ")}
           {data.schedule.selectedDates.length > 3 && ` +${data.schedule.selectedDates.length - 3} more`}
@@ -142,7 +150,16 @@ export default function SummarySection({ data, isSubmitting, error, onSubmit, is
       {error && <p className="mt-3 text-xs text-red-400">{error}</p>}
 
       <Button onClick={onSubmit} disabled={isSubmitting} className="mt-4 w-full rounded-xl bg-primary text-sm font-medium text-primary-foreground hover:bg-primary/90 h-11">
-        {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating…</> : <><Wallet className="mr-2 h-4 w-4" /> Create Schedule</>}
+        {isSubmitting ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating…
+          </>
+        ) : (
+          <>
+            <Wallet className="mr-2 h-4 w-4" />{" "}
+            {isCommitment ? "Create Commitment Proposal" : "Create Schedule"}
+          </>
+        )}
       </Button>
     </div>
   );

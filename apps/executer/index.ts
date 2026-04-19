@@ -324,19 +324,13 @@ class AutoSolBackend {
 
       logger.info(`Recipient ATA ensured: ${recipientAta.address.toString()}`);
 
-      const paymentVault = this.getSplVaultPDA(scheduleAddress, mint);
-      const vaultAuthority = this.getVaultAuthorityPDA(scheduleAddress);
-
       const txSignature = await this.program.methods
         .executeSplPayment(new BN(paymentIndex))
         .accounts({
           paymentSchedule: scheduleAddress,
           executor: this.wallet.publicKey,
           recipientTokenAccount: recipientAta.address,
-          paymentVault,
-          vaultAuthority,
           mint,
-          tokenProgram: TOKEN_PROGRAM_ID,
         })
         .signers([this.wallet.payer])
         .rpc();
