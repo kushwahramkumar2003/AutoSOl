@@ -308,6 +308,8 @@ router.get("/schedules/:address", async (req, res) => {
       paymentsExecuted: s.paymentsExecuted,
       remainingAmount: Number(s.totalAmount) - Number(s.paymentAmount) * s.paymentsExecuted,
       status: s.status.toLowerCase(),
+      schedulePolicy: s.schedulePolicy.toLowerCase(),
+      proposalId: s.proposalId,
       createdAt: s.createdAt.toISOString(),
       memo: "", // memo is stored on-chain only
     }));

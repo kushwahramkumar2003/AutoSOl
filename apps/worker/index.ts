@@ -6,6 +6,9 @@ import {
   DEFAULT_REDIS_DEAD_LETTER_STREAM_MAXLEN,
   DEFAULT_REDIS_STREAM,
   DEFAULT_REDIS_STREAM_MAXLEN,
+  PaymentCommitmentAcceptedEventSchema,
+  PaymentCommitmentActivatedEventSchema,
+  PaymentCommitmentProposedEventSchema,
   FeePercentageUpdatedEventSchema,
   FeesWithdrawnEventSchema,
   PaymentExecutedEventSchema,
@@ -46,11 +49,14 @@ const sleep = (ms: number) =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
 const EVENT_PRIORITY: Record<string, number> = {
-  PaymentScheduleCreatedEvent: 0,
-  PaymentExecutedEvent: 1,
-  PaymentScheduleCancelledEvent: 1,
-  FeesWithdrawnEvent: 2,
-  FeePercentageUpdatedEvent: 3,
+  PaymentCommitmentProposedEvent: 0,
+  PaymentCommitmentAcceptedEvent: 1,
+  PaymentScheduleCreatedEvent: 2,
+  PaymentCommitmentActivatedEvent: 3,
+  PaymentExecutedEvent: 4,
+  PaymentScheduleCancelledEvent: 4,
+  FeesWithdrawnEvent: 5,
+  FeePercentageUpdatedEvent: 6,
 };
 
 class RetryableOrderingError extends Error {
@@ -139,10 +145,15 @@ class AutoSolWorkerService {
       ["payment_schedules", "mint"],
       ["payment_schedules", "fee_amount"],
       ["payment_schedules", "is_sol"],
+      ["payment_schedules", "schedule_policy"],
+      ["payment_schedules", "proposal_id"],
       ["payments", "mint"],
       ["payments", "is_sol"],
       ["fee_withdrawals", "mint"],
       ["fee_withdrawals", "is_sol"],
+      ["payment_commitment_proposals", "note_uri"],
+      ["payment_commitment_proposals", "schedule_times"],
+      ["payment_commitment_proposals", "status"],
     ];
 
     const missingColumns: string[] = [];
@@ -438,6 +449,15 @@ class AutoSolWorkerService {
       case "PaymentScheduleCreatedEvent":
         await this.handlePaymentScheduleCreated(event);
         return;
+      case "PaymentCommitmentProposedEvent":
+        await this.handlePaymentCommitmentProposed(event);
+        return;
+      case "PaymentCommitmentAcceptedEvent":
+        await this.handlePaymentCommitmentAccepted(event);
+        return;
+      case "PaymentCommitmentActivatedEvent":
+        await this.handlePaymentCommitmentActivated(event);
+        return;
       case "PaymentExecutedEvent":
         await this.handlePaymentExecuted(event);
         return;
@@ -458,6 +478,24 @@ class AutoSolWorkerService {
   private async handlePaymentScheduleCreated(event: EventWrapper) {
     const data = PaymentScheduleCreatedEventSchema.parse(event.event_data);
 
+    const proposalId =
+      data.proposal_id === "11111111111111111111111111111111"
+        ? null
+        : data.proposal_id;
+
+    if (data.is_commitment && proposalId) {
+      const proposal = await this.prisma.paymentCommitmentProposal.findUnique({
+        where: { id: proposalId },
+        select: { id: true },
+      });
+
+      if (!proposal) {
+        throw new RetryableOrderingError(
+          `Commitment proposal ${proposalId} is not indexed yet; retry after PaymentCommitmentProposedEvent is processed`
+        );
+      }
+    }
+
     await this.prisma.paymentSchedule.upsert({
       where: { id: data.schedule_id },
       update: {
@@ -471,6 +509,8 @@ class AutoSolWorkerService {
         status: "ACTIVE",
         createdAt: data.created_at,
         isSol: data.is_sol,
+        schedulePolicy: data.is_commitment ? "COMMITMENT" : "STANDARD",
+        proposalId,
       },
       create: {
         id: data.schedule_id,
@@ -484,8 +524,85 @@ class AutoSolWorkerService {
         status: "ACTIVE",
         createdAt: data.created_at,
         isSol: data.is_sol,
+        schedulePolicy: data.is_commitment ? "COMMITMENT" : "STANDARD",
+        proposalId,
       },
     });
+  }
+
+  private async handlePaymentCommitmentProposed(event: EventWrapper) {
+    const data = PaymentCommitmentProposedEventSchema.parse(event.event_data);
+
+    await this.prisma.paymentCommitmentProposal.upsert({
+      where: { id: data.proposal_id },
+      update: {
+        owner: data.owner,
+        recipient: data.recipient,
+        mint: data.mint,
+        paymentAmount: data.payment_amount,
+        paymentCount: data.payment_count,
+        scheduleTimes: data.schedule_times.map((time) => time.toISOString()),
+        memo: data.memo,
+        noteUri: data.note_uri,
+        isSol: data.is_sol,
+        status: "PROPOSED",
+        createdAt: data.created_at,
+      },
+      create: {
+        id: data.proposal_id,
+        owner: data.owner,
+        recipient: data.recipient,
+        mint: data.mint,
+        paymentAmount: data.payment_amount,
+        paymentCount: data.payment_count,
+        scheduleTimes: data.schedule_times.map((time) => time.toISOString()),
+        memo: data.memo,
+        noteUri: data.note_uri,
+        isSol: data.is_sol,
+        status: "PROPOSED",
+        createdAt: data.created_at,
+      },
+    });
+  }
+
+  private async handlePaymentCommitmentAccepted(event: EventWrapper) {
+    const data = PaymentCommitmentAcceptedEventSchema.parse(event.event_data);
+
+    const updated = await this.prisma.paymentCommitmentProposal.updateMany({
+      where: { id: data.proposal_id },
+      data: {
+        owner: data.owner,
+        recipient: data.recipient,
+        status: "ACCEPTED",
+        acceptedAt: data.accepted_at,
+      },
+    });
+
+    if (updated.count === 0) {
+      throw new RetryableOrderingError(
+        `Commitment proposal ${data.proposal_id} is not indexed yet; retry after PaymentCommitmentProposedEvent is processed`
+      );
+    }
+  }
+
+  private async handlePaymentCommitmentActivated(event: EventWrapper) {
+    const data = PaymentCommitmentActivatedEventSchema.parse(event.event_data);
+
+    const updated = await this.prisma.paymentCommitmentProposal.updateMany({
+      where: { id: data.proposal_id },
+      data: {
+        owner: data.owner,
+        recipient: data.recipient,
+        status: "ACTIVATED",
+        activatedAt: data.activated_at,
+      },
+    });
+
+    if (updated.count === 0) {
+      throw new RetryableOrderingError(
+        `Commitment proposal ${data.proposal_id} is not indexed yet; retry after PaymentCommitmentProposedEvent is processed`
+      );
+    }
   }
 
   private async handlePaymentExecuted(event: EventWrapper) {

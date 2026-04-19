@@ -104,6 +104,8 @@ pub struct PaymentScheduleCreatedEvent {
     #[serde(serialize_with = "pubkey_as_base58")]
     pub schedule_id: Pubkey,
     #[serde(serialize_with = "pubkey_as_base58")]
+    pub proposal_id: Pubkey,
+    #[serde(serialize_with = "pubkey_as_base58")]
     pub owner: Pubkey,
     #[serde(serialize_with = "pubkey_as_base58")]
     pub recipient: Pubkey,
@@ -115,6 +117,7 @@ pub struct PaymentScheduleCreatedEvent {
     pub payment_count: u64,
     pub created_at: i64,
     pub is_sol: bool,
+    pub is_commitment: bool,
 }
 
 #[derive(Serialize, Deserialize, BorshDeserialize, BorshSerialize, Clone, Debug)]
@@ -143,6 +146,50 @@ pub struct PaymentScheduleCancelledEvent {
     pub mint: Pubkey,
     pub refund_amount: u64,
     pub cancelled_at: i64,
+    pub is_sol: bool,
+}
+
+#[derive(Serialize, Deserialize, BorshDeserialize, BorshSerialize, Clone, Debug)]
+pub struct PaymentCommitmentProposedEvent {
+    #[serde(serialize_with = "pubkey_as_base58")]
+    pub proposal_id: Pubkey,
+    #[serde(serialize_with = "pubkey_as_base58")]
+    pub owner: Pubkey,
+    #[serde(serialize_with = "pubkey_as_base58")]
+    pub recipient: Pubkey,
+    #[serde(serialize_with = "pubkey_as_base58")]
+    pub mint: Pubkey,
+    pub payment_amount: u64,
+    pub payment_count: u64,
+    pub schedule_times: Vec<i64>,
+    pub memo: String,
+    pub note_uri: String,
+    pub created_at: i64,
+    pub is_sol: bool,
+}
+
+#[derive(Serialize, Deserialize, BorshDeserialize, BorshSerialize, Clone, Debug)]
+pub struct PaymentCommitmentAcceptedEvent {
+    #[serde(serialize_with = "pubkey_as_base58")]
+    pub proposal_id: Pubkey,
+    #[serde(serialize_with = "pubkey_as_base58")]
+    pub owner: Pubkey,
+    #[serde(serialize_with = "pubkey_as_base58")]
+    pub recipient: Pubkey,
+    pub accepted_at: i64,
+}
+
+#[derive(Serialize, Deserialize, BorshDeserialize, BorshSerialize, Clone, Debug)]
+pub struct PaymentCommitmentActivatedEvent {
+    #[serde(serialize_with = "pubkey_as_base58")]
+    pub proposal_id: Pubkey,
+    #[serde(serialize_with = "pubkey_as_base58")]
+    pub schedule_id: Pubkey,
+    #[serde(serialize_with = "pubkey_as_base58")]
+    pub owner: Pubkey,
+    #[serde(serialize_with = "pubkey_as_base58")]
+    pub recipient: Pubkey,
+    pub activated_at: i64,
     pub is_sol: bool,
 }
 
@@ -259,6 +306,18 @@ impl BlockchainMonitor {
             ("PaymentScheduleCreatedEvent", PAYMENT_SCHEDULE_CREATED_DISCRIMINATOR),
             ("PaymentExecutedEvent", PAYMENT_EXECUTED_DISCRIMINATOR),
             ("PaymentScheduleCancelledEvent", PAYMENT_SCHEDULE_CANCELLED_DISCRIMINATOR),
+            (
+                "PaymentCommitmentProposedEvent",
+                calculate_event_discriminator("PaymentCommitmentProposedEvent"),
+            ),
+            (
+                "PaymentCommitmentAcceptedEvent",
+                calculate_event_discriminator("PaymentCommitmentAcceptedEvent"),
+            ),
+            (
+                "PaymentCommitmentActivatedEvent",
+                calculate_event_discriminator("PaymentCommitmentActivatedEvent"),
+            ),
             ("FeesWithdrawnEvent", FEES_WITHDRAWN_DISCRIMINATOR),
             ("FeePercentageUpdatedEvent", FEE_PERCENTAGE_UPDATED_DISCRIMINATOR),
         ];
@@ -355,6 +414,12 @@ impl BlockchainMonitor {
 
         let discriminator = &data[0..8];
         let event_data = &data[8..];
+        let payment_commitment_proposed_discriminator =
+            calculate_event_discriminator("PaymentCommitmentProposedEvent");
+        let payment_commitment_accepted_discriminator =
+            calculate_event_discriminator("PaymentCommitmentAcceptedEvent");
+        let payment_commitment_activated_discriminator =
+            calculate_event_discriminator("PaymentCommitmentActivatedEvent");
         
         let mut redis_con = self.redis_client.get_connection()
             .map_err(|e| anyhow!("Failed to get Redis connection: {}", e))?;
@@ -410,6 +475,57 @@ impl BlockchainMonitor {
                 }
                 Err(e) => {
                     println!("Failed to deserialize PaymentScheduleCancelledEvent: {}", e);
+                    None
+                }
+            }
+        } else if discriminator == payment_commitment_proposed_discriminator {
+            match PaymentCommitmentProposedEvent::try_from_slice(event_data) {
+                Ok(event) => {
+                    println!("Found PaymentCommitmentProposedEvent: {:#?}", event);
+                    Some(EventWrapper {
+                        event_type: "PaymentCommitmentProposedEvent".to_string(),
+                        event_data: serde_json::to_value(&event)?,
+                        signature: signature.to_string(),
+                        slot,
+                        timestamp,
+                    })
+                }
+                Err(e) => {
+                    println!("Failed to deserialize PaymentCommitmentProposedEvent: {}", e);
+                    None
+                }
+            }
+        } else if discriminator == payment_commitment_accepted_discriminator {
+            match PaymentCommitmentAcceptedEvent::try_from_slice(event_data) {
+                Ok(event) => {
+                    println!("Found PaymentCommitmentAcceptedEvent: {:#?}", event);
+                    Some(EventWrapper {
+                        event_type: "PaymentCommitmentAcceptedEvent".to_string(),
+                        event_data: serde_json::to_value(&event)?,
+                        signature: signature.to_string(),
+                        slot,
+                        timestamp,
+                    })
+                }
+                Err(e) => {
+                    println!("Failed to deserialize PaymentCommitmentAcceptedEvent: {}", e);
+                    None
+                }
+            }
+        } else if discriminator == payment_commitment_activated_discriminator {
+            match PaymentCommitmentActivatedEvent::try_from_slice(event_data) {
+                Ok(event) => {
+                    println!("Found PaymentCommitmentActivatedEvent: {:#?}", event);
+                    Some(EventWrapper {
+                        event_type: "PaymentCommitmentActivatedEvent".to_string(),
+                        event_data: serde_json::to_value(&event)?,
+                        signature: signature.to_string(),
+                        slot,
+                        timestamp,
+                    })
+                }
+                Err(e) => {
+                    println!("Failed to deserialize PaymentCommitmentActivatedEvent: {}", e);
                     None
                 }
             }

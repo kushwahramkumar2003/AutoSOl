@@ -38,6 +38,7 @@ const timestampSchema = z.union([
 
 export const PaymentScheduleCreatedEventSchema = z.object({
   schedule_id: pubkeySchema,
+  proposal_id: pubkeySchema,
   owner: pubkeySchema,
   recipient: pubkeySchema,
   mint: pubkeySchema,
@@ -47,6 +48,7 @@ export const PaymentScheduleCreatedEventSchema = z.object({
   payment_count: intSchema,
   created_at: timestampSchema,
   is_sol: z.boolean(),
+  is_commitment: z.boolean(),
 });
 
 export const PaymentExecutedEventSchema = z.object({
@@ -66,6 +68,36 @@ export const PaymentScheduleCancelledEventSchema = z.object({
   mint: pubkeySchema,
   refund_amount: bigintSchema,
   cancelled_at: timestampSchema,
+  is_sol: z.boolean(),
+});
+
+export const PaymentCommitmentProposedEventSchema = z.object({
+  proposal_id: pubkeySchema,
+  owner: pubkeySchema,
+  recipient: pubkeySchema,
+  mint: pubkeySchema,
+  payment_amount: bigintSchema,
+  payment_count: intSchema,
+  schedule_times: z.array(timestampSchema),
+  memo: z.string(),
+  note_uri: z.string(),
+  created_at: timestampSchema,
+  is_sol: z.boolean(),
+});
+
+export const PaymentCommitmentAcceptedEventSchema = z.object({
+  proposal_id: pubkeySchema,
+  owner: pubkeySchema,
+  recipient: pubkeySchema,
+  accepted_at: timestampSchema,
+});
+
+export const PaymentCommitmentActivatedEventSchema = z.object({
+  proposal_id: pubkeySchema,
+  schedule_id: pubkeySchema,
+  owner: pubkeySchema,
+  recipient: pubkeySchema,
+  activated_at: timestampSchema,
   is_sol: z.boolean(),
 });
 
@@ -103,6 +135,15 @@ export type PaymentExecutedEvent = z.infer<typeof PaymentExecutedEventSchema>;
 export type PaymentScheduleCancelledEvent = z.infer<
   typeof PaymentScheduleCancelledEventSchema
 >;
+export type PaymentCommitmentProposedEvent = z.infer<
+  typeof PaymentCommitmentProposedEventSchema
+>;
+export type PaymentCommitmentAcceptedEvent = z.infer<
+  typeof PaymentCommitmentAcceptedEventSchema
+>;
+export type PaymentCommitmentActivatedEvent = z.infer<
+  typeof PaymentCommitmentActivatedEventSchema
+>;
 export type FeesWithdrawnEvent = z.infer<typeof FeesWithdrawnEventSchema>;
 export type FeePercentageUpdatedEvent = z.infer<
   typeof FeePercentageUpdatedEventSchema
@@ -116,6 +157,12 @@ export function parseEventData(event: EventWrapper) {
       return PaymentExecutedEventSchema.parse(event.event_data);
     case "PaymentScheduleCancelledEvent":
       return PaymentScheduleCancelledEventSchema.parse(event.event_data);
+    case "PaymentCommitmentProposedEvent":
+      return PaymentCommitmentProposedEventSchema.parse(event.event_data);
+    case "PaymentCommitmentAcceptedEvent":
+      return PaymentCommitmentAcceptedEventSchema.parse(event.event_data);
+    case "PaymentCommitmentActivatedEvent":
+      return PaymentCommitmentActivatedEventSchema.parse(event.event_data);
     case "FeesWithdrawnEvent":
       return FeesWithdrawnEventSchema.parse(event.event_data);
     case "FeePercentageUpdatedEvent":
@@ -138,6 +185,18 @@ export function buildEventKey(event: EventWrapper): string {
     case "PaymentScheduleCancelledEvent": {
       const data = PaymentScheduleCancelledEventSchema.parse(event.event_data);
       return `${event.event_type}:${event.signature}:${data.schedule_id}`;
+    }
+    case "PaymentCommitmentProposedEvent": {
+      const data = PaymentCommitmentProposedEventSchema.parse(event.event_data);
+      return `${event.event_type}:${event.signature}:${data.proposal_id}`;
+    }
+    case "PaymentCommitmentAcceptedEvent": {
+      const data = PaymentCommitmentAcceptedEventSchema.parse(event.event_data);
+      return `${event.event_type}:${event.signature}:${data.proposal_id}`;
+    }
+    case "PaymentCommitmentActivatedEvent": {
+      const data = PaymentCommitmentActivatedEventSchema.parse(event.event_data);
+      return `${event.event_type}:${event.signature}:${data.proposal_id}:${data.schedule_id}`;
     }
     case "FeesWithdrawnEvent": {
       const data = FeesWithdrawnEventSchema.parse(event.event_data);

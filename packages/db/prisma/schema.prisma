@@ -19,11 +19,38 @@ model PaymentSchedule {
   paymentsExecuted  Int                   @default(0) @map("payments_executed")
   isSol             Boolean               @default(true) @map("is_sol")
   status            PaymentScheduleStatus @default(ACTIVE)
+  schedulePolicy    PaymentSchedulePolicy @default(STANDARD) @map("schedule_policy")
+  proposalId        String?               @unique @map("proposal_id")
   createdAt         DateTime              @map("created_at")
   updatedAt         DateTime              @updatedAt @map("updated_at")
   payments          Payment[]
+  proposal          PaymentCommitmentProposal? @relation("ScheduleProposal", fields: [proposalId], references: [id])
 
   @@map("payment_schedules")
+}
+
+model PaymentCommitmentProposal {
+  id                String                  @id
+  owner             String
+  recipient         String
+  mint              String
+  paymentAmount     BigInt                  @map("payment_amount")
+  paymentCount      Int                     @map("payment_count")
+  scheduleTimes     Json                    @map("schedule_times")
+  memo              String
+  noteUri           String                  @map("note_uri")
+  isSol             Boolean                 @default(true) @map("is_sol")
+  status            PaymentCommitmentStatus @default(PROPOSED)
+  acceptedAt        DateTime?               @map("accepted_at")
+  activatedAt       DateTime?               @map("activated_at")
+  createdAt         DateTime                @map("created_at")
+  updatedAt         DateTime                @updatedAt @map("updated_at")
+  activatedSchedule PaymentSchedule?        @relation("ScheduleProposal")
+
+  @@map("payment_commitment_proposals")
+  @@index([owner])
+  @@index([recipient])
+  @@index([status])
 }
 
 model Payment {
@@ -95,6 +122,17 @@ enum PaymentScheduleStatus {
   ACTIVE
   COMPLETED
   CANCELLED
+}
+
+enum PaymentSchedulePolicy {
+  STANDARD
+  COMMITMENT
+}
+
+enum PaymentCommitmentStatus {
+  PROPOSED
+  ACCEPTED
+  ACTIVATED
 }
 
 enum EventStatus {

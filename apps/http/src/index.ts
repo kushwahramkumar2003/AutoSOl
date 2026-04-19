@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import dashboardRoutes from "./routes/dashboard";
+import commitmentRoutes from "./routes/commitments";
 import tokenRoutes from "./routes/tokens";
 import { prisma } from "@autosol/db";
 
@@ -13,6 +14,7 @@ app.use(express.json());
 
 // Main routers
 app.use("/api/v1/dashboard", dashboardRoutes);
+app.use("/api/v1/commitments", commitmentRoutes);
 app.use("/api/v1/tokens", tokenRoutes);
 
 // Health check
