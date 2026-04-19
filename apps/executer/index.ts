@@ -4,7 +4,6 @@ import {
   Connection,
   Keypair,
   PublicKey,
-  SystemProgram,
   LAMPORTS_PER_SOL,
 } from "@solana/web3.js";
 import {
@@ -12,7 +11,6 @@ import {
   getAssociatedTokenAddress,
   getOrCreateAssociatedTokenAccount,
 } from "@solana/spl-token";
-import * as schedule from "node-schedule";
 import * as fs from "fs";
 import * as path from "path";
 import * as winston from "winston";
@@ -22,8 +20,7 @@ import type { AutoSol } from "./types/auto_sol";
 const PROGRAM_ID = new PublicKey(
   "G4zWuZQ7SaP9VgE7bhucKgQ7MVWjLVBhL4wHK6ymVAQL"
 );
-const DEFAULT_EXECUTION_TIMES = ["0 0 0 * * *", "0 0 12 * * *"]; // midnight & noon
-const CONFIG_FILE = path.join(process.cwd(), "executor-config.json");
+const DEFAULT_EXECUTION_INTERVAL_MS = 3 * 60 * 1000; // 3 minutes
 const LOG_FILE = path.join(process.cwd(), "executor.log");
 
 // PDA seed constants (must match on-chain program)
@@ -77,10 +74,11 @@ interface PaymentScheduleData {
   mint: PublicKey;
   payments: PaymentEntry[];
   createdAt: BN;
-  status: { active?: object; completed?: object; cancelled?: object };
+  status: { active?: object; paused?: object; completed?: object; cancelled?: object };
   paymentType: { sol?: object; splToken?: object };
   memo: string;
   vaultBump: number;
+  requestId?: PublicKey | null;
 }
 
 interface ExecutionResult {
@@ -101,6 +99,41 @@ class AutoSolBackend {
   private provider: AnchorProvider;
   private program: Program<AutoSol>;
   private idl: any;
+
+  private serializeError(error: unknown): unknown {
+    if (error instanceof ExecutorError) {
+      return {
+        name: error.name,
+        message: error.message,
+        code: error.code,
+        details: this.serializeError(error.details),
+      };
+    }
+
+    if (error instanceof Error) {
+      const plain = error as Error & { code?: unknown; details?: unknown; cause?: unknown };
+      return {
+        name: plain.name,
+        message: plain.message,
+        stack: plain.stack,
+        code: plain.code,
+        details: this.serializeError(plain.details),
+        cause: this.serializeError(plain.cause),
+      };
+    }
+
+    if (Array.isArray(error)) {
+      return error.map((item) => this.serializeError(item));
+    }
+
+    if (error && typeof error === "object") {
+      return Object.fromEntries(
+        Object.entries(error).map(([key, value]) => [key, this.serializeError(value)])
+      );
+    }
+
+    return error;
+  }
 
   constructor(
     connection: Connection,
@@ -265,7 +298,7 @@ class AutoSolBackend {
       throw new ExecutorError(
         "Failed to execute pending payments",
         "BULK_EXECUTION_ERROR",
-        error
+        this.serializeError(error)
       );
     }
   }
@@ -372,12 +405,17 @@ class AutoSolBackend {
 // ─── Executor Service ────────────────────────────────────────────────────────
 class ExecutorService {
   private backend: AutoSolBackend;
-  private executionTimes!: string[];
+  private executionIntervalMs: number;
   private connection: Connection;
   private wallet: anchor.Wallet;
+  private timer: NodeJS.Timeout | null = null;
+  private isExecuting = false;
 
   constructor() {
-    this.loadConfig();
+    this.executionIntervalMs = Math.max(
+      10000,
+      Number(process.env.EXECUTION_INTERVAL_MS || DEFAULT_EXECUTION_INTERVAL_MS)
+    );
     this.connection = new Connection(
       process.env.RPC_URL || "http://127.0.0.1:8899",
       "confirmed"
@@ -391,23 +429,43 @@ class ExecutorService {
     );
   }
 
-  private loadConfig() {
+  private async runExecutionCycle(trigger: "startup" | "interval") {
+    if (this.isExecuting) {
+      logger.warn("Skipping execution cycle because prior cycle is still running", {
+        trigger,
+      });
+      return;
+    }
+
+    this.isExecuting = true;
+    logger.info("Starting payment execution cycle", {
+      trigger,
+      time: new Date().toISOString(),
+    });
+
     try {
-      if (fs.existsSync(CONFIG_FILE)) {
-        const config = JSON.parse(fs.readFileSync(CONFIG_FILE, "utf-8"));
-        this.executionTimes = config.executionTimes || DEFAULT_EXECUTION_TIMES;
-      } else {
-        this.executionTimes = DEFAULT_EXECUTION_TIMES;
-        fs.writeFileSync(
-          CONFIG_FILE,
-          JSON.stringify({ executionTimes: this.executionTimes }, null, 2)
-        );
-        logger.info("Created default config file", { path: CONFIG_FILE });
-      }
-      logger.info("Loaded execution schedule", { times: this.executionTimes });
-    } catch (error) {
-      logger.error("Failed to load config", { error });
-      this.executionTimes = DEFAULT_EXECUTION_TIMES;
+      const result = await this.backend.executePendingPayments();
+      logger.info("Execution cycle completed", {
+        trigger,
+        totalExecuted: result.totalExecuted,
+        totalFailed: result.totalFailed,
+        results: result.results.map((r) => ({
+          schedule: r.scheduleAddress.slice(0, 8) + "...",
+          index: r.paymentIndex,
+          success: r.success,
+          isSpl: r.isSplToken || false,
+          tx: r.txSignature?.slice(0, 8) + "..." || r.error,
+        })),
+      });
+    } catch (error: any) {
+      logger.error("Execution cycle failed", {
+        trigger,
+        error: error.message,
+        code: error.code || "UNKNOWN",
+        details: error.details,
+      });
+    } finally {
+      this.isExecuting = false;
     }
   }
 
@@ -453,38 +511,15 @@ class ExecutorService {
         );
       }
 
-      // Schedule execution jobs
-      this.executionTimes.forEach((cron, index) => {
-        schedule.scheduleJob(`execution-${index}`, cron, async () => {
-          logger.info("Starting scheduled payment execution", {
-            time: new Date().toISOString(),
-          });
-          try {
-            const result = await this.backend.executePendingPayments();
-            logger.info("Execution completed", {
-              totalExecuted: result.totalExecuted,
-              totalFailed: result.totalFailed,
-              results: result.results.map((r) => ({
-                schedule: r.scheduleAddress.slice(0, 8) + "...",
-                index: r.paymentIndex,
-                success: r.success,
-                isSpl: r.isSplToken || false,
-                tx: r.txSignature?.slice(0, 8) + "..." || r.error,
-              })),
-            });
-          } catch (error: any) {
-            logger.error("Scheduled execution failed", {
-              error: error.message,
-              code: error.code || "UNKNOWN",
-              details: error.details,
-            });
-          }
-        });
+      logger.info("Executor service started", {
+        executionIntervalMs: this.executionIntervalMs,
+        executionIntervalMinutes: this.executionIntervalMs / 60000,
       });
 
-      logger.info("Executor service started", {
-        executionTimes: this.executionTimes,
-      });
+      await this.runExecutionCycle("startup");
+      this.timer = setInterval(() => {
+        void this.runExecutionCycle("interval");
+      }, this.executionIntervalMs);
     } catch (error: any) {
       logger.error("Failed to start executor service", {
         error: error.message,
@@ -497,12 +532,9 @@ class ExecutorService {
 
   async stop() {
     try {
-      // Cancel all scheduled jobs
-      const jobs = schedule.scheduledJobs;
-      if (jobs) {
-        for (const jobName in jobs) {
-          jobs[jobName]?.cancel();
-        }
+      if (this.timer) {
+        clearInterval(this.timer);
+        this.timer = null;
       }
       logger.info("Executor service stopped");
     } catch (error: unknown) {
