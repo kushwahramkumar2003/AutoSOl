@@ -106,6 +106,8 @@ pub struct PaymentScheduleCreatedEvent {
     #[serde(serialize_with = "pubkey_as_base58")]
     pub proposal_id: Pubkey,
     #[serde(serialize_with = "pubkey_as_base58")]
+    pub request_id: Pubkey,
+    #[serde(serialize_with = "pubkey_as_base58")]
     pub owner: Pubkey,
     #[serde(serialize_with = "pubkey_as_base58")]
     pub recipient: Pubkey,
@@ -118,6 +120,7 @@ pub struct PaymentScheduleCreatedEvent {
     pub created_at: i64,
     pub is_sol: bool,
     pub is_commitment: bool,
+    pub is_request: bool,
 }
 
 #[derive(Serialize, Deserialize, BorshDeserialize, BorshSerialize, Clone, Debug)]
@@ -147,6 +150,24 @@ pub struct PaymentScheduleCancelledEvent {
     pub refund_amount: u64,
     pub cancelled_at: i64,
     pub is_sol: bool,
+}
+
+#[derive(Serialize, Deserialize, BorshDeserialize, BorshSerialize, Clone, Debug)]
+pub struct PaymentSchedulePausedEvent {
+    #[serde(serialize_with = "pubkey_as_base58")]
+    pub schedule_id: Pubkey,
+    #[serde(serialize_with = "pubkey_as_base58")]
+    pub owner: Pubkey,
+    pub paused_at: i64,
+}
+
+#[derive(Serialize, Deserialize, BorshDeserialize, BorshSerialize, Clone, Debug)]
+pub struct PaymentScheduleResumedEvent {
+    #[serde(serialize_with = "pubkey_as_base58")]
+    pub schedule_id: Pubkey,
+    #[serde(serialize_with = "pubkey_as_base58")]
+    pub owner: Pubkey,
+    pub resumed_at: i64,
 }
 
 #[derive(Serialize, Deserialize, BorshDeserialize, BorshSerialize, Clone, Debug)]
@@ -190,6 +211,61 @@ pub struct PaymentCommitmentActivatedEvent {
     #[serde(serialize_with = "pubkey_as_base58")]
     pub recipient: Pubkey,
     pub activated_at: i64,
+    pub is_sol: bool,
+}
+
+#[derive(Serialize, Deserialize, BorshDeserialize, BorshSerialize, Clone, Debug)]
+pub struct PaymentRequestProposedEvent {
+    #[serde(serialize_with = "pubkey_as_base58")]
+    pub request_id: Pubkey,
+    #[serde(serialize_with = "pubkey_as_base58")]
+    pub requester: Pubkey,
+    #[serde(serialize_with = "pubkey_as_base58")]
+    pub payer: Pubkey,
+    #[serde(serialize_with = "pubkey_as_base58")]
+    pub mint: Pubkey,
+    pub payment_amount: u64,
+    pub payment_count: u64,
+    pub schedule_times: Vec<i64>,
+    pub memo: String,
+    pub note_uri: String,
+    pub created_at: i64,
+    pub is_sol: bool,
+}
+
+#[derive(Serialize, Deserialize, BorshDeserialize, BorshSerialize, Clone, Debug)]
+pub struct PaymentRequestDeclinedEvent {
+    #[serde(serialize_with = "pubkey_as_base58")]
+    pub request_id: Pubkey,
+    #[serde(serialize_with = "pubkey_as_base58")]
+    pub requester: Pubkey,
+    #[serde(serialize_with = "pubkey_as_base58")]
+    pub payer: Pubkey,
+    pub decisioned_at: i64,
+}
+
+#[derive(Serialize, Deserialize, BorshDeserialize, BorshSerialize, Clone, Debug)]
+pub struct PaymentRequestRevokedEvent {
+    #[serde(serialize_with = "pubkey_as_base58")]
+    pub request_id: Pubkey,
+    #[serde(serialize_with = "pubkey_as_base58")]
+    pub requester: Pubkey,
+    #[serde(serialize_with = "pubkey_as_base58")]
+    pub payer: Pubkey,
+    pub decisioned_at: i64,
+}
+
+#[derive(Serialize, Deserialize, BorshDeserialize, BorshSerialize, Clone, Debug)]
+pub struct PaymentRequestAcceptedEvent {
+    #[serde(serialize_with = "pubkey_as_base58")]
+    pub request_id: Pubkey,
+    #[serde(serialize_with = "pubkey_as_base58")]
+    pub schedule_id: Pubkey,
+    #[serde(serialize_with = "pubkey_as_base58")]
+    pub requester: Pubkey,
+    #[serde(serialize_with = "pubkey_as_base58")]
+    pub payer: Pubkey,
+    pub accepted_at: i64,
     pub is_sol: bool,
 }
 
@@ -307,6 +383,14 @@ impl BlockchainMonitor {
             ("PaymentExecutedEvent", PAYMENT_EXECUTED_DISCRIMINATOR),
             ("PaymentScheduleCancelledEvent", PAYMENT_SCHEDULE_CANCELLED_DISCRIMINATOR),
             (
+                "PaymentSchedulePausedEvent",
+                calculate_event_discriminator("PaymentSchedulePausedEvent"),
+            ),
+            (
+                "PaymentScheduleResumedEvent",
+                calculate_event_discriminator("PaymentScheduleResumedEvent"),
+            ),
+            (
                 "PaymentCommitmentProposedEvent",
                 calculate_event_discriminator("PaymentCommitmentProposedEvent"),
             ),
@@ -317,6 +401,22 @@ impl BlockchainMonitor {
             (
                 "PaymentCommitmentActivatedEvent",
                 calculate_event_discriminator("PaymentCommitmentActivatedEvent"),
+            ),
+            (
+                "PaymentRequestProposedEvent",
+                calculate_event_discriminator("PaymentRequestProposedEvent"),
+            ),
+            (
+                "PaymentRequestDeclinedEvent",
+                calculate_event_discriminator("PaymentRequestDeclinedEvent"),
+            ),
+            (
+                "PaymentRequestRevokedEvent",
+                calculate_event_discriminator("PaymentRequestRevokedEvent"),
+            ),
+            (
+                "PaymentRequestAcceptedEvent",
+                calculate_event_discriminator("PaymentRequestAcceptedEvent"),
             ),
             ("FeesWithdrawnEvent", FEES_WITHDRAWN_DISCRIMINATOR),
             ("FeePercentageUpdatedEvent", FEE_PERCENTAGE_UPDATED_DISCRIMINATOR),
@@ -420,6 +520,18 @@ impl BlockchainMonitor {
             calculate_event_discriminator("PaymentCommitmentAcceptedEvent");
         let payment_commitment_activated_discriminator =
             calculate_event_discriminator("PaymentCommitmentActivatedEvent");
+        let payment_schedule_paused_discriminator =
+            calculate_event_discriminator("PaymentSchedulePausedEvent");
+        let payment_schedule_resumed_discriminator =
+            calculate_event_discriminator("PaymentScheduleResumedEvent");
+        let payment_request_proposed_discriminator =
+            calculate_event_discriminator("PaymentRequestProposedEvent");
+        let payment_request_declined_discriminator =
+            calculate_event_discriminator("PaymentRequestDeclinedEvent");
+        let payment_request_revoked_discriminator =
+            calculate_event_discriminator("PaymentRequestRevokedEvent");
+        let payment_request_accepted_discriminator =
+            calculate_event_discriminator("PaymentRequestAcceptedEvent");
         
         let mut redis_con = self.redis_client.get_connection()
             .map_err(|e| anyhow!("Failed to get Redis connection: {}", e))?;
@@ -478,6 +590,40 @@ impl BlockchainMonitor {
                     None
                 }
             }
+        } else if discriminator == payment_schedule_paused_discriminator {
+            match PaymentSchedulePausedEvent::try_from_slice(event_data) {
+                Ok(event) => {
+                    println!("Found PaymentSchedulePausedEvent: {:#?}", event);
+                    Some(EventWrapper {
+                        event_type: "PaymentSchedulePausedEvent".to_string(),
+                        event_data: serde_json::to_value(&event)?,
+                        signature: signature.to_string(),
+                        slot,
+                        timestamp,
+                    })
+                }
+                Err(e) => {
+                    println!("Failed to deserialize PaymentSchedulePausedEvent: {}", e);
+                    None
+                }
+            }
+        } else if discriminator == payment_schedule_resumed_discriminator {
+            match PaymentScheduleResumedEvent::try_from_slice(event_data) {
+                Ok(event) => {
+                    println!("Found PaymentScheduleResumedEvent: {:#?}", event);
+                    Some(EventWrapper {
+                        event_type: "PaymentScheduleResumedEvent".to_string(),
+                        event_data: serde_json::to_value(&event)?,
+                        signature: signature.to_string(),
+                        slot,
+                        timestamp,
+                    })
+                }
+                Err(e) => {
+                    println!("Failed to deserialize PaymentScheduleResumedEvent: {}", e);
+                    None
+                }
+            }
         } else if discriminator == payment_commitment_proposed_discriminator {
             match PaymentCommitmentProposedEvent::try_from_slice(event_data) {
                 Ok(event) => {
@@ -526,6 +672,74 @@ impl BlockchainMonitor {
                 }
                 Err(e) => {
                     println!("Failed to deserialize PaymentCommitmentActivatedEvent: {}", e);
+                    None
+                }
+            }
+        } else if discriminator == payment_request_proposed_discriminator {
+            match PaymentRequestProposedEvent::try_from_slice(event_data) {
+                Ok(event) => {
+                    println!("Found PaymentRequestProposedEvent: {:#?}", event);
+                    Some(EventWrapper {
+                        event_type: "PaymentRequestProposedEvent".to_string(),
+                        event_data: serde_json::to_value(&event)?,
+                        signature: signature.to_string(),
+                        slot,
+                        timestamp,
+                    })
+                }
+                Err(e) => {
+                    println!("Failed to deserialize PaymentRequestProposedEvent: {}", e);
+                    None
+                }
+            }
+        } else if discriminator == payment_request_declined_discriminator {
+            match PaymentRequestDeclinedEvent::try_from_slice(event_data) {
+                Ok(event) => {
+                    println!("Found PaymentRequestDeclinedEvent: {:#?}", event);
+                    Some(EventWrapper {
+                        event_type: "PaymentRequestDeclinedEvent".to_string(),
+                        event_data: serde_json::to_value(&event)?,
+                        signature: signature.to_string(),
+                        slot,
+                        timestamp,
+                    })
+                }
+                Err(e) => {
+                    println!("Failed to deserialize PaymentRequestDeclinedEvent: {}", e);
+                    None
+                }
+            }
+        } else if discriminator == payment_request_revoked_discriminator {
+            match PaymentRequestRevokedEvent::try_from_slice(event_data) {
+                Ok(event) => {
+                    println!("Found PaymentRequestRevokedEvent: {:#?}", event);
+                    Some(EventWrapper {
+                        event_type: "PaymentRequestRevokedEvent".to_string(),
+                        event_data: serde_json::to_value(&event)?,
+                        signature: signature.to_string(),
+                        slot,
+                        timestamp,
+                    })
+                }
+                Err(e) => {
+                    println!("Failed to deserialize PaymentRequestRevokedEvent: {}", e);
+                    None
+                }
+            }
+        } else if discriminator == payment_request_accepted_discriminator {
+            match PaymentRequestAcceptedEvent::try_from_slice(event_data) {
+                Ok(event) => {
+                    println!("Found PaymentRequestAcceptedEvent: {:#?}", event);
+                    Some(EventWrapper {
+                        event_type: "PaymentRequestAcceptedEvent".to_string(),
+                        event_data: serde_json::to_value(&event)?,
+                        signature: signature.to_string(),
+                        slot,
+                        timestamp,
+                    })
+                }
+                Err(e) => {
+                    println!("Failed to deserialize PaymentRequestAcceptedEvent: {}", e);
                     None
                 }
             }

@@ -9,11 +9,17 @@ import {
   PaymentCommitmentAcceptedEventSchema,
   PaymentCommitmentActivatedEventSchema,
   PaymentCommitmentProposedEventSchema,
+  PaymentRequestAcceptedEventSchema,
+  PaymentRequestDeclinedEventSchema,
+  PaymentRequestProposedEventSchema,
+  PaymentRequestRevokedEventSchema,
   FeePercentageUpdatedEventSchema,
   FeesWithdrawnEventSchema,
   PaymentExecutedEventSchema,
   PaymentScheduleCancelledEventSchema,
   PaymentScheduleCreatedEventSchema,
+  PaymentSchedulePausedEventSchema,
+  PaymentScheduleResumedEventSchema,
   buildEventKey,
   parseStreamPayload,
 } from "@autosol/event-contract";
@@ -50,9 +56,15 @@ const sleep = (ms: number) =>
 
 const EVENT_PRIORITY: Record<string, number> = {
   PaymentCommitmentProposedEvent: 0,
+  PaymentRequestProposedEvent: 0,
   PaymentCommitmentAcceptedEvent: 1,
+  PaymentRequestDeclinedEvent: 1,
+  PaymentRequestRevokedEvent: 1,
   PaymentScheduleCreatedEvent: 2,
   PaymentCommitmentActivatedEvent: 3,
+  PaymentRequestAcceptedEvent: 3,
+  PaymentSchedulePausedEvent: 3,
+  PaymentScheduleResumedEvent: 3,
   PaymentExecutedEvent: 4,
   PaymentScheduleCancelledEvent: 4,
   FeesWithdrawnEvent: 5,
@@ -147,6 +159,7 @@ class AutoSolWorkerService {
       ["payment_schedules", "is_sol"],
       ["payment_schedules", "schedule_policy"],
       ["payment_schedules", "proposal_id"],
+      ["payment_schedules", "request_id"],
       ["payments", "mint"],
       ["payments", "is_sol"],
       ["fee_withdrawals", "mint"],
@@ -154,6 +167,9 @@ class AutoSolWorkerService {
       ["payment_commitment_proposals", "note_uri"],
       ["payment_commitment_proposals", "schedule_times"],
       ["payment_commitment_proposals", "status"],
+      ["payment_request_proposals", "note_uri"],
+      ["payment_request_proposals", "schedule_times"],
+      ["payment_request_proposals", "status"],
     ];
 
     const missingColumns: string[] = [];
@@ -458,6 +474,24 @@ class AutoSolWorkerService {
       case "PaymentCommitmentActivatedEvent":
         await this.handlePaymentCommitmentActivated(event);
         return;
+      case "PaymentRequestProposedEvent":
+        await this.handlePaymentRequestProposed(event);
+        return;
+      case "PaymentRequestDeclinedEvent":
+        await this.handlePaymentRequestDeclined(event);
+        return;
+      case "PaymentRequestRevokedEvent":
+        await this.handlePaymentRequestRevoked(event);
+        return;
+      case "PaymentRequestAcceptedEvent":
+        await this.handlePaymentRequestAccepted(event);
+        return;
+      case "PaymentSchedulePausedEvent":
+        await this.handlePaymentSchedulePaused(event);
+        return;
+      case "PaymentScheduleResumedEvent":
+        await this.handlePaymentScheduleResumed(event);
+        return;
       case "PaymentExecutedEvent":
         await this.handlePaymentExecuted(event);
         return;
@@ -482,6 +516,10 @@ class AutoSolWorkerService {
       data.proposal_id === "11111111111111111111111111111111"
         ? null
         : data.proposal_id;
+    const requestId =
+      data.request_id === "11111111111111111111111111111111"
+        ? null
+        : data.request_id;
 
     if (data.is_commitment && proposalId) {
       const proposal = await this.prisma.paymentCommitmentProposal.findUnique({
@@ -492,6 +530,19 @@ class AutoSolWorkerService {
       if (!proposal) {
         throw new RetryableOrderingError(
           `Commitment proposal ${proposalId} is not indexed yet; retry after PaymentCommitmentProposedEvent is processed`
+        );
+      }
+    }
+
+    if (data.is_request && requestId) {
+      const request = await this.prisma.paymentRequestProposal.findUnique({
+        where: { id: requestId },
+        select: { id: true },
+      });
+
+      if (!request) {
+        throw new RetryableOrderingError(
+          `Request proposal ${requestId} is not indexed yet; retry after PaymentRequestProposedEvent is processed`
         );
       }
     }
@@ -509,8 +560,13 @@ class AutoSolWorkerService {
         status: "ACTIVE",
         createdAt: data.created_at,
         isSol: data.is_sol,
-        schedulePolicy: data.is_commitment ? "COMMITMENT" : "STANDARD",
+        schedulePolicy: data.is_commitment
+          ? "COMMITMENT"
+          : data.is_request
+            ? "REQUEST"
+            : "STANDARD",
         proposalId,
+        requestId,
       },
       create: {
         id: data.schedule_id,
@@ -524,8 +580,13 @@ class AutoSolWorkerService {
         status: "ACTIVE",
         createdAt: data.created_at,
         isSol: data.is_sol,
-        schedulePolicy: data.is_commitment ? "COMMITMENT" : "STANDARD",
+        schedulePolicy: data.is_commitment
+          ? "COMMITMENT"
+          : data.is_request
+            ? "REQUEST"
+            : "STANDARD",
         proposalId,
+        requestId,
       },
     });
   }
@@ -603,6 +664,115 @@ class AutoSolWorkerService {
         `Commitment proposal ${data.proposal_id} is not indexed yet; retry after PaymentCommitmentProposedEvent is processed`
       );
     }
+  }
+
+  private async handlePaymentRequestProposed(event: EventWrapper) {
+    const data = PaymentRequestProposedEventSchema.parse(event.event_data);
+
+    await this.prisma.paymentRequestProposal.upsert({
+      where: { id: data.request_id },
+      update: {
+        requester: data.requester,
+        payer: data.payer,
+        mint: data.mint,
+        paymentAmount: data.payment_amount,
+        paymentCount: data.payment_count,
+        scheduleTimes: data.schedule_times.map((time) => time.toISOString()),
+        memo: data.memo,
+        noteUri: data.note_uri,
+        isSol: data.is_sol,
+        status: "PROPOSED",
+        createdAt: data.created_at,
+      },
+      create: {
+        id: data.request_id,
+        requester: data.requester,
+        payer: data.payer,
+        mint: data.mint,
+        paymentAmount: data.payment_amount,
+        paymentCount: data.payment_count,
+        scheduleTimes: data.schedule_times.map((time) => time.toISOString()),
+        memo: data.memo,
+        noteUri: data.note_uri,
+        isSol: data.is_sol,
+        status: "PROPOSED",
+        createdAt: data.created_at,
+      },
+    });
+  }
+
+  private async handlePaymentRequestDeclined(event: EventWrapper) {
+    const data = PaymentRequestDeclinedEventSchema.parse(event.event_data);
+
+    const updated = await this.prisma.paymentRequestProposal.updateMany({
+      where: { id: data.request_id },
+      data: {
+        requester: data.requester,
+        payer: data.payer,
+        status: "DECLINED",
+        decisionedAt: data.decisioned_at,
+      },
+    });
+    if (updated.count === 0) {
+      throw new RetryableOrderingError(
+        `Request proposal ${data.request_id} is not indexed yet; retry after PaymentRequestProposedEvent is processed`
+      );
+    }
+  }
+
+  private async handlePaymentRequestRevoked(event: EventWrapper) {
+    const data = PaymentRequestRevokedEventSchema.parse(event.event_data);
+
+    const updated = await this.prisma.paymentRequestProposal.updateMany({
+      where: { id: data.request_id },
+      data: {
+        requester: data.requester,
+        payer: data.payer,
+        status: "REVOKED",
+        decisionedAt: data.decisioned_at,
+      },
+    });
+    if (updated.count === 0) {
+      throw new RetryableOrderingError(
+        `Request proposal ${data.request_id} is not indexed yet; retry after PaymentRequestProposedEvent is processed`
+      );
+    }
+  }
+
+  private async handlePaymentRequestAccepted(event: EventWrapper) {
+    const data = PaymentRequestAcceptedEventSchema.parse(event.event_data);
+
+    const updated = await this.prisma.paymentRequestProposal.updateMany({
+      where: { id: data.request_id },
+      data: {
+        requester: data.requester,
+        payer: data.payer,
+        status: "ACCEPTED",
+        acceptedAt: data.accepted_at,
+        decisionedAt: data.accepted_at,
+      },
+    });
+    if (updated.count === 0) {
+      throw new RetryableOrderingError(
+        `Request proposal ${data.request_id} is not indexed yet; retry after PaymentRequestProposedEvent is processed`
+      );
+    }
+  }
+
+  private async handlePaymentSchedulePaused(event: EventWrapper) {
+    const data = PaymentSchedulePausedEventSchema.parse(event.event_data);
+    await this.prisma.paymentSchedule.updateMany({
+      where: { id: data.schedule_id },
+      data: { status: "PAUSED" },
+    });
+  }
+
+  private async handlePaymentScheduleResumed(event: EventWrapper) {
+    const data = PaymentScheduleResumedEventSchema.parse(event.event_data);
+    await this.prisma.paymentSchedule.updateMany({
+      where: { id: data.schedule_id },
+      data: { status: "ACTIVE" },
+    });
   }
 
   private async handlePaymentExecuted(event: EventWrapper) {

@@ -62,6 +62,26 @@ export interface CommitmentProposal {
   activatedAt: string | null;
   createdAt: string;
   scheduleId: string | null;
+  scheduleStatus?: string | null;
+}
+
+export interface PaymentRequestProposal {
+  id: string;
+  requester: string;
+  payer: string;
+  mint: string;
+  isSol: boolean;
+  paymentAmount: number;
+  paymentCount: number;
+  scheduleTimes: string[];
+  memo: string;
+  noteUri: string;
+  status: string;
+  decisionedAt: string | null;
+  acceptedAt: string | null;
+  createdAt: string;
+  scheduleId: string | null;
+  scheduleStatus?: string | null;
 }
 
 export interface WalletTransaction {
@@ -147,6 +167,8 @@ function mapScheduleStatus(status: ScheduleStatus): string {
   switch (status) {
     case ScheduleStatus.Active:
       return "active";
+    case ScheduleStatus.Paused:
+      return "paused";
     case ScheduleStatus.Completed:
       return "completed";
     case ScheduleStatus.Cancelled:
@@ -219,6 +241,8 @@ function mapRpcSchedule(
     schedulePolicy:
       scheduleWithAddress.data.schedulePolicy === SchedulePolicy.Commitment
         ? "commitment"
+        : scheduleWithAddress.data.schedulePolicy === SchedulePolicy.Request
+          ? "request"
         : "standard",
     proposalId: scheduleWithAddress.data.proposalId?.toBase58() ?? null,
     createdAt: toIsoDate(scheduleWithAddress.data.createdAt.toNumber()),
@@ -315,10 +339,38 @@ function mapCommitmentStatus(status: PaymentCommitmentStatus): string {
   }
 }
 
+function deriveCommitmentStatus(
+  baseStatus: string,
+  scheduleStatus?: string | null
+): string {
+  if (baseStatus === "activated") {
+    if (scheduleStatus === "completed") {
+      return "completed";
+    }
+    if (scheduleStatus === "cancelled") {
+      return "cancelled";
+    }
+  }
+
+  return baseStatus;
+}
+
 async function fetchCommitmentsFromRpc(
   address: PublicKey,
   program: AutoSolProgram
 ): Promise<CommitmentProposal[]> {
+  const { ownerSchedules, recipientSchedules } = await getScheduleContext(
+    address,
+    program
+  );
+  const scheduleStatusById = new Map<string, string>();
+  [...ownerSchedules, ...recipientSchedules].forEach((scheduleWithAddress) => {
+    scheduleStatusById.set(
+      scheduleWithAddress.address.toBase58(),
+      mapScheduleStatus(scheduleWithAddress.data.status)
+    );
+  });
+
   const [sent, received] = await Promise.all([
     program.getCommitmentProposalsForOwner(address),
     program.getCommitmentProposalsForRecipient(address),
@@ -328,6 +380,13 @@ async function fetchCommitmentsFromRpc(
 
   [...sent, ...received].forEach((proposalWithAddress) => {
     const proposal = proposalWithAddress.data;
+    const scheduleId = proposal.activatedSchedule?.toBase58() ?? null;
+    const scheduleStatus = scheduleId ? scheduleStatusById.get(scheduleId) ?? null : null;
+    const status = deriveCommitmentStatus(
+      mapCommitmentStatus(proposal.status),
+      scheduleStatus
+    );
+
     proposals.set(proposalWithAddress.address.toBase58(), {
       id: proposalWithAddress.address.toBase58(),
       owner: proposal.owner.toBase58(),
@@ -341,7 +400,7 @@ async function fetchCommitmentsFromRpc(
       ),
       memo: proposal.memo,
       noteUri: proposal.noteUri,
-      status: mapCommitmentStatus(proposal.status),
+      status,
       acceptedAt: proposal.acceptedAt
         ? toIsoDate(proposal.acceptedAt.toNumber())
         : null,
@@ -349,7 +408,8 @@ async function fetchCommitmentsFromRpc(
         ? toIsoDate(proposal.activatedAt.toNumber())
         : null,
       createdAt: toIsoDate(proposal.createdAt.toNumber()),
-      scheduleId: proposal.activatedSchedule?.toBase58() ?? null,
+      scheduleId,
+      scheduleStatus,
     });
   });
 
@@ -685,7 +745,13 @@ export async function fetchCommitmentsResilient(
     const combined = new Map<string, CommitmentProposal>();
     [...(sent.commitments || []), ...(received.commitments || [])].forEach(
       (proposal) => {
-        combined.set(proposal.id, proposal);
+        combined.set(proposal.id, {
+          ...proposal,
+          status: deriveCommitmentStatus(
+            proposal.status,
+            (proposal as CommitmentProposal).scheduleStatus ?? null
+          ),
+        });
       }
     );
 
@@ -706,6 +772,106 @@ export async function fetchCommitmentsResilient(
     const commitments = await fetchCommitmentsFromRpc(address, program);
     return {
       data: commitments,
+      source: "rpc",
+      notice: getBackendFallbackNotice(error),
+    };
+  }
+}
+
+async function fetchRequestsFromRpc(
+  address: PublicKey,
+  program: AutoSolProgram
+): Promise<PaymentRequestProposal[]> {
+  const [sent, received] = await Promise.all([
+    program.getRequestProposalsForRequester(address),
+    program.getRequestProposalsForPayer(address),
+  ]);
+
+  const requests = new Map<string, PaymentRequestProposal>();
+  [...sent, ...received].forEach((requestWithAddress) => {
+    const request = requestWithAddress.data;
+    requests.set(requestWithAddress.address.toBase58(), {
+      id: requestWithAddress.address.toBase58(),
+      requester: request.requester.toBase58(),
+      payer: request.payer.toBase58(),
+      mint: request.mint.toBase58(),
+      isSol: request.paymentType === PaymentType.Sol,
+      paymentAmount: request.paymentAmount.toNumber(),
+      paymentCount: request.scheduleTimes.length,
+      scheduleTimes: request.scheduleTimes.map((time) =>
+        toIsoDate(time.toNumber())
+      ),
+      memo: request.memo,
+      noteUri: request.noteUri,
+      status: String(request.status).toLowerCase(),
+      decisionedAt: request.decisionedAt
+        ? toIsoDate(request.decisionedAt.toNumber())
+        : null,
+      acceptedAt: request.acceptedAt
+        ? toIsoDate(request.acceptedAt.toNumber())
+        : null,
+      createdAt: toIsoDate(request.createdAt.toNumber()),
+      scheduleId: request.activatedSchedule?.toBase58() ?? null,
+      scheduleStatus: null,
+    });
+  });
+
+  return Array.from(requests.values()).sort(
+    (left, right) =>
+      new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
+  );
+}
+
+export async function fetchRequestsResilient(
+  address: PublicKey,
+  program: AutoSolProgram | null
+): Promise<ResilientResult<PaymentRequestProposal[]>> {
+  try {
+    const [sent, received] = await Promise.all([
+      fetchBackendJson<{ requests: PaymentRequestProposal[] }>(
+        `/requests/sent/${address.toBase58()}`
+      ),
+      fetchBackendJson<{ requests: PaymentRequestProposal[] }>(
+        `/requests/received/${address.toBase58()}`
+      ),
+    ]);
+
+    const combined = new Map<string, PaymentRequestProposal>();
+    [...(sent.requests || []), ...(received.requests || [])].forEach((request) => {
+      combined.set(request.id, request);
+    });
+
+    if (program) {
+      try {
+        const rpcRequests = await fetchRequestsFromRpc(address, program);
+        rpcRequests.forEach((request) => {
+          // Prefer RPC state for freshness and to surface proposals the backend has not indexed yet.
+          combined.set(request.id, {
+            ...combined.get(request.id),
+            ...request,
+          });
+        });
+      } catch {
+        // Keep backend data if the direct RPC supplement is unavailable.
+      }
+    }
+
+    return {
+      data: Array.from(combined.values()).sort(
+        (left, right) =>
+          new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
+      ),
+      source: "backend",
+      notice: null,
+    };
+  } catch (error) {
+    if (!program) {
+      throw error;
+    }
+
+    const requests = await fetchRequestsFromRpc(address, program);
+    return {
+      data: requests,
       source: "rpc",
       notice: getBackendFallbackNotice(error),
     };

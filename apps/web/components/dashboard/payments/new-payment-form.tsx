@@ -6,7 +6,6 @@ import { AnimatePresence, motion } from "framer-motion";
 import { PublicKey } from "@solana/web3.js";
 import { useProgram } from "@/hooks/use-program";
 import { AutoSolProgram } from "@/lib/program";
-import { useFeeSettings } from "@/hooks/use-fee-settings";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -33,6 +32,9 @@ export interface PaymentScheduleFormData {
     scheduleTimes: number[];
     selectedDates: Date[];
     frequency: "once" | "daily" | "weekly" | "monthly" | "custom";
+    executionHour: number;
+    executionMinute: number;
+    timezone: string;
     endDate?: Date;
     repeatCount?: number;
   };
@@ -50,7 +52,6 @@ const reveal = {
 export default function NewPaymentForm() {
   const router = useRouter();
   const { program } = useProgram();
-  const { calculateFee } = useFeeSettings();
   const wallet = useWallet();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -60,7 +61,15 @@ export default function NewPaymentForm() {
   const [formData, setFormData] = useState<PaymentScheduleFormData>({
     recipient: { address: "", name: "" },
     payment: { amount: 0, token: "So11111111111111111111111111111111111111112", memo: "", symbol: "SOL", decimals: 9 },
-    schedule: { scheduleTimes: [], selectedDates: [], frequency: "once", repeatCount: 12 },
+    schedule: {
+      scheduleTimes: [],
+      selectedDates: [],
+      frequency: "once",
+      repeatCount: 12,
+      executionHour: 9,
+      executionMinute: 0,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+    },
     workflow: { mode: "standard", noteMarkdown: "" },
   });
 
@@ -114,15 +123,16 @@ export default function NewPaymentForm() {
           ].join("\n");
 
         const noteUri = await uploadMarkdownToPinata(noteMarkdown);
-        const result = isSol
-          ? await program.createPaymentCommitmentProposal({
+        if (isSol) {
+          await program.createPaymentCommitmentProposal({
               paymentAmount: amount,
               recipientAddress: recipientPk,
               scheduleTimes: formData.schedule.scheduleTimes,
               memo: formData.payment.memo,
               noteUri,
-            })
-          : await program.createSplPaymentCommitmentProposal({
+            });
+        } else {
+          await program.createSplPaymentCommitmentProposal({
               paymentAmount: amount,
               recipientAddress: recipientPk,
               scheduleTimes: formData.schedule.scheduleTimes,
@@ -130,6 +140,7 @@ export default function NewPaymentForm() {
               noteUri,
               mint: new PublicKey(formData.payment.token),
             });
+        }
 
         toast.success("Payment commitment proposal created!");
         router.push("/dashboard/commitments");

@@ -3,7 +3,7 @@
 import { useSidebar } from "@/components/ui/sidebar";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, CalendarClock, CalendarDays, ArrowLeftRight, Plus, Zap, ShieldCheck } from "lucide-react";
+import { LayoutDashboard, CalendarClock, CalendarDays, ArrowLeftRight, Plus, Zap, ShieldCheck, ReceiptText } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -35,6 +35,7 @@ export default function DashboardSidebar() {
     { title: "Dashboard",          icon: LayoutDashboard, href: "/dashboard" },
     { title: "Payments",           icon: CalendarClock,   href: "/dashboard/payments" },
     { title: "Commitments",        icon: ShieldCheck,     href: "/dashboard/commitments" },
+    { title: "Requests",           icon: ReceiptText,     href: "/dashboard/requests" },
     { title: "Calendar",           icon: CalendarDays,    href: "/dashboard/payments/calendar" },
     { title: "Transactions",       icon: ArrowLeftRight,  href: "/dashboard/transactions" },
   ];

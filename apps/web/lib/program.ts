@@ -42,6 +42,7 @@ export interface PaymentScheduleData {
   vaultBump: number;
   schedulePolicy: SchedulePolicy;
   proposalId: PublicKey | null;
+  requestId: PublicKey | null;
 }
 
 export interface Payment {
@@ -62,6 +63,7 @@ export interface FeeSettingsData {
 
 export enum ScheduleStatus {
   Active = "Active",
+  Paused = "Paused",
   Completed = "Completed",
   Cancelled = "Cancelled",
 }
@@ -74,6 +76,7 @@ export enum PaymentType {
 export enum SchedulePolicy {
   Standard = "Standard",
   Commitment = "Commitment",
+  Request = "Request",
 }
 
 export enum PaymentCommitmentStatus {
@@ -93,6 +96,29 @@ export interface PaymentCommitmentProposalData {
   activatedAt: anchor.BN | null;
   paymentType: PaymentType;
   status: PaymentCommitmentStatus;
+  memo: string;
+  noteUri: string;
+  activatedSchedule: PublicKey | null;
+}
+
+export enum PaymentRequestStatus {
+  Proposed = "Proposed",
+  Declined = "Declined",
+  Revoked = "Revoked",
+  Accepted = "Accepted",
+}
+
+export interface PaymentRequestProposalData {
+  requester: PublicKey;
+  payer: PublicKey;
+  mint: PublicKey;
+  paymentAmount: anchor.BN;
+  scheduleTimes: anchor.BN[];
+  createdAt: anchor.BN;
+  decisionedAt: anchor.BN | null;
+  acceptedAt: anchor.BN | null;
+  paymentType: PaymentType;
+  status: PaymentRequestStatus;
   memo: string;
   noteUri: string;
   activatedSchedule: PublicKey | null;
@@ -126,6 +152,11 @@ export interface ScheduleWithAddress {
 export interface CommitmentProposalWithAddress {
   address: PublicKey;
   data: PaymentCommitmentProposalData;
+}
+
+export interface RequestProposalWithAddress {
+  address: PublicKey;
+  data: PaymentRequestProposalData;
 }
 
 export class AutoSolError extends Error {
@@ -198,6 +229,23 @@ export class AutoSolProgram {
       ],
       this.programId
     );
+  }
+
+  private getMethod(methodName: string): any {
+    const methods = (this.program as any).methods;
+    const snakeCase = methodName.replace(/[A-Z]/g, (char) => `_${char.toLowerCase()}`);
+    const method =
+      methods?.[methodName] ??
+      methods?.[snakeCase];
+
+    if (!method) {
+      throw new AutoSolError(
+        `Program method not found: ${methodName}`,
+        "PROGRAM_METHOD_NOT_FOUND"
+      );
+    }
+
+    return method.bind(methods);
   }
 
   private getVaultAuthorityPDA(
@@ -306,6 +354,7 @@ export class AutoSolProgram {
       vaultBump: schedule.vaultBump,
       schedulePolicy: this.mapSchedulePolicy(schedule.schedulePolicy),
       proposalId: schedule.proposalId ?? null,
+      requestId: schedule.requestId ?? null,
     };
   }
 
@@ -329,10 +378,12 @@ export class AutoSolProgram {
 
   private mapScheduleStatus(status: {
     active?: Record<string, never>;
+    paused?: Record<string, never>;
     completed?: Record<string, never>;
     cancelled?: Record<string, never>;
   }): ScheduleStatus {
     if (status.active) return ScheduleStatus.Active;
+    if (status.paused) return ScheduleStatus.Paused;
     if (status.completed) return ScheduleStatus.Completed;
     if (status.cancelled) return ScheduleStatus.Cancelled;
     return ScheduleStatus.Active;
@@ -349,11 +400,45 @@ export class AutoSolProgram {
   private mapSchedulePolicy(schedulePolicy: {
     standard?: Record<string, never>;
     commitment?: Record<string, never>;
+    request?: Record<string, never>;
   }): SchedulePolicy {
     if (schedulePolicy?.commitment) {
       return SchedulePolicy.Commitment;
     }
+    if (schedulePolicy?.request) {
+      return SchedulePolicy.Request;
+    }
     return SchedulePolicy.Standard;
+  }
+
+  private mapRequestStatus(status: {
+    proposed?: Record<string, never>;
+    declined?: Record<string, never>;
+    revoked?: Record<string, never>;
+    accepted?: Record<string, never>;
+  }): PaymentRequestStatus {
+    if (status?.declined) return PaymentRequestStatus.Declined;
+    if (status?.revoked) return PaymentRequestStatus.Revoked;
+    if (status?.accepted) return PaymentRequestStatus.Accepted;
+    return PaymentRequestStatus.Proposed;
+  }
+
+  private mapRequestProposalData(request: any): PaymentRequestProposalData {
+    return {
+      requester: request.requester,
+      payer: request.payer,
+      mint: request.mint,
+      paymentAmount: request.paymentAmount,
+      scheduleTimes: request.scheduleTimes,
+      createdAt: request.createdAt,
+      decisionedAt: request.decisionedAt ?? null,
+      acceptedAt: request.acceptedAt ?? null,
+      paymentType: this.mapPaymentType(request.paymentType),
+      status: this.mapRequestStatus(request.status),
+      memo: request.memo,
+      noteUri: request.noteUri,
+      activatedSchedule: request.activatedSchedule ?? null,
+    };
   }
 
   private mapCommitmentStatus(status: {
@@ -774,6 +859,152 @@ export class AutoSolProgram {
     }
   }
 
+  public async createPaymentRequestProposal(
+    params: CreateCommitmentProposalParams,
+    requestKeypair: Keypair = Keypair.generate()
+  ): Promise<{ requestAddress: PublicKey; txSignature: string }> {
+    const { paymentAmount, recipientAddress, scheduleTimes, memo, noteUri } =
+      params;
+    this.validateScheduleTimes(scheduleTimes);
+    const txSignature = await this.getMethod("createPaymentRequestProposal")(
+        new anchor.BN(paymentAmount),
+        recipientAddress,
+        scheduleTimes.map((time) => new anchor.BN(time)),
+        memo,
+        noteUri
+      )
+      .accounts({
+        paymentRequestProposal: requestKeypair.publicKey,
+        requester: this.program.provider.publicKey,
+      })
+      .signers([requestKeypair])
+      .rpc({ skipPreflight: false, maxRetries: 1, commitment: "confirmed" });
+
+    return {
+      requestAddress: requestKeypair.publicKey,
+      txSignature,
+    };
+  }
+
+  public async createSplPaymentRequestProposal(
+    params: CreateSplCommitmentProposalParams,
+    requestKeypair: Keypair = Keypair.generate()
+  ): Promise<{ requestAddress: PublicKey; txSignature: string }> {
+    const { paymentAmount, recipientAddress, scheduleTimes, memo, noteUri, mint } =
+      params;
+    this.validateScheduleTimes(scheduleTimes);
+    const txSignature = await this.getMethod("createSplPaymentRequestProposal")(
+        new anchor.BN(paymentAmount),
+        recipientAddress,
+        scheduleTimes.map((time) => new anchor.BN(time)),
+        memo,
+        noteUri
+      )
+      .accounts({
+        paymentRequestProposal: requestKeypair.publicKey,
+        requester: this.program.provider.publicKey,
+        mint,
+      })
+      .signers([requestKeypair])
+      .rpc({ skipPreflight: false, maxRetries: 1, commitment: "confirmed" });
+
+    return {
+      requestAddress: requestKeypair.publicKey,
+      txSignature,
+    };
+  }
+
+  public async declinePaymentRequestProposal(
+    requestAddress: PublicKey
+  ): Promise<string> {
+    return await this.getMethod("declinePaymentRequestProposal")()
+      .accounts({
+        paymentRequestProposal: requestAddress,
+        payer: this.program.provider.publicKey,
+      })
+      .rpc({ skipPreflight: false, maxRetries: 1, commitment: "confirmed" });
+  }
+
+  public async revokePaymentRequestProposal(
+    requestAddress: PublicKey
+  ): Promise<string> {
+    return await this.getMethod("revokePaymentRequestProposal")()
+      .accounts({
+        paymentRequestProposal: requestAddress,
+        requester: this.program.provider.publicKey,
+      })
+      .rpc({ skipPreflight: false, maxRetries: 1, commitment: "confirmed" });
+  }
+
+  public async acceptPaymentRequestProposal(
+    requestAddress: PublicKey,
+    paymentScheduleKeypair: Keypair = Keypair.generate()
+  ): Promise<{ scheduleAddress: PublicKey; txSignature: string }> {
+    const txSignature = await this.getMethod("acceptPaymentRequestProposal")()
+      .accounts({
+        paymentRequestProposal: requestAddress,
+        paymentSchedule: paymentScheduleKeypair.publicKey,
+        payer: this.program.provider.publicKey,
+      })
+      .signers([paymentScheduleKeypair])
+      .rpc({ skipPreflight: false, maxRetries: 1, commitment: "confirmed" });
+
+    return { scheduleAddress: paymentScheduleKeypair.publicKey, txSignature };
+  }
+
+  public async acceptSplPaymentRequestProposal(
+    requestAddress: PublicKey,
+    mint: PublicKey,
+    paymentScheduleKeypair: Keypair = Keypair.generate()
+  ): Promise<{ scheduleAddress: PublicKey; txSignature: string }> {
+    const payerTokenAccount = await getAssociatedTokenAddress(
+      mint,
+      this.program.provider.publicKey!
+    );
+    const [paymentVault] = this.getSplVaultPDA(paymentScheduleKeypair.publicKey, mint);
+    const [vaultAuthority] = this.getVaultAuthorityPDA(paymentScheduleKeypair.publicKey);
+    const [feeVault] = this.getSplFeeVaultPDA(mint);
+    const [feeVaultAuthority] = this.getFeeVaultAuthorityPDA(mint);
+
+    const txSignature = await this.getMethod("acceptSplPaymentRequestProposal")()
+      .accounts({
+        paymentRequestProposal: requestAddress,
+        paymentSchedule: paymentScheduleKeypair.publicKey,
+        payer: this.program.provider.publicKey,
+        payerTokenAccount,
+        paymentVault,
+        vaultAuthority,
+        feeVault,
+        feeVaultAuthority,
+        mint,
+        systemProgram: anchor.web3.SystemProgram.programId,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+      })
+      .signers([paymentScheduleKeypair])
+      .rpc({ skipPreflight: false, maxRetries: 1, commitment: "confirmed" });
+
+    return { scheduleAddress: paymentScheduleKeypair.publicKey, txSignature };
+  }
+
+  public async pausePaymentSchedule(scheduleAddress: PublicKey): Promise<string> {
+    return await this.getMethod("pausePaymentSchedule")()
+      .accounts({
+        paymentSchedule: scheduleAddress,
+        owner: this.program.provider.publicKey,
+      })
+      .rpc({ skipPreflight: false, maxRetries: 1, commitment: "confirmed" });
+  }
+
+  public async resumePaymentSchedule(scheduleAddress: PublicKey): Promise<string> {
+    return await this.getMethod("resumePaymentSchedule")()
+      .accounts({
+        paymentSchedule: scheduleAddress,
+        owner: this.program.provider.publicKey,
+      })
+      .rpc({ skipPreflight: false, maxRetries: 1, commitment: "confirmed" });
+  }
+
   // ─── Cancel SOL payment schedule ──────────────────────────────────────
 
   public async cancelPaymentSchedule(
@@ -1031,6 +1262,72 @@ export class AutoSolProgram {
     }
   }
 
+  public async getPaymentRequestProposal(
+    requestAddress: PublicKey
+  ): Promise<PaymentRequestProposalData> {
+    try {
+      const request = await (this.program.account as any).paymentRequestProposal.fetch(
+        requestAddress
+      );
+      return this.mapRequestProposalData(request);
+    } catch (error) {
+      this.logger("Error fetching payment request proposal:", error);
+      throw new AutoSolError(
+        "Failed to fetch payment request proposal",
+        "PAYMENT_REQUEST_PROPOSAL_FETCH_ERROR",
+        error as Error
+      );
+    }
+  }
+
+  public async getRequestProposalsForRequester(
+    requesterAddress: PublicKey
+  ): Promise<RequestProposalWithAddress[]> {
+    const requests = await (this.program.account as any).paymentRequestProposal.all([
+      {
+        memcmp: {
+          offset: 8,
+          bytes: requesterAddress.toBase58(),
+        },
+      },
+    ]);
+
+    return requests.map((request: any) => ({
+      address: request.publicKey,
+      data: this.mapRequestProposalData(request.account),
+    }));
+  }
+
+  public async getRequestProposalsForPayer(
+    payerAddress: PublicKey
+  ): Promise<RequestProposalWithAddress[]> {
+    let requests;
+    try {
+      requests = await (this.program.account as any).paymentRequestProposal.all([
+        {
+          memcmp: {
+            offset: 8 + 32,
+            bytes: payerAddress.toBase58(),
+          },
+        },
+      ]);
+    } catch (memcmpError) {
+      this.logger(
+        "Payer request memcmp lookup failed, falling back to full scan:",
+        memcmpError
+      );
+      const allRequests = await (this.program.account as any).paymentRequestProposal.all();
+      requests = allRequests.filter((request: any) =>
+        request.account.payer.equals(payerAddress)
+      );
+    }
+
+    return requests.map((request: any) => ({
+      address: request.publicKey,
+      data: this.mapRequestProposalData(request.account),
+    }));
+  }
+
   public async getSchedulesForRecipient(
     recipientAddress: PublicKey
   ): Promise<ScheduleWithAddress[]> {
@@ -1126,6 +1423,8 @@ export class AutoSolProgram {
         switch (schedule.data.status) {
           case ScheduleStatus.Active:
             stats.activeSchedules++;
+            break;
+          case ScheduleStatus.Paused:
             break;
           case ScheduleStatus.Completed:
             stats.completedSchedules++;

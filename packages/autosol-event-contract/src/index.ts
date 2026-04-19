@@ -39,6 +39,7 @@ const timestampSchema = z.union([
 export const PaymentScheduleCreatedEventSchema = z.object({
   schedule_id: pubkeySchema,
   proposal_id: pubkeySchema,
+  request_id: pubkeySchema,
   owner: pubkeySchema,
   recipient: pubkeySchema,
   mint: pubkeySchema,
@@ -49,6 +50,7 @@ export const PaymentScheduleCreatedEventSchema = z.object({
   created_at: timestampSchema,
   is_sol: z.boolean(),
   is_commitment: z.boolean(),
+  is_request: z.boolean(),
 });
 
 export const PaymentExecutedEventSchema = z.object({
@@ -69,6 +71,18 @@ export const PaymentScheduleCancelledEventSchema = z.object({
   refund_amount: bigintSchema,
   cancelled_at: timestampSchema,
   is_sol: z.boolean(),
+});
+
+export const PaymentSchedulePausedEventSchema = z.object({
+  schedule_id: pubkeySchema,
+  owner: pubkeySchema,
+  paused_at: timestampSchema,
+});
+
+export const PaymentScheduleResumedEventSchema = z.object({
+  schedule_id: pubkeySchema,
+  owner: pubkeySchema,
+  resumed_at: timestampSchema,
 });
 
 export const PaymentCommitmentProposedEventSchema = z.object({
@@ -98,6 +112,43 @@ export const PaymentCommitmentActivatedEventSchema = z.object({
   owner: pubkeySchema,
   recipient: pubkeySchema,
   activated_at: timestampSchema,
+  is_sol: z.boolean(),
+});
+
+export const PaymentRequestProposedEventSchema = z.object({
+  request_id: pubkeySchema,
+  requester: pubkeySchema,
+  payer: pubkeySchema,
+  mint: pubkeySchema,
+  payment_amount: bigintSchema,
+  payment_count: intSchema,
+  schedule_times: z.array(timestampSchema),
+  memo: z.string(),
+  note_uri: z.string(),
+  created_at: timestampSchema,
+  is_sol: z.boolean(),
+});
+
+export const PaymentRequestDeclinedEventSchema = z.object({
+  request_id: pubkeySchema,
+  requester: pubkeySchema,
+  payer: pubkeySchema,
+  decisioned_at: timestampSchema,
+});
+
+export const PaymentRequestRevokedEventSchema = z.object({
+  request_id: pubkeySchema,
+  requester: pubkeySchema,
+  payer: pubkeySchema,
+  decisioned_at: timestampSchema,
+});
+
+export const PaymentRequestAcceptedEventSchema = z.object({
+  request_id: pubkeySchema,
+  schedule_id: pubkeySchema,
+  requester: pubkeySchema,
+  payer: pubkeySchema,
+  accepted_at: timestampSchema,
   is_sol: z.boolean(),
 });
 
@@ -135,6 +186,12 @@ export type PaymentExecutedEvent = z.infer<typeof PaymentExecutedEventSchema>;
 export type PaymentScheduleCancelledEvent = z.infer<
   typeof PaymentScheduleCancelledEventSchema
 >;
+export type PaymentSchedulePausedEvent = z.infer<
+  typeof PaymentSchedulePausedEventSchema
+>;
+export type PaymentScheduleResumedEvent = z.infer<
+  typeof PaymentScheduleResumedEventSchema
+>;
 export type PaymentCommitmentProposedEvent = z.infer<
   typeof PaymentCommitmentProposedEventSchema
 >;
@@ -143,6 +200,18 @@ export type PaymentCommitmentAcceptedEvent = z.infer<
 >;
 export type PaymentCommitmentActivatedEvent = z.infer<
   typeof PaymentCommitmentActivatedEventSchema
+>;
+export type PaymentRequestProposedEvent = z.infer<
+  typeof PaymentRequestProposedEventSchema
+>;
+export type PaymentRequestDeclinedEvent = z.infer<
+  typeof PaymentRequestDeclinedEventSchema
+>;
+export type PaymentRequestRevokedEvent = z.infer<
+  typeof PaymentRequestRevokedEventSchema
+>;
+export type PaymentRequestAcceptedEvent = z.infer<
+  typeof PaymentRequestAcceptedEventSchema
 >;
 export type FeesWithdrawnEvent = z.infer<typeof FeesWithdrawnEventSchema>;
 export type FeePercentageUpdatedEvent = z.infer<
@@ -157,12 +226,24 @@ export function parseEventData(event: EventWrapper) {
       return PaymentExecutedEventSchema.parse(event.event_data);
     case "PaymentScheduleCancelledEvent":
       return PaymentScheduleCancelledEventSchema.parse(event.event_data);
+    case "PaymentSchedulePausedEvent":
+      return PaymentSchedulePausedEventSchema.parse(event.event_data);
+    case "PaymentScheduleResumedEvent":
+      return PaymentScheduleResumedEventSchema.parse(event.event_data);
     case "PaymentCommitmentProposedEvent":
       return PaymentCommitmentProposedEventSchema.parse(event.event_data);
     case "PaymentCommitmentAcceptedEvent":
       return PaymentCommitmentAcceptedEventSchema.parse(event.event_data);
     case "PaymentCommitmentActivatedEvent":
       return PaymentCommitmentActivatedEventSchema.parse(event.event_data);
+    case "PaymentRequestProposedEvent":
+      return PaymentRequestProposedEventSchema.parse(event.event_data);
+    case "PaymentRequestDeclinedEvent":
+      return PaymentRequestDeclinedEventSchema.parse(event.event_data);
+    case "PaymentRequestRevokedEvent":
+      return PaymentRequestRevokedEventSchema.parse(event.event_data);
+    case "PaymentRequestAcceptedEvent":
+      return PaymentRequestAcceptedEventSchema.parse(event.event_data);
     case "FeesWithdrawnEvent":
       return FeesWithdrawnEventSchema.parse(event.event_data);
     case "FeePercentageUpdatedEvent":
@@ -186,6 +267,14 @@ export function buildEventKey(event: EventWrapper): string {
       const data = PaymentScheduleCancelledEventSchema.parse(event.event_data);
       return `${event.event_type}:${event.signature}:${data.schedule_id}`;
     }
+    case "PaymentSchedulePausedEvent": {
+      const data = PaymentSchedulePausedEventSchema.parse(event.event_data);
+      return `${event.event_type}:${event.signature}:${data.schedule_id}`;
+    }
+    case "PaymentScheduleResumedEvent": {
+      const data = PaymentScheduleResumedEventSchema.parse(event.event_data);
+      return `${event.event_type}:${event.signature}:${data.schedule_id}`;
+    }
     case "PaymentCommitmentProposedEvent": {
       const data = PaymentCommitmentProposedEventSchema.parse(event.event_data);
       return `${event.event_type}:${event.signature}:${data.proposal_id}`;
@@ -197,6 +286,22 @@ export function buildEventKey(event: EventWrapper): string {
     case "PaymentCommitmentActivatedEvent": {
       const data = PaymentCommitmentActivatedEventSchema.parse(event.event_data);
       return `${event.event_type}:${event.signature}:${data.proposal_id}:${data.schedule_id}`;
+    }
+    case "PaymentRequestProposedEvent": {
+      const data = PaymentRequestProposedEventSchema.parse(event.event_data);
+      return `${event.event_type}:${event.signature}:${data.request_id}`;
+    }
+    case "PaymentRequestDeclinedEvent": {
+      const data = PaymentRequestDeclinedEventSchema.parse(event.event_data);
+      return `${event.event_type}:${event.signature}:${data.request_id}`;
+    }
+    case "PaymentRequestRevokedEvent": {
+      const data = PaymentRequestRevokedEventSchema.parse(event.event_data);
+      return `${event.event_type}:${event.signature}:${data.request_id}`;
+    }
+    case "PaymentRequestAcceptedEvent": {
+      const data = PaymentRequestAcceptedEventSchema.parse(event.event_data);
+      return `${event.event_type}:${event.signature}:${data.request_id}:${data.schedule_id}`;
     }
     case "FeesWithdrawnEvent": {
       const data = FeesWithdrawnEventSchema.parse(event.event_data);

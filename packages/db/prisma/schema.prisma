@@ -21,10 +21,12 @@ model PaymentSchedule {
   status            PaymentScheduleStatus @default(ACTIVE)
   schedulePolicy    PaymentSchedulePolicy @default(STANDARD) @map("schedule_policy")
   proposalId        String?               @unique @map("proposal_id")
+  requestId         String?               @unique @map("request_id")
   createdAt         DateTime              @map("created_at")
   updatedAt         DateTime              @updatedAt @map("updated_at")
   payments          Payment[]
   proposal          PaymentCommitmentProposal? @relation("ScheduleProposal", fields: [proposalId], references: [id])
+  request           PaymentRequestProposal? @relation("ScheduleRequest", fields: [requestId], references: [id])
 
   @@map("payment_schedules")
 }
@@ -50,6 +52,30 @@ model PaymentCommitmentProposal {
   @@map("payment_commitment_proposals")
   @@index([owner])
   @@index([recipient])
+  @@index([status])
+}
+
+model PaymentRequestProposal {
+  id                String               @id
+  requester         String
+  payer             String
+  mint              String
+  paymentAmount     BigInt               @map("payment_amount")
+  paymentCount      Int                  @map("payment_count")
+  scheduleTimes     Json                 @map("schedule_times")
+  memo              String
+  noteUri           String               @map("note_uri")
+  isSol             Boolean              @default(true) @map("is_sol")
+  status            PaymentRequestStatus @default(PROPOSED)
+  decisionedAt      DateTime?            @map("decisioned_at")
+  acceptedAt        DateTime?            @map("accepted_at")
+  createdAt         DateTime             @map("created_at")
+  updatedAt         DateTime             @updatedAt @map("updated_at")
+  activatedSchedule PaymentSchedule?     @relation("ScheduleRequest")
+
+  @@map("payment_request_proposals")
+  @@index([requester])
+  @@index([payer])
   @@index([status])
 }
 
@@ -120,6 +146,7 @@ model EventLog {
 
 enum PaymentScheduleStatus {
   ACTIVE
+  PAUSED
   COMPLETED
   CANCELLED
 }
@@ -127,12 +154,20 @@ enum PaymentScheduleStatus {
 enum PaymentSchedulePolicy {
   STANDARD
   COMMITMENT
+  REQUEST
 }
 
 enum PaymentCommitmentStatus {
   PROPOSED
   ACCEPTED
   ACTIVATED
+}
+
+enum PaymentRequestStatus {
+  PROPOSED
+  DECLINED
+  REVOKED
+  ACCEPTED
 }
 
 enum EventStatus {

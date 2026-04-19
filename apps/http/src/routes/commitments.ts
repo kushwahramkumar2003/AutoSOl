@@ -21,6 +21,7 @@ const serializeProposal = (proposal: any) => ({
   activatedAt: proposal.activatedAt?.toISOString() ?? null,
   createdAt: proposal.createdAt.toISOString(),
   scheduleId: proposal.activatedSchedule?.id ?? null,
+  scheduleStatus: proposal.activatedSchedule?.status?.toLowerCase() ?? null,
   schedulePolicy:
     proposal.activatedSchedule?.schedulePolicy.toLowerCase() ?? null,
 });

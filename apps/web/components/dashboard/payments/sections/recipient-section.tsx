@@ -12,9 +12,27 @@ interface Props {
   data: { address: string; name: string };
   updateData: (d: { address: string; name: string }) => void;
   program: AutoSolProgram | null;
+  title?: string;
+  addressPlaceholder?: string;
+  namePlaceholder?: string;
+  recentLabel?: string;
+  submitLabel?: string;
+  nextStepTokenLabel?: string;
+  nextStepScheduleLabel?: string;
 }
 
-export default function RecipientSection({ data, updateData, program }: Props) {
+export default function RecipientSection({
+  data,
+  updateData,
+  program,
+  title = "Recipient",
+  addressPlaceholder = "Solana wallet address",
+  namePlaceholder = "Label",
+  recentLabel = "Recent",
+  submitLabel = "Create Schedule",
+  nextStepTokenLabel = "Token & Amount",
+  nextStepScheduleLabel = "Schedule",
+}: Props) {
   const { publicKey } = useWallet();
   const [copied, setCopied] = useState(false);
   const [recentRecipients, setRecentRecipients] = useState<
@@ -52,7 +70,7 @@ export default function RecipientSection({ data, updateData, program }: Props) {
   return (
     <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 sm:p-5">
       <div className="mb-4 flex items-center justify-between">
-        <span className="text-xs font-medium uppercase tracking-wider text-slate-500">Recipient</span>
+        <span className="text-xs font-medium uppercase tracking-wider text-slate-500">{title}</span>
         {sectionComplete && (
           <span className="flex items-center gap-1 text-[11px] text-emerald-400">
             <CheckCircle className="h-3 w-3" /> Ready
@@ -66,7 +84,7 @@ export default function RecipientSection({ data, updateData, program }: Props) {
           <div className="group relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500 transition-colors group-focus-within:text-slate-300" />
             <Input
-              placeholder="Solana wallet address"
+              placeholder={addressPlaceholder}
               value={data.address}
               onChange={(e) => updateData({ ...data, address: e.target.value })}
               className="field-surface h-11 pl-10 pr-10 transition-colors focus:border-white/20"
@@ -78,7 +96,7 @@ export default function RecipientSection({ data, updateData, program }: Props) {
           <div className="group relative">
             <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500 transition-colors group-focus-within:text-slate-300" />
             <Input
-              placeholder="Label"
+              placeholder={namePlaceholder}
               value={data.name}
               onChange={(e) => updateData({ ...data, name: e.target.value })}
               className="field-surface h-11 pl-10 transition-colors focus:border-white/20"
@@ -100,7 +118,7 @@ export default function RecipientSection({ data, updateData, program }: Props) {
         {/* Recent recipients */}
         {recentRecipients.length > 0 && !data.address && (
           <div className="space-y-1.5">
-            <span className="text-[11px] text-slate-500">Recent</span>
+            <span className="text-[11px] text-slate-500">{recentLabel}</span>
             <div className="flex flex-wrap gap-1.5">
               {recentRecipients.map((r) => (
                 <button
@@ -121,16 +139,16 @@ export default function RecipientSection({ data, updateData, program }: Props) {
           <div className="mt-2 space-y-2 opacity-40 pointer-events-none select-none">
             <div className="flex items-center gap-2 rounded-lg bg-white/[0.02] border border-white/[0.04] px-3 py-2.5 text-xs text-slate-500">
               <Coins className="h-3.5 w-3.5" />
-              <span>Token & Amount</span>
+              <span>{nextStepTokenLabel}</span>
               <span className="ml-auto text-[10px] text-slate-600">Step 2</span>
             </div>
             <div className="flex items-center gap-2 rounded-lg bg-white/[0.02] border border-white/[0.04] px-3 py-2.5 text-xs text-slate-500">
               <Clock className="h-3.5 w-3.5" />
-              <span>Schedule</span>
+              <span>{nextStepScheduleLabel}</span>
               <span className="ml-auto text-[10px] text-slate-600">Step 3</span>
             </div>
             <Button disabled className="mt-1 w-full rounded-xl bg-primary/30 text-sm font-medium text-primary-foreground/50 h-11 cursor-not-allowed">
-              <Wallet className="mr-2 h-4 w-4" /> Create Schedule
+              <Wallet className="mr-2 h-4 w-4" /> {submitLabel}
             </Button>
           </div>
         )}

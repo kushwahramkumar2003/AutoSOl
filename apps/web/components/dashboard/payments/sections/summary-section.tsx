@@ -14,6 +14,15 @@ interface Props {
   isSubmitting?: boolean;
   error?: string | null;
   onSubmit?: () => void;
+  labels?: {
+    summaryTitle?: string;
+    counterpartyLabel?: string;
+    counterpartyValuePrefix?: string;
+    totalLabel?: string;
+    submitLabel?: string;
+    submittingLabel?: string;
+    helperText?: string | null;
+  };
   // Success mode
   isSuccess?: boolean;
   txSignature?: string | null;
@@ -21,10 +30,34 @@ interface Props {
   onDone?: () => void;
 }
 
-export default function SummarySection({ data, isSubmitting, error, onSubmit, isSuccess, txSignature, scheduleAddress, onDone }: Props) {
+export default function SummarySection({
+  data,
+  isSubmitting,
+  error,
+  onSubmit,
+  labels,
+  isSuccess,
+  txSignature,
+  scheduleAddress,
+  onDone,
+}: Props) {
   const { getFeePercentage, calculateFee } = useFeeSettings();
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const isCommitment = data.workflow.mode === "commitment";
+  const summaryTitle = labels?.summaryTitle ?? "Summary";
+  const counterpartyLabel = labels?.counterpartyLabel ?? "To";
+  const counterpartyValuePrefix = labels?.counterpartyValuePrefix ?? "";
+  const totalLabel =
+    labels?.totalLabel ?? (isCommitment ? "Activation Deposit" : "Total Locked");
+  const submitLabel =
+    labels?.submitLabel ?? (isCommitment ? "Create Commitment Proposal" : "Create Schedule");
+  const submittingLabel = labels?.submittingLabel ?? "Creating…";
+  const helperText =
+    labels?.helperText === undefined
+      ? isCommitment
+        ? "Recipient must accept this proposal before funds are locked."
+        : null
+      : labels.helperText;
 
   const fee = calculateFee(data.payment.amount);
   const perPayment = data.payment.amount + fee;
@@ -90,12 +123,14 @@ export default function SummarySection({ data, isSubmitting, error, onSubmit, is
   // ── Review + submit state ──
   return (
     <div className="rounded-xl border border-primary/10 bg-primary/[0.03] p-4 sm:p-5">
-      <div className="mb-3 text-xs font-medium uppercase tracking-wider text-slate-500">Summary</div>
+      <div className="mb-3 text-xs font-medium uppercase tracking-wider text-slate-500">{summaryTitle}</div>
 
       <div className="space-y-2.5 text-sm">
         <div className="flex items-center justify-between">
-          <span className="text-slate-400">To</span>
-          <span className="text-white">{data.recipient.name} <span className="text-xs text-slate-500">({data.recipient.address.slice(0, 4)}…{data.recipient.address.slice(-4)})</span></span>
+          <span className="text-slate-400">{counterpartyLabel}</span>
+          <span className="text-white">
+            {counterpartyValuePrefix}{data.recipient.name} <span className="text-xs text-slate-500">({data.recipient.address.slice(0, 4)}…{data.recipient.address.slice(-4)})</span>
+          </span>
         </div>
         <div className="flex items-center justify-between">
           <span className="text-slate-400">Token</span>
@@ -119,9 +154,7 @@ export default function SummarySection({ data, isSubmitting, error, onSubmit, is
           <span className="text-slate-300">{fee.toFixed(4)} {data.payment.symbol}</span>
         </div>
         <div className="flex items-center justify-between border-t border-white/[0.06] pt-2.5">
-          <span className="text-slate-400">
-            {isCommitment ? "Activation Deposit" : "Total Locked"}
-          </span>
+          <span className="text-slate-400">{totalLabel}</span>
           <div className="flex items-center gap-1.5">
             <TokenAvatar
               symbol={data.payment.symbol}
@@ -136,12 +169,11 @@ export default function SummarySection({ data, isSubmitting, error, onSubmit, is
         {data.payment.memo && (
           <div className="text-xs text-slate-500">Memo: {data.payment.memo}</div>
         )}
-        {isCommitment && (
-          <div className="text-xs text-amber-300/80">
-            Recipient must accept this proposal before funds are locked.
-          </div>
-        )}
+        {helperText && <div className="text-xs text-amber-300/80">{helperText}</div>}
         <div className="text-[11px] text-slate-500">
+          At {String(data.schedule.executionHour).padStart(2, "0")}:
+          {String(data.schedule.executionMinute).padStart(2, "0")}{" "}
+          {data.schedule.timezone} ·{" "}
           {data.schedule.selectedDates.slice(0, 3).map((d) => format(d, "MMM d")).join(", ")}
           {data.schedule.selectedDates.length > 3 && ` +${data.schedule.selectedDates.length - 3} more`}
         </div>
@@ -152,12 +184,11 @@ export default function SummarySection({ data, isSubmitting, error, onSubmit, is
       <Button onClick={onSubmit} disabled={isSubmitting} className="mt-4 w-full rounded-xl bg-primary text-sm font-medium text-primary-foreground hover:bg-primary/90 h-11">
         {isSubmitting ? (
           <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating…
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> {submittingLabel}
           </>
         ) : (
           <>
-            <Wallet className="mr-2 h-4 w-4" />{" "}
-            {isCommitment ? "Create Commitment Proposal" : "Create Schedule"}
+            <Wallet className="mr-2 h-4 w-4" /> {submitLabel}
           </>
         )}
       </Button>

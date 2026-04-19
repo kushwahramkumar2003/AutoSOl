@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { addDays, addMonths, addWeeks, format, isBefore, isSameDay, startOfDay, setHours, setMinutes } from "date-fns";
+import { addDays, addMonths, addWeeks, format, isBefore, isSameDay, startOfDay } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -14,6 +14,9 @@ interface Props {
     scheduleTimes: number[];
     selectedDates: Date[];
     frequency: "once" | "daily" | "weekly" | "monthly" | "custom";
+    executionHour: number;
+    executionMinute: number;
+    timezone: string;
     endDate?: Date;
     repeatCount?: number;
   };
@@ -29,22 +32,100 @@ const FREQ = [
 ] as const;
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
+const MINUTES = Array.from({ length: 60 }, (_, i) => i);
+
+function getTimeZoneOffsetMs(timestampMs: number, timeZone: string): number {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+
+  const parts = formatter.formatToParts(new Date(timestampMs));
+  const lookup = (type: string) =>
+    Number(parts.find((part) => part.type === type)?.value ?? "0");
+
+  const asUtc = Date.UTC(
+    lookup("year"),
+    lookup("month") - 1,
+    lookup("day"),
+    lookup("hour"),
+    lookup("minute"),
+    lookup("second")
+  );
+
+  return asUtc - timestampMs;
+}
+
+function zonedDateTimeToEpochSeconds(
+  date: Date,
+  hour: number,
+  minute: number,
+  timeZone: string
+): number {
+  const year = date.getFullYear();
+  const month = date.getMonth();
+  const day = date.getDate();
+  const wallClockMs = Date.UTC(year, month, day, hour, minute, 0);
+
+  let utcMs = wallClockMs;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const offsetMs = getTimeZoneOffsetMs(utcMs, timeZone);
+    const nextUtcMs = wallClockMs - offsetMs;
+    if (nextUtcMs === utcMs) {
+      break;
+    }
+    utcMs = nextUtcMs;
+  }
+
+  return Math.floor(utcMs / 1000);
+}
 
 export default function ScheduleSection({ data, updateData }: Props) {
   const [startDate, setStartDate] = useState<Date | undefined>(data.selectedDates[0]);
-  const [execHour, setExecHour] = useState(9); // default 9 AM
-  const [execMinute, setExecMinute] = useState(0);
+  const [supportedTimezones, setSupportedTimezones] = useState<string[]>(["UTC"]);
   const count = data.repeatCount || 12;
   const recurring = data.frequency === "daily" || data.frequency === "weekly" || data.frequency === "monthly";
 
+  useEffect(() => {
+    const resolved = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+    const supportedValuesOf = (Intl as unknown as Intl.DateTimeFormatConstructor & {
+      supportedValuesOf?: (key: "timeZone") => string[];
+    }).supportedValuesOf;
+    const list =
+      typeof supportedValuesOf === "function"
+        ? supportedValuesOf("timeZone")
+        : [resolved, "UTC"];
+    const unique = Array.from(new Set([resolved, ...list]));
+    setSupportedTimezones(unique);
+
+    if (!data.timezone) {
+      updateData({ ...data, timezone: resolved });
+    }
+  }, []);
+
   // Sync scheduleTimes with dates + time
   useEffect(() => {
-    const times = data.selectedDates.map((d) => {
-      const withTime = setMinutes(setHours(d, execHour), execMinute);
-      return Math.floor(withTime.getTime() / 1000);
-    });
+    const times = data.selectedDates.map((date) =>
+      zonedDateTimeToEpochSeconds(
+        date,
+        data.executionHour,
+        data.executionMinute,
+        data.timezone || "UTC"
+      )
+    );
     updateData({ ...data, scheduleTimes: times });
-  }, [data.selectedDates, execHour, execMinute]);
+  }, [
+    data.selectedDates,
+    data.executionHour,
+    data.executionMinute,
+    data.timezone,
+  ]);
 
   const genRecurring = (start: Date, freq: "daily" | "weekly" | "monthly") => {
     const dates: Date[] = [startOfDay(start)];
@@ -153,7 +234,12 @@ export default function ScheduleSection({ data, updateData }: Props) {
         {/* Execution time picker */}
         <div className="ml-auto flex items-center gap-2">
           <Clock className="h-3.5 w-3.5 text-slate-500" />
-          <Select value={String(execHour)} onValueChange={(v) => setExecHour(Number(v))}>
+          <Select
+            value={String(data.executionHour)}
+            onValueChange={(v) =>
+              updateData({ ...data, executionHour: Number(v) })
+            }
+          >
             <SelectTrigger className="h-8 w-[72px] border-white/[0.08] bg-white/[0.03] text-xs text-white">
               <SelectValue />
             </SelectTrigger>
@@ -165,7 +251,39 @@ export default function ScheduleSection({ data, updateData }: Props) {
               ))}
             </SelectContent>
           </Select>
-          <span className="text-[11px] text-slate-500">UTC</span>
+          <span className="text-slate-500">:</span>
+          <Select
+            value={String(data.executionMinute)}
+            onValueChange={(v) =>
+              updateData({ ...data, executionMinute: Number(v) })
+            }
+          >
+            <SelectTrigger className="h-8 w-[72px] border-white/[0.08] bg-white/[0.03] text-xs text-white">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="border-white/10 bg-[#0a0a0a] text-white max-h-48">
+              {MINUTES.map((m) => (
+                <SelectItem key={m} value={String(m)} className="text-xs">
+                  {String(m).padStart(2, "0")}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select
+            value={data.timezone || "UTC"}
+            onValueChange={(v) => updateData({ ...data, timezone: v })}
+          >
+            <SelectTrigger className="h-8 w-[220px] border-white/[0.08] bg-white/[0.03] text-xs text-white">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="border-white/10 bg-[#0a0a0a] text-white max-h-56">
+              {supportedTimezones.map((tz) => (
+                <SelectItem key={tz} value={tz} className="text-xs">
+                  {tz}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -228,7 +346,10 @@ export default function ScheduleSection({ data, updateData }: Props) {
           {/* Execution info */}
           <div className="flex items-center gap-1.5 px-1 text-[11px] text-slate-500">
             <Info className="h-3 w-3" />
-            Payments execute at {String(execHour).padStart(2, "0")}:{String(execMinute).padStart(2, "0")} UTC · {data.frequency} schedule
+            Payments execute at{" "}
+            {String(data.executionHour).padStart(2, "0")}:
+            {String(data.executionMinute).padStart(2, "0")} {data.timezone} ·{" "}
+            {data.frequency} schedule
           </div>
         </div>
       )}
