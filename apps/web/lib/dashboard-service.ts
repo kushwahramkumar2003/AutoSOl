@@ -1,4 +1,5 @@
 /*eslint no-unused-vars: "error"*/
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { AutoSolProgram, PaymentType } from "./program";
 import { PublicKey } from "@solana/web3.js";

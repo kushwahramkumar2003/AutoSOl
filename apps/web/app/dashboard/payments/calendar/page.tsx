@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   CalendarDays, ChevronLeft, ChevronRight, ExternalLink,
-  Loader2, Plus, RefreshCw, Wallet,
+  Plus, RefreshCw, Wallet,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useProgram } from "@/hooks/use-program";

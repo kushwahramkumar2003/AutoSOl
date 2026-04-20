@@ -3,17 +3,14 @@
 import DashboardHeader from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import {
-  ArrowDownRight, ArrowUpRight, Clock, Download, MoreHorizontal,
-  Search, Copy, ExternalLink, Filter, ChevronDown,
+  ArrowDownRight, ArrowUpRight, Clock, Download,
+  Search, Copy, ExternalLink, Filter,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";

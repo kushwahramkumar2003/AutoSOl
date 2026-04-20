@@ -1,20 +1,17 @@
 "use client";
 
 import React, { useState } from "react";
-import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
-import { Twitter, Github, Linkedin, Send, CheckCircle, ArrowRight } from "lucide-react";
+import { Twitter, Github, Linkedin, Send, CheckCircle } from "lucide-react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
 
 export default function Footer(): React.ReactElement {
   const [email, setEmail] = useState("");
   const [subscribed, setSubscribed] = useState(false);
   const [error, setError] = useState("");
   const currentYear = new Date().getFullYear();
-  const router = useRouter();
 
   const socialLinks = [
     { icon: Twitter, href: "#", label: "Twitter" },

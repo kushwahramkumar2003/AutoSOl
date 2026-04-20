@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Coins, DollarSign, FileText, Info, Loader2, RefreshCw } from "lucide-react";
+import { Coins, DollarSign, FileText, Loader2, RefreshCw } from "lucide-react";
 
 interface Props {
   data: { amount: number; token: string; memo: string; symbol: string; decimals: number };
@@ -18,7 +18,7 @@ export default function PaymentSection({ data, updateData }: Props) {
   const {
     availableTokens, isLoadingTokens, tokenError, inputError,
     selectedToken, handleAmountChange, getUSDValue, formatTokenAmount,
-    calculateFee, calculateTotal, getStepSize, refreshTokens,
+    calculateFee, getStepSize, refreshTokens,
   } = useFetchTokens(data, updateData);
 
   return (

@@ -3,7 +3,7 @@
 import { useSidebar } from "@/components/ui/sidebar";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, CalendarClock, CalendarDays, ArrowLeftRight, Plus, Zap, ShieldCheck, ReceiptText } from "lucide-react";
+import { LayoutDashboard, CalendarClock, CalendarDays, ArrowLeftRight, Plus, Zap, ShieldCheck, ReceiptText, Settings2, Vault } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -18,11 +18,13 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { useEffect } from "react";
+import { usePrivilegedAccess } from "@/hooks/use-privileged-access";
 
 export default function DashboardSidebar() {
   const router = useRouter();
   const pathname = usePathname();
   const { open, setOpen, isMobile } = useSidebar();
+  const { isAdmin, isFeeCollector, canInitialize } = usePrivilegedAccess();
 
   const isActive = (path: string) => pathname === path;
 
@@ -38,6 +40,12 @@ export default function DashboardSidebar() {
     { title: "Requests",           icon: ReceiptText,     href: "/dashboard/requests" },
     { title: "Calendar",           icon: CalendarDays,    href: "/dashboard/payments/calendar" },
     { title: "Transactions",       icon: ArrowLeftRight,  href: "/dashboard/transactions" },
+    ...(isAdmin || canInitialize
+      ? [{ title: "Admin", icon: Settings2, href: "/dashboard/admin" }]
+      : []),
+    ...(isFeeCollector
+      ? [{ title: "Fee Collector", icon: Vault, href: "/dashboard/fee-collector" }]
+      : []),
   ];
 
   return (

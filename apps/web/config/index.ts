@@ -5,6 +5,7 @@ import { z } from "zod";
 // In development, sensible dev-only defaults are allowed.
 
 const isProduction = process.env.NODE_ENV === "production";
+const isBuildPhase = process.env.NEXT_PHASE === "phase-production-build";
 
 // Placeholder values that must never reach production.
 const BANNED_PRODUCTION_VALUES = new Set([
@@ -15,7 +16,7 @@ const BANNED_PRODUCTION_VALUES = new Set([
 ]);
 
 function requireProductionSecret(envVar: string | undefined, name: string): string {
-  if (isProduction) {
+  if (isProduction && !isBuildPhase) {
     if (!envVar || BANNED_PRODUCTION_VALUES.has(envVar)) {
       throw new Error(
         `[AutoSOl] Missing or placeholder secret for "${name}". ` +

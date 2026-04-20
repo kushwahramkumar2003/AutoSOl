@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { idl } from "@/program/idl";
 import { AutoSol } from "@/program/types";
 import * as anchor from "@coral-xyz/anchor";
@@ -56,6 +57,7 @@ export interface Payment {
 export interface FeeSettingsData {
   authority: PublicKey;
   feePercentage: number;
+  whitelistedMints: PublicKey[];
   executorAllowedKeys: PublicKey[];
   feeCollectorAllowedKeys: PublicKey[];
   initialized: boolean;
@@ -293,6 +295,7 @@ export class AutoSolProgram {
       return {
         authority: feeSettings.authority,
         feePercentage: feeSettings.feePercentage,
+        whitelistedMints: feeSettings.whitelistedMints ?? [],
         executorAllowedKeys: feeSettings.executorAllowedKeys,
         feeCollectorAllowedKeys: feeSettings.feeCollectorAllowedKeys,
         initialized: feeSettings.initialized,
@@ -473,6 +476,128 @@ export class AutoSolProgram {
         "COST_CALCULATION_ERROR",
         error as Error
       );
+    }
+  }
+
+  public async initializeFeeSettings(): Promise<string> {
+    const txSignature = await this.getMethod("initialize")()
+      .accounts({
+        authority: this.program.provider.publicKey,
+      })
+      .rpc({ skipPreflight: false, maxRetries: 1, commitment: "confirmed" });
+
+    return txSignature;
+  }
+
+  public async addWhitelistedMint(mint: PublicKey): Promise<string> {
+    return await this.getMethod("addWhitelistedMint")(mint)
+      .accounts({
+        authority: this.program.provider.publicKey,
+      })
+      .rpc({ skipPreflight: false, maxRetries: 1, commitment: "confirmed" });
+  }
+
+  public async removeWhitelistedMint(mint: PublicKey): Promise<string> {
+    return await this.getMethod("removeWhitelistedMint")(mint)
+      .accounts({
+        authority: this.program.provider.publicKey,
+      })
+      .rpc({ skipPreflight: false, maxRetries: 1, commitment: "confirmed" });
+  }
+
+  public async addFeeCollector(feeCollector: PublicKey): Promise<string> {
+    return await this.getMethod("addFeeCollector")(feeCollector)
+      .accounts({
+        authority: this.program.provider.publicKey,
+      })
+      .rpc({ skipPreflight: false, maxRetries: 1, commitment: "confirmed" });
+  }
+
+  public async removeFeeCollector(feeCollector: PublicKey): Promise<string> {
+    return await this.getMethod("removeFeeCollector")(feeCollector)
+      .accounts({
+        authority: this.program.provider.publicKey,
+      })
+      .rpc({ skipPreflight: false, maxRetries: 1, commitment: "confirmed" });
+  }
+
+  public async updateFeePercentage(newFeePercentage: number): Promise<string> {
+    const normalizedFee = this.validateU16(newFeePercentage, "newFeePercentage");
+
+    return await this.getMethod("updateFeePercentage")(normalizedFee)
+      .accounts({
+        authority: this.program.provider.publicKey,
+      })
+      .rpc({ skipPreflight: false, maxRetries: 1, commitment: "confirmed" });
+  }
+
+  public async withdrawFees(amount: number): Promise<string> {
+    const normalizedAmount = this.toU64BN(amount, "amount");
+
+    return await this.getMethod("withdrawFees")(normalizedAmount)
+      .accounts({
+        authority: this.program.provider.publicKey,
+      })
+      .rpc({ skipPreflight: false, maxRetries: 1, commitment: "confirmed" });
+  }
+
+  public async withdrawSplFees(
+    mint: PublicKey,
+    amount: number
+  ): Promise<string> {
+    const normalizedAmount = this.toU64BN(amount, "amount");
+    const authorityTokenAccount = await getAssociatedTokenAddress(
+      mint,
+      this.program.provider.publicKey!
+    );
+    const [feeVault] = this.getSplFeeVaultPDA(mint);
+    const [feeVaultAuthority] = this.getFeeVaultAuthorityPDA(mint);
+
+    try {
+      await getAccount(this.connection, authorityTokenAccount);
+    } catch {
+      const ix = createAssociatedTokenAccountInstruction(
+        this.program.provider.publicKey!,
+        authorityTokenAccount,
+        this.program.provider.publicKey!,
+        mint,
+        TOKEN_PROGRAM_ID,
+        ASSOCIATED_TOKEN_PROGRAM_ID
+      );
+      const tx = new anchor.web3.Transaction().add(ix);
+      tx.feePayer = this.program.provider.publicKey!;
+      tx.recentBlockhash = (
+        await this.connection.getLatestBlockhash("confirmed")
+      ).blockhash;
+      await this.program.provider.sendAndConfirm!(tx, [], {
+        commitment: "confirmed",
+      });
+    }
+
+    return await this.getMethod("withdrawSplFees")(normalizedAmount)
+      .accounts({
+        authority: this.program.provider.publicKey,
+        authorityTokenAccount,
+        feeVault,
+        feeVaultAuthority,
+        mint,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .rpc({ skipPreflight: false, maxRetries: 1, commitment: "confirmed" });
+  }
+
+  public async getSolFeeVaultBalance(): Promise<number> {
+    const [feeVault] = this.getFeeVaultPDA();
+    return await this.connection.getBalance(feeVault, "confirmed");
+  }
+
+  public async getSplFeeVaultBalance(mint: PublicKey): Promise<number> {
+    const [feeVault] = this.getSplFeeVaultPDA(mint);
+    try {
+      const account = await getAccount(this.connection, feeVault);
+      return Number(account.amount);
+    } catch {
+      return 0;
     }
   }
 
@@ -1530,6 +1655,35 @@ export class AutoSolProgram {
         );
       }
     }
+  }
+
+  private toU64BN(value: number, label: string): anchor.BN {
+    if (!Number.isFinite(value) || !Number.isInteger(value) || value < 0) {
+      throw new AutoSolError(
+        `${label} must be a non-negative integer`,
+        "INVALID_NUMERIC_INPUT"
+      );
+    }
+
+    if (value > Number.MAX_SAFE_INTEGER) {
+      throw new AutoSolError(
+        `${label} exceeds JavaScript safe integer limits`,
+        "INVALID_NUMERIC_INPUT"
+      );
+    }
+
+    return new anchor.BN(value);
+  }
+
+  private validateU16(value: number, label: string): number {
+    if (!Number.isFinite(value) || !Number.isInteger(value) || value < 0 || value > 65535) {
+      throw new AutoSolError(
+        `${label} must be an integer between 0 and 65535`,
+        "INVALID_NUMERIC_INPUT"
+      );
+    }
+
+    return value;
   }
 
   private wrapTransactionError(error: unknown, defaultCode: string): AutoSolError {

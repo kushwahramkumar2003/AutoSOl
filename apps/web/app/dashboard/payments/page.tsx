@@ -4,7 +4,7 @@ import DashboardHeader from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import {
   MoreHorizontal, Plus, Search, Clock, AlertCircle, RefreshCw, Eye, Trash2,
-  Copy, ExternalLink, Pause, Play, CheckCircle, XCircle,
+  Copy, ExternalLink, Play, CheckCircle, XCircle,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
