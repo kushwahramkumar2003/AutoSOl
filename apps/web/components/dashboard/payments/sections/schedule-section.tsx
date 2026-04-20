@@ -86,6 +86,14 @@ function zonedDateTimeToEpochSeconds(
   return Math.floor(utcMs / 1000);
 }
 
+function areNumberArraysEqual(a: number[], b: number[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
+
 export default function ScheduleSection({ data, updateData }: Props) {
   const [startDate, setStartDate] = useState<Date | undefined>(data.selectedDates[0]);
   const [supportedTimezones, setSupportedTimezones] = useState<string[]>(["UTC"]);
@@ -107,7 +115,7 @@ export default function ScheduleSection({ data, updateData }: Props) {
     if (!data.timezone) {
       updateData({ ...data, timezone: resolved });
     }
-  }, []);
+  }, [data, data.timezone, updateData]);
 
   // Sync scheduleTimes with dates + time
   useEffect(() => {
@@ -119,12 +127,17 @@ export default function ScheduleSection({ data, updateData }: Props) {
         data.timezone || "UTC"
       )
     );
-    updateData({ ...data, scheduleTimes: times });
+    if (!areNumberArraysEqual(times, data.scheduleTimes)) {
+      updateData({ ...data, scheduleTimes: times });
+    }
   }, [
+    data,
     data.selectedDates,
     data.executionHour,
     data.executionMinute,
     data.timezone,
+    data.scheduleTimes,
+    updateData,
   ]);
 
   const genRecurring = (start: Date, freq: "daily" | "weekly" | "monthly") => {

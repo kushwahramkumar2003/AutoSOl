@@ -48,6 +48,14 @@ const FREQUENCY_OPTIONS = [
   { value: "custom", label: "Custom" },
 ] as const;
 
+function areNumberArraysEqual(a: number[], b: number[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
+
 export default function ScheduleStep({ data, updateData }: ScheduleStepProps) {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(
     data.selectedDates[0]
@@ -60,13 +68,17 @@ export default function ScheduleStep({ data, updateData }: ScheduleStepProps) {
     data.frequency === "monthly";
 
   useEffect(() => {
-    updateData({
-      ...data,
-      scheduleTimes: data.selectedDates.map((date) =>
-        Math.floor(date.getTime() / 1000)
-      ),
-    });
-  }, [data.selectedDates]);
+    const nextScheduleTimes = data.selectedDates.map((date) =>
+      Math.floor(date.getTime() / 1000)
+    );
+
+    if (!areNumberArraysEqual(nextScheduleTimes, data.scheduleTimes)) {
+      updateData({
+        ...data,
+        scheduleTimes: nextScheduleTimes,
+      });
+    }
+  }, [data, data.scheduleTimes, data.selectedDates, updateData]);
 
   const scheduleSummary = useMemo(() => {
     if (data.selectedDates.length === 0) {
