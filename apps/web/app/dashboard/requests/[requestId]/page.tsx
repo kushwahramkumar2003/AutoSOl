@@ -2,43 +2,53 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
+import { getAssociatedTokenAddress } from "@solana/spl-token";
 import DashboardHeader from "@/components/dashboard/header";
 import MarkdownContractPreview from "@/components/shared/markdown-contract-preview";
 import { TokenAvatar } from "@/components/shared/token-avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useProgram } from "@/hooks/use-program";
 import { toast } from "sonner";
-import { CheckCircle2, Pause, Play, XCircle } from "lucide-react";
-import { formatRawTokenAmount, getTokenLabel } from "@/lib/token-registry";
-import type { PaymentRequestProposal } from "@/lib/resilient-data";
+import { AlertCircle, CheckCircle2, Loader2, Pause, Play, XCircle } from "lucide-react";
+import {
+  formatRawTokenAmount,
+  getTokenLabel,
+} from "@/lib/token-registry";
+import {
+  fetchRequestByIdResilient,
+  type PaymentRequestProposal,
+} from "@/lib/resilient-data";
 import { PaymentRequestStatus } from "@/lib/program";
 
-function toRequestStatus(status: PaymentRequestStatus): PaymentRequestProposal["status"] {
-  switch (status) {
-    case PaymentRequestStatus.Accepted:
-      return "accepted";
-    case PaymentRequestStatus.Declined:
-      return "declined";
-    case PaymentRequestStatus.Revoked:
-      return "revoked";
-    case PaymentRequestStatus.Proposed:
-    default:
-      return "proposed";
-  }
+const PAYMENT_SCHEDULE_ACCOUNT_SPACE = 8 + 806;
+const TOKEN_ACCOUNT_SPACE = 165;
+const APPROVAL_TX_BUFFER_LAMPORTS = 50_000;
+
+interface FundingCheckState {
+  loading: boolean;
+  canFund: boolean;
+  warnings: string[];
 }
 
 export default function RequestDetailPage() {
   const params = useParams<{ requestId: string }>();
   const requestId = params?.requestId;
+  const { connection } = useConnection();
   const wallet = useWallet();
   const { program } = useProgram();
   const [request, setRequest] = useState<PaymentRequestProposal | null>(null);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
+  const [fundingCheck, setFundingCheck] = useState<FundingCheckState>({
+    loading: false,
+    canFund: true,
+    warnings: [],
+  });
 
   const fetchRequest = useCallback(async () => {
     if (!requestId) {
@@ -48,58 +58,8 @@ export default function RequestDetailPage() {
 
     setLoading(true);
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1"}/requests/${requestId}`,
-        { cache: "no-store" }
-      );
-      if (!response.ok) {
-        throw new Error(`Request fetch failed (${response.status})`);
-      }
-      const payload = (await response.json()) as { request?: PaymentRequestProposal };
-      let nextRequest = payload.request ?? null;
-
-      if (program && nextRequest) {
-        try {
-          const liveRequest = await program.getPaymentRequestProposal(
-            new PublicKey(requestId)
-          );
-
-          const liveScheduleId =
-            liveRequest.activatedSchedule?.toBase58() ?? nextRequest.scheduleId ?? null;
-
-          nextRequest = {
-            ...nextRequest,
-            requester: liveRequest.requester.toBase58(),
-            payer: liveRequest.payer.toBase58(),
-            mint: liveRequest.mint.toBase58(),
-            isSol: liveRequest.paymentType === "Sol",
-            paymentAmount: liveRequest.paymentAmount.toNumber(),
-            paymentCount: liveRequest.scheduleTimes.length,
-            scheduleTimes: liveRequest.scheduleTimes.map((time) =>
-              new Date(time.toNumber() * 1000).toISOString()
-            ),
-            memo: liveRequest.memo,
-            noteUri: liveRequest.noteUri,
-            status: toRequestStatus(liveRequest.status),
-            decisionedAt: liveRequest.decisionedAt
-              ? new Date(liveRequest.decisionedAt.toNumber() * 1000).toISOString()
-              : null,
-            acceptedAt: liveRequest.acceptedAt
-              ? new Date(liveRequest.acceptedAt.toNumber() * 1000).toISOString()
-              : null,
-            createdAt: new Date(liveRequest.createdAt.toNumber() * 1000).toISOString(),
-            scheduleId: liveScheduleId,
-            scheduleStatus:
-              liveRequest.status === PaymentRequestStatus.Accepted
-                ? nextRequest.scheduleStatus ?? "active"
-                : nextRequest.scheduleStatus ?? null,
-          };
-        } catch (liveError) {
-          console.warn("Live request fetch failed, using API payload", liveError);
-        }
-      }
-
-      setRequest(nextRequest);
+      const result = await fetchRequestByIdResilient(requestId, program);
+      setRequest(result.data);
     } catch (error) {
       console.error("Error fetching request:", error);
       toast.error("Failed to load payment request");
@@ -111,6 +71,148 @@ export default function RequestDetailPage() {
   useEffect(() => {
     void fetchRequest();
   }, [fetchRequest]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const checkFunding = async () => {
+      const walletAddress = wallet.publicKey?.toBase58();
+      if (
+        !request ||
+        !program ||
+        !wallet.publicKey ||
+        walletAddress !== request.payer ||
+        request.status !== "proposed"
+      ) {
+        if (!cancelled) {
+          setFundingCheck({
+            loading: false,
+            canFund: true,
+            warnings: [],
+          });
+        }
+        return;
+      }
+
+      if (request.paymentAmount > Number.MAX_SAFE_INTEGER / Math.max(1, request.paymentCount)) {
+        if (!cancelled) {
+          setFundingCheck({
+            loading: false,
+            canFund: false,
+            warnings: ["Request amount is too large to verify safely in the browser."],
+          });
+        }
+        return;
+      }
+
+      setFundingCheck({
+        loading: true,
+        canFund: false,
+        warnings: [],
+      });
+
+      try {
+        const paymentCount = request.paymentCount;
+        const totalAmountRaw = request.paymentAmount * paymentCount;
+        const { feeAmount, totalCost } = await program.calculateTotalCost(
+          request.paymentAmount,
+          paymentCount
+        );
+
+        const warnings: string[] = [];
+        let hasBlockingIssue = false;
+        const payerLamports = await connection.getBalance(wallet.publicKey, "confirmed");
+        const scheduleRent = await connection.getMinimumBalanceForRentExemption(
+          PAYMENT_SCHEDULE_ACCOUNT_SPACE
+        );
+
+        if (request.isSol) {
+          const solVaultRent = await connection.getMinimumBalanceForRentExemption(0);
+          const requiredLamports =
+            totalCost + scheduleRent + solVaultRent + APPROVAL_TX_BUFFER_LAMPORTS;
+
+          if (payerLamports < requiredLamports) {
+            hasBlockingIssue = true;
+            warnings.push(
+              `You need about ${formatRawTokenAmount(requiredLamports, request.mint, true)} SOL to approve this request, including schedule rent and fees. Your wallet currently has ${formatRawTokenAmount(payerLamports, request.mint, true)} SOL.`
+            );
+          }
+        } else {
+          const mint = new PublicKey(request.mint);
+          const payerTokenAccount = await getAssociatedTokenAddress(mint, wallet.publicKey);
+          const payerTokenBalance = await connection
+            .getTokenAccountBalance(payerTokenAccount, "confirmed")
+            .catch(() => null);
+          const payerTokenRaw = payerTokenBalance
+            ? Number.parseInt(payerTokenBalance.value.amount, 10)
+            : 0;
+
+          if (!payerTokenBalance) {
+            hasBlockingIssue = true;
+            warnings.push(
+              `Your wallet does not have an associated ${getTokenLabel(request.mint, false)} token account on this network.`
+            );
+          } else if (payerTokenRaw < totalCost) {
+            hasBlockingIssue = true;
+            warnings.push(
+              `You need ${formatRawTokenAmount(totalCost, request.mint, false)} ${getTokenLabel(request.mint, false)} to approve this request, but only ${formatRawTokenAmount(payerTokenRaw, request.mint, false)} is available.`
+            );
+          }
+
+          const paymentVaultRent = await connection.getMinimumBalanceForRentExemption(
+            TOKEN_ACCOUNT_SPACE
+          );
+          const feeVaultRent = await connection.getMinimumBalanceForRentExemption(
+            TOKEN_ACCOUNT_SPACE
+          );
+          const requiredLamports =
+            scheduleRent +
+            paymentVaultRent +
+            feeVaultRent +
+            APPROVAL_TX_BUFFER_LAMPORTS;
+
+          if (payerLamports < requiredLamports) {
+            hasBlockingIssue = true;
+            warnings.push(
+              `You need about ${formatRawTokenAmount(requiredLamports, request.mint, true)} SOL for schedule rent, token vault setup, and transaction fees. Your wallet currently has ${formatRawTokenAmount(payerLamports, request.mint, true)} SOL.`
+            );
+          }
+
+          if (feeAmount > 0) {
+            warnings.push(
+              `Approval will lock ${formatRawTokenAmount(totalAmountRaw, request.mint, false)} ${getTokenLabel(request.mint, false)} for payouts and route ${formatRawTokenAmount(feeAmount, request.mint, false)} ${getTokenLabel(request.mint, false)} to platform fees.`
+            );
+          }
+        }
+
+        if (!cancelled) {
+          setFundingCheck({
+            loading: false,
+            canFund: !hasBlockingIssue,
+            warnings,
+          });
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setFundingCheck({
+            loading: false,
+            canFund: false,
+            warnings: [
+              error instanceof Error
+                ? `Unable to verify approval funding right now: ${error.message}`
+                : "Unable to verify approval funding right now.",
+            ],
+          });
+        }
+      }
+    };
+
+    void checkFunding();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [connection, program, request, wallet.publicKey]);
 
   const handleAccept = async () => {
     if (!program || !requestId || !request) return;
@@ -215,7 +317,12 @@ export default function RequestDetailPage() {
   const canRevoke = request && walletAddress === request.requester && request.status === "proposed";
   const canPause = request && walletAddress === request.payer && request.scheduleStatus === "active";
   const canResume = request && walletAddress === request.payer && request.scheduleStatus === "paused";
-  const canCancel = request && walletAddress === request.payer && request.scheduleStatus && ["active", "paused"].includes(request.scheduleStatus);
+  const canCancel = Boolean(
+    request &&
+      walletAddress === request.payer &&
+      request.scheduleStatus &&
+      ["active", "paused"].includes(request.scheduleStatus)
+  );
 
   const tokenLabel = request ? getTokenLabel(request.mint, request.isSol) : "";
   const paymentAmountUi = request
@@ -243,6 +350,9 @@ export default function RequestDetailPage() {
         request.isSol
       )
     : null;
+  const approvalBlocked = Boolean(
+    canAccept && (!fundingCheck.canFund || fundingCheck.loading)
+  );
 
   return (
     <div className="app-shell flex min-h-screen flex-col">
@@ -294,6 +404,38 @@ export default function RequestDetailPage() {
               className="mt-6"
             />
 
+            {canAccept && (fundingCheck.loading || fundingCheck.warnings.length > 0) ? (
+              <Alert
+                className={`mt-6 border-white/[0.08] ${
+                  fundingCheck.canFund
+                    ? "bg-white/[0.02] text-slate-200"
+                    : "border-amber-500/30 bg-amber-500/10 text-amber-50"
+                } [&>svg]:text-current`}
+              >
+                {fundingCheck.loading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <AlertCircle className="h-4 w-4" />
+                )}
+                <AlertTitle>
+                  {fundingCheck.loading
+                    ? "Checking payer funding requirements"
+                    : fundingCheck.canFund
+                      ? "Approval cost preview"
+                      : "Approval is blocked"}
+                </AlertTitle>
+                <AlertDescription>
+                  <div className="space-y-1">
+                    {fundingCheck.loading ? (
+                      <p>Verifying token balances, schedule rent, and setup costs before approval.</p>
+                    ) : (
+                      fundingCheck.warnings.map((warning) => <p key={warning}>{warning}</p>)
+                    )}
+                  </div>
+                </AlertDescription>
+              </Alert>
+            ) : null}
+
             <div className="mt-6 rounded-2xl border border-white/[0.06] bg-white/[0.015] p-4 sm:p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
@@ -342,9 +484,13 @@ export default function RequestDetailPage() {
 
             <div className="mt-6 flex flex-wrap gap-2">
               {canAccept && (
-                <Button className="rounded-xl" disabled={working} onClick={() => void handleAccept()}>
+                <Button
+                  className="rounded-xl"
+                  disabled={working || approvalBlocked}
+                  onClick={() => void handleAccept()}
+                >
                   <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
-                  Approve & Fund
+                  {fundingCheck.loading ? "Checking funding…" : "Approve & Fund"}
                 </Button>
               )}
               {canDecline && (

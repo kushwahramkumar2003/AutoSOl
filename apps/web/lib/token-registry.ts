@@ -6,6 +6,14 @@ export interface KnownToken {
   logoURI: string | null;
 }
 
+export interface TokenRegistryOption {
+  symbol: string;
+  name: string;
+  decimals: number;
+  mintAddress: string;
+  logoURI: string | null;
+}
+
 export const SOL_NATIVE_MINT = "11111111111111111111111111111111";
 export const WRAPPED_SOL_MINT = "So11111111111111111111111111111111111111112";
 
@@ -96,6 +104,40 @@ export function getKnownTokenByMint(mint: string): KnownToken | undefined {
 
 export function getKnownTokenBySymbol(symbol: string): KnownToken | undefined {
   return KNOWN_TOKENS_BY_SYMBOL.get(symbol.toUpperCase());
+}
+
+export function getAllKnownTokens(): KnownToken[] {
+  return [...KNOWN_TOKENS];
+}
+
+function prefersDevnetMint(rpcEndpoint?: string): boolean {
+  if (!rpcEndpoint) {
+    return false;
+  }
+
+  const normalized = rpcEndpoint.toLowerCase();
+  return normalized.includes("devnet");
+}
+
+export function getPopularTokenOptions(
+  rpcEndpoint?: string
+): TokenRegistryOption[] {
+  const useDevnetPreference = prefersDevnetMint(rpcEndpoint);
+
+  return KNOWN_TOKENS.map((token) => {
+    const preferredMint =
+      useDevnetPreference && token.symbol === "USDC" && token.mintAddresses[1]
+        ? token.mintAddresses[1]
+        : token.mintAddresses[0];
+
+    return {
+      symbol: token.symbol,
+      name: token.name,
+      decimals: token.decimals,
+      mintAddress: preferredMint,
+      logoURI: token.logoURI,
+    };
+  });
 }
 
 export function getTokenLabel(mint: string, isSol: boolean = false): string {

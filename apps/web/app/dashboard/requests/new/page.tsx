@@ -6,7 +6,7 @@ import { PublicKey } from "@solana/web3.js";
 import { useWallet } from "@solana/wallet-adapter-react";
 import DashboardHeader from "@/components/dashboard/header";
 import RecipientSection from "@/components/dashboard/payments/sections/recipient-section";
-import PaymentSection from "@/components/dashboard/payments/sections/payment-section";
+import RequestPaymentSection from "@/components/dashboard/requests/request-payment-section";
 import ScheduleSection from "@/components/dashboard/payments/sections/schedule-section";
 import SummarySection from "@/components/dashboard/payments/sections/summary-section";
 import { useProgram } from "@/hooks/use-program";
@@ -175,7 +175,7 @@ export default function NewRequestPage() {
           />
 
           {recipientValid && (
-            <PaymentSection
+            <RequestPaymentSection
               data={formData.payment}
               updateData={(d) => update({ payment: d })}
             />

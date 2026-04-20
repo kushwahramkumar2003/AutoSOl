@@ -782,6 +782,18 @@ async function fetchRequestsFromRpc(
   address: PublicKey,
   program: AutoSolProgram
 ): Promise<PaymentRequestProposal[]> {
+  const { ownerSchedules, recipientSchedules } = await getScheduleContext(
+    address,
+    program
+  );
+  const scheduleStatusById = new Map<string, string>();
+  [...ownerSchedules, ...recipientSchedules].forEach((scheduleWithAddress) => {
+    scheduleStatusById.set(
+      scheduleWithAddress.address.toBase58(),
+      mapScheduleStatus(scheduleWithAddress.data.status)
+    );
+  });
+
   const [sent, received] = await Promise.all([
     program.getRequestProposalsForRequester(address),
     program.getRequestProposalsForPayer(address),
@@ -790,6 +802,7 @@ async function fetchRequestsFromRpc(
   const requests = new Map<string, PaymentRequestProposal>();
   [...sent, ...received].forEach((requestWithAddress) => {
     const request = requestWithAddress.data;
+    const scheduleId = request.activatedSchedule?.toBase58() ?? null;
     requests.set(requestWithAddress.address.toBase58(), {
       id: requestWithAddress.address.toBase58(),
       requester: request.requester.toBase58(),
@@ -811,8 +824,8 @@ async function fetchRequestsFromRpc(
         ? toIsoDate(request.acceptedAt.toNumber())
         : null,
       createdAt: toIsoDate(request.createdAt.toNumber()),
-      scheduleId: request.activatedSchedule?.toBase58() ?? null,
-      scheduleStatus: null,
+      scheduleId,
+      scheduleStatus: scheduleId ? scheduleStatusById.get(scheduleId) ?? null : null,
     });
   });
 
@@ -875,5 +888,140 @@ export async function fetchRequestsResilient(
       source: "rpc",
       notice: getBackendFallbackNotice(error),
     };
+  }
+}
+
+export async function fetchRequestByIdResilient(
+  requestId: string,
+  program: AutoSolProgram | null
+): Promise<ResilientResult<PaymentRequestProposal | null>> {
+  try {
+    const payload = await fetchBackendJson<{ request?: PaymentRequestProposal }>(
+      `/requests/${requestId}`
+    );
+
+    let request = payload.request ?? null;
+
+    if (program) {
+      try {
+        const liveRequest = await program.getPaymentRequestProposal(
+          new PublicKey(requestId)
+        );
+
+        let scheduleStatus = request?.scheduleStatus ?? null;
+        const scheduleId =
+          liveRequest.activatedSchedule?.toBase58() ?? request?.scheduleId ?? null;
+
+        if (scheduleId) {
+          try {
+            const liveSchedule = await program.getPaymentSchedule(
+              new PublicKey(scheduleId)
+            );
+            scheduleStatus = mapScheduleStatus(liveSchedule.status);
+          } catch {
+            // Keep existing schedule status if schedule fetch fails.
+          }
+        }
+
+        request = {
+          id: request?.id ?? requestId,
+          requester: liveRequest.requester.toBase58(),
+          payer: liveRequest.payer.toBase58(),
+          mint: liveRequest.mint.toBase58(),
+          isSol: liveRequest.paymentType === PaymentType.Sol,
+          paymentAmount: liveRequest.paymentAmount.toNumber(),
+          paymentCount: liveRequest.scheduleTimes.length,
+          scheduleTimes: liveRequest.scheduleTimes.map((time) =>
+            toIsoDate(time.toNumber())
+          ),
+          memo: liveRequest.memo,
+          noteUri: liveRequest.noteUri,
+          status: String(liveRequest.status).toLowerCase(),
+          decisionedAt: liveRequest.decisionedAt
+            ? toIsoDate(liveRequest.decisionedAt.toNumber())
+            : null,
+          acceptedAt: liveRequest.acceptedAt
+            ? toIsoDate(liveRequest.acceptedAt.toNumber())
+            : null,
+          createdAt: toIsoDate(liveRequest.createdAt.toNumber()),
+          scheduleId,
+          scheduleStatus,
+        };
+      } catch {
+        // Keep backend request when direct RPC is unavailable.
+      }
+    }
+
+    return {
+      data: request,
+      source: "backend",
+      notice: null,
+    };
+  } catch (error) {
+    if (!program) {
+      throw error;
+    }
+
+    try {
+      const liveRequest = await program.getPaymentRequestProposal(
+        new PublicKey(requestId)
+      );
+
+      const scheduleId = liveRequest.activatedSchedule?.toBase58() ?? null;
+      let scheduleStatus: string | null = null;
+
+      if (scheduleId) {
+        try {
+          const liveSchedule = await program.getPaymentSchedule(
+            new PublicKey(scheduleId)
+          );
+          scheduleStatus = mapScheduleStatus(liveSchedule.status);
+        } catch {
+          scheduleStatus = null;
+        }
+      }
+
+      return {
+        data: {
+          id: requestId,
+          requester: liveRequest.requester.toBase58(),
+          payer: liveRequest.payer.toBase58(),
+          mint: liveRequest.mint.toBase58(),
+          isSol: liveRequest.paymentType === PaymentType.Sol,
+          paymentAmount: liveRequest.paymentAmount.toNumber(),
+          paymentCount: liveRequest.scheduleTimes.length,
+          scheduleTimes: liveRequest.scheduleTimes.map((time) =>
+            toIsoDate(time.toNumber())
+          ),
+          memo: liveRequest.memo,
+          noteUri: liveRequest.noteUri,
+          status: String(liveRequest.status).toLowerCase(),
+          decisionedAt: liveRequest.decisionedAt
+            ? toIsoDate(liveRequest.decisionedAt.toNumber())
+            : null,
+          acceptedAt: liveRequest.acceptedAt
+            ? toIsoDate(liveRequest.acceptedAt.toNumber())
+            : null,
+          createdAt: toIsoDate(liveRequest.createdAt.toNumber()),
+          scheduleId,
+          scheduleStatus,
+        },
+        source: "rpc",
+        notice: getBackendFallbackNotice(error),
+      };
+    } catch (rpcError) {
+      if (
+        error instanceof Error &&
+        error.message.includes("404")
+      ) {
+        return {
+          data: null,
+          source: "backend",
+          notice: null,
+        };
+      }
+
+      throw rpcError;
+    }
   }
 }
