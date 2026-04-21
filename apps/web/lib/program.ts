@@ -531,6 +531,22 @@ export class AutoSolProgram {
       .rpc({ skipPreflight: false, maxRetries: 1, commitment: "confirmed" });
   }
 
+  public async addExecutor(executor: PublicKey): Promise<string> {
+    return await this.getMethod("addExecutor")(executor)
+      .accounts({
+        authority: this.program.provider.publicKey,
+      })
+      .rpc({ skipPreflight: false, maxRetries: 1, commitment: "confirmed" });
+  }
+
+  public async removeExecutor(executor: PublicKey): Promise<string> {
+    return await this.getMethod("removeExecutor")(executor)
+      .accounts({
+        authority: this.program.provider.publicKey,
+      })
+      .rpc({ skipPreflight: false, maxRetries: 1, commitment: "confirmed" });
+  }
+
   public async withdrawFees(amount: number): Promise<string> {
     const normalizedAmount = this.toU64BN(amount, "amount");
 

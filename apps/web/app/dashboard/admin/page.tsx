@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
-import { RefreshCw, ShieldCheck, Settings2, UserPlus2, WalletCards } from "lucide-react";
+import { RefreshCw, ServerCog, ShieldCheck, Settings2, UserPlus2, WalletCards } from "lucide-react";
 import DashboardHeader from "@/components/dashboard/header";
 import { AccessGuard } from "@/components/dashboard/admin/access-guard";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -41,6 +41,7 @@ export default function AdminPage() {
   const [workingAction, setWorkingAction] = useState<string | null>(null);
   const [solFeeVaultBalance, setSolFeeVaultBalance] = useState<number | null>(null);
   const [nextFeePercentage, setNextFeePercentage] = useState<string>("1");
+  const [executorAddress, setExecutorAddress] = useState("");
   const [feeCollectorAddress, setFeeCollectorAddress] = useState("");
   const [whitelistMint, setWhitelistMint] = useState("");
 
@@ -74,6 +75,10 @@ export default function AdminPage() {
   );
   const feeCollectors = useMemo(
     () => feeSettings?.feeCollectorAllowedKeys.map((key) => key.toBase58()) ?? [],
+    [feeSettings]
+  );
+  const executors = useMemo(
+    () => feeSettings?.executorAllowedKeys.map((key) => key.toBase58()) ?? [],
     [feeSettings]
   );
 
@@ -131,6 +136,26 @@ export default function AdminPage() {
     });
   };
 
+  const handleAddExecutor = async () => {
+    if (!program) return;
+    const address = parseAddress(executorAddress, "executor wallet");
+    await runAction("executor-add", async () => {
+      await program.addExecutor(address);
+      setExecutorAddress("");
+      toast.success("Executor added");
+      window.location.reload();
+    });
+  };
+
+  const handleRemoveExecutor = async (address: string) => {
+    if (!program) return;
+    await runAction(`executor-remove-${address}`, async () => {
+      await program.removeExecutor(new PublicKey(address));
+      toast.success("Executor removed");
+      window.location.reload();
+    });
+  };
+
   const handleAddWhitelist = async () => {
     if (!program) return;
     const mint = parseAddress(whitelistMint, "mint");
@@ -162,7 +187,7 @@ export default function AdminPage() {
           <div>
             <h1 className="text-xl font-semibold text-white">Admin Console</h1>
             <p className="mt-1 text-sm text-slate-400">
-              Authority-only controls for initialization, fee policy, fee-collector allowlist, and mint whitelist.
+              Authority-only controls for initialization, fee policy, executor allowlist, fee-collector allowlist, and mint whitelist.
             </p>
           </div>
           <Button
@@ -201,7 +226,7 @@ export default function AdminPage() {
           title="Admin access denied"
           description={`This route currently requires either the on-chain authority wallet or the env-configured admin wallet. Current on-chain authority: ${feeSettings?.authority.toBase58() ?? "unknown"}. Env admin: ${configuredAdminWallet ?? "not set"}. Executor role is separate and does not grant admin access.`}
         >
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5">
               <div className="text-xs uppercase tracking-wider text-slate-500">Program State</div>
               <div className="mt-3 text-lg font-semibold text-white">{initialized ? "Initialized" : "Not initialized"}</div>
@@ -216,6 +241,11 @@ export default function AdminPage() {
               <div className="text-xs uppercase tracking-wider text-slate-500">Fee Collectors</div>
               <div className="mt-3 text-lg font-semibold text-white">{feeCollectors.length}</div>
               <div className="mt-1 text-xs text-slate-400">Allowlisted withdrawal wallets.</div>
+            </div>
+            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5">
+              <div className="text-xs uppercase tracking-wider text-slate-500">Executors</div>
+              <div className="mt-3 text-lg font-semibold text-white">{executors.length}</div>
+              <div className="mt-1 text-xs text-slate-400">Wallets allowed to execute due payments.</div>
             </div>
             <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5">
               <div className="text-xs uppercase tracking-wider text-slate-500">SOL Fee Vault</div>
@@ -254,11 +284,11 @@ export default function AdminPage() {
                   <div className="mt-1 text-sm text-slate-400">
                     Simulation preview: update platform fee from {currentFeePercent.toFixed(2)}% to {(nextFeeBps / 100).toFixed(2)}%.
                   </div>
-                  <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-                    <Input
-                      value={nextFeePercentage}
-                      onChange={(event) => setNextFeePercentage(event.target.value)}
-                      placeholder="1.00"
+              <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                  <Input
+                    value={nextFeePercentage}
+                    onChange={(event) => setNextFeePercentage(event.target.value)}
+                    placeholder="1.00"
                       className="field-surface h-11"
                     />
                     <Button
@@ -270,6 +300,53 @@ export default function AdminPage() {
                     </Button>
                   </div>
                   <div className="mt-2 text-xs text-slate-500">Input is percentage, not basis points.</div>
+                </div>
+
+                <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5">
+                  <div className="flex items-center gap-2 text-sm font-medium text-white">
+                    <ServerCog className="h-4 w-4" /> Executor Allowlist
+                  </div>
+                  <div className="mt-1 text-sm text-slate-400">
+                    Simulation preview: add or remove wallets allowed to submit execution transactions. The EC2 executor must run with the private key for one of these public keys.
+                  </div>
+                  <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                    <Input
+                      value={executorAddress}
+                      onChange={(event) => setExecutorAddress(event.target.value)}
+                      placeholder="Executor wallet public key"
+                      className="field-surface h-11"
+                    />
+                    <Button
+                      className="rounded-xl"
+                      disabled={(!isAdmin || !onChainAdmin) || workingAction === "executor-add"}
+                      onClick={() => void handleAddExecutor()}
+                    >
+                      Add Executor
+                    </Button>
+                  </div>
+                  <div className="mt-2 text-xs text-slate-500">
+                    Only the on-chain authority wallet can change this. Allowlisting a public key here does not deploy the executor; it only authorizes that wallet on-chain.
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {executors.length === 0 ? (
+                      <div className="text-sm text-slate-500">No executors allowlisted.</div>
+                    ) : (
+                      executors.map((address) => (
+                        <div key={address} className="flex items-center gap-2 rounded-xl border border-white/[0.06] bg-black/20 px-3 py-2 text-xs text-slate-300">
+                          <span>{address}</span>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 rounded-lg border-red-500/30 px-2 text-red-300"
+                            disabled={(!isAdmin || !onChainAdmin) || workingAction === `executor-remove-${address}`}
+                            onClick={() => void handleRemoveExecutor(address)}
+                          >
+                            Remove
+                          </Button>
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
 
                 <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5">
