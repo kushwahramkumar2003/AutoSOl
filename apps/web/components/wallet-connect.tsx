@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo } from "react";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { useState, useCallback, useEffect } from "react";
+import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
-import { PublicKey, Connection } from "@solana/web3.js";
+import { PublicKey } from "@solana/web3.js";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -37,10 +37,10 @@ import {
   Coins,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import config from "@/config";
 import { useProgram } from "@/hooks/use-program";
+import { useNetworkConfig } from "@/lib/network-config";
+import type { NetworkType } from "@/lib/network-config";
 
-export type NetworkType = "mainnet-beta" | "devnet" | "testnet" | "localnet";
 
 export interface WalletConnectProps {
   network?: NetworkType;
@@ -119,7 +119,7 @@ const formatBalance = (balance: number): string => {
 };
 
 export function WalletConnect({
-  network = config.rpcEndpoint === "http://127.0.0.1:8899" ? "localnet" : "devnet",
+  network: networkProp,
   allowNetworkChange = true,
   showBalance = true,
   buttonSize = "sm",
@@ -134,6 +134,8 @@ export function WalletConnect({
   maxHistoryItems = 5,
 }: WalletConnectProps) {
   const { publicKey, disconnect, connected, wallet, connecting } = useWallet();
+  const { connection } = useConnection();
+  const { network: activeNetwork, setNetwork } = useNetworkConfig();
   const { program } = useProgram();
   const [isWalletDialogOpen, setIsWalletDialogOpen] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
@@ -145,11 +147,7 @@ export function WalletConnect({
   const [txLoading, setTxLoading] = useState(false);
   const [txError, setTxError] = useState<string | null>(null);
 
-  // Use a single Connection instance from config
-  const connection = useMemo(
-    () => new Connection(config.rpcEndpoint, "confirmed"),
-    []
-  );
+  const network = networkProp ?? activeNetwork;
 
   // Fetch balance when connected
   useEffect(() => {
@@ -294,6 +292,7 @@ export function WalletConnect({
   }, [publicKey, network]);
 
   const switchNetwork = (newNetwork: NetworkType) => {
+    setNetwork(newNetwork);
     toast.success(`Network switched to ${newNetwork}`, {
       description: `You are now connected to ${newNetwork}`,
       icon: <Network className="h-4 w-4" />,

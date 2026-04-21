@@ -45,7 +45,10 @@ function requireProductionSecret(envVar: string | undefined, name: string): stri
 // ── Config object ──────────────────────────────────────────────────────────
 
 export const config = {
-  rpcEndpoint: process.env.RPC_URL ?? "http://127.0.0.1:8899",
+  rpcEndpoint:
+    process.env.NEXT_PUBLIC_RPC_URL ??
+    process.env.RPC_URL ??
+    (isProduction ? "https://api.devnet.solana.com" : "http://127.0.0.1:8899"),
 
   nextAuthSecret: requireProductionSecret(
     process.env.NEXTAUTH_SECRET ?? "next-auth-secret",
