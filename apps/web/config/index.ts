@@ -6,6 +6,7 @@ import { z } from "zod";
 
 const isProduction = process.env.NODE_ENV === "production";
 const isBuildPhase = process.env.NEXT_PHASE === "phase-production-build";
+const isServerRuntime = typeof window === "undefined";
 
 // Placeholder values that must never reach production.
 const BANNED_PRODUCTION_VALUES = new Set([
@@ -16,6 +17,11 @@ const BANNED_PRODUCTION_VALUES = new Set([
 ]);
 
 function requireProductionSecret(envVar: string | undefined, name: string): string {
+  if (!isServerRuntime) {
+    // Never enforce server secrets in browser/client bundles.
+    return envVar ?? "";
+  }
+
   if (isProduction && !isBuildPhase) {
     if (!envVar || BANNED_PRODUCTION_VALUES.has(envVar)) {
       throw new Error(

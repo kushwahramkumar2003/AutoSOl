@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
-import configs from "./config";
 
 export async function middleware(req: NextRequest) {
-  const token = await getToken({ req, secret: configs.nextAuthSecret });
   const { pathname } = req.nextUrl;
 
   // SEC-002: Only explicitly listed routes are public.
@@ -26,8 +24,22 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  if (token) {
-    return NextResponse.next();
+  const nextAuthSecret = process.env.NEXTAUTH_SECRET;
+  if (!nextAuthSecret) {
+    // Avoid edge-runtime crashes when env is misconfigured.
+    // Protected routes are redirected to /auth instead of throwing.
+    const loginUrl = new URL("/auth", req.url);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  try {
+    const token = await getToken({ req, secret: nextAuthSecret });
+    if (token) {
+      return NextResponse.next();
+    }
+  } catch (error) {
+    // Edge middleware must not throw or Vercel returns MIDDLEWARE_INVOCATION_FAILED.
+    console.error("[middleware] token decode failed:", error);
   }
 
   const loginUrl = new URL("/auth", req.url);
