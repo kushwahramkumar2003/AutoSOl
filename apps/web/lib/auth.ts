@@ -4,7 +4,6 @@ import z from "zod";
 import nacl from "tweetnacl";
 import { PublicKey } from "@solana/web3.js";
 import bs58 from "bs58";
-import config from "@/config";
 // Import the nonce store shared with the challenge endpoint.
 // The nonce is consumed (deleted) after a single successful verify,
 // preventing replay attacks (SEC-001).
@@ -15,6 +14,17 @@ const SigninSchema = z.object({
   signature: z.string(),
   nonce: z.string(),
 });
+
+const authTokenExpirationTime =
+  z.coerce.number().optional().parse(process.env.AUTH_TOKEN_EXPIRATION_TIME) ??
+  60 * 60 * 24 * 7;
+
+const nextAuthSecret = process.env.NEXTAUTH_SECRET;
+if (process.env.NODE_ENV === "production" && !nextAuthSecret) {
+  throw new Error(
+    '[AutoSOl] NEXTAUTH_SECRET is required in production for NextAuth.'
+  );
+}
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -117,10 +127,7 @@ export const authOptions: NextAuthOptions = {
   },
   session: {
     strategy: "jwt",
-    maxAge:
-      typeof config?.authTokenExpirationTime === "number"
-        ? config.authTokenExpirationTime
-        : 60 * 60 * 24 * 7, // 7 days
+    maxAge: authTokenExpirationTime,
   },
-  secret: config.nextAuthSecret,
+  secret: nextAuthSecret,
 };
