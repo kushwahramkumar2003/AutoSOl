@@ -1,14 +1,20 @@
 "use client";
 
-import { useState } from "react";
-import { signIn } from "next-auth/react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { PublicKey } from "@solana/web3.js";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
+import {
+  ArrowRight,
+  ExternalLink,
+  Lock,
+  ShieldCheck,
+  Wallet as WalletIcon,
+} from "lucide-react";
+import { toast } from "sonner";
 import { WalletConnect } from "@/components/wallet-connect";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
-import bs58 from "bs58";
 import {
   Card,
   CardContent,
@@ -17,16 +23,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  ArrowRight,
-  ShieldCheck,
-  Wallet as WalletIcon,
-  Fingerprint,
-  Lock,
-  ExternalLink,
-} from "lucide-react";
 
-// Animated background blob component
 const AnimatedBackground = () => {
   return (
     <div className="fixed inset-0 overflow-hidden -z-10">
@@ -66,57 +63,12 @@ const AnimatedBackground = () => {
   );
 };
 
-// Animated floating objects
-const FloatingElements = () => {
-  return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none">
-      {[
-        { icon: <WalletIcon size={18} />, delay: 0 },
-        { icon: <ShieldCheck size={18} />, delay: 1 },
-        { icon: <Fingerprint size={18} />, delay: 2 },
-      ].map((item, index) => (
-        <motion.div
-          key={index}
-          className="absolute text-primary/40"
-          initial={{
-            x: `${Math.random() * 100}%`,
-            y: `${Math.random() * 100}%`,
-            opacity: 0,
-          }}
-          animate={{
-            y: [
-              `${Math.random() * 100}%`,
-              `${Math.random() * 100}%`,
-              `${Math.random() * 100}%`,
-            ],
-            x: [
-              `${Math.random() * 100}%`,
-              `${Math.random() * 100}%`,
-              `${Math.random() * 100}%`,
-            ],
-            opacity: [0.4, 0.7, 0.4],
-          }}
-          transition={{
-            duration: 15,
-            delay: item.delay * 2,
-            repeat: Infinity,
-            ease: "easeInOut",
-          }}
-        >
-          {item.icon}
-        </motion.div>
-      ))}
-    </div>
-  );
-};
-
-// Stats animation component
 const StatsAnimation = () => {
   const stats = [
-    { label: "Secure Transactions", value: "10M+" },
-    { label: "Wallet Connections", value: "500K+" },
-    { label: "Transaction Speed", value: "400ms" },
-    { label: "Blockchain Reliability", value: "99.99%" },
+    { label: "Automated Payments", value: "10M+" },
+    { label: "Wallet Sessions", value: "500K+" },
+    { label: "Execution Speed", value: "400ms" },
+    { label: "Reliability", value: "99.99%" },
   ];
 
   return (
@@ -124,7 +76,7 @@ const StatsAnimation = () => {
       {stats.map((stat, index) => (
         <motion.div
           key={index}
-          className="flex flex-col items-center justify-center p-3 bg-background/50 backdrop-blur-sm rounded-lg border border-primary/20"
+          className="flex flex-col items-center justify-center rounded-lg border border-primary/20 bg-background/50 p-3 backdrop-blur-sm"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 * index, duration: 0.5 }}
@@ -148,18 +100,17 @@ const StatsAnimation = () => {
   );
 };
 
-// Features list component
 const Features = () => {
   const features = [
-    "Secure wallet authentication",
-    "Multi-chain support",
-    "Fast transaction processing",
-    "Enhanced security with signature verification",
+    "Wallet-native access without server-side sign-in",
+    "Direct on-chain interaction from the connected wallet",
+    "Network switching for devnet, mainnet, testnet, and localnet",
+    "No nonce, signature challenge, or session dependency",
   ];
 
   return (
     <div className="mt-6">
-      <h3 className="text-sm font-medium mb-2">Key Features</h3>
+      <h3 className="mb-2 text-sm font-medium">What changed</h3>
       <ul className="space-y-2">
         {features.map((feature, index) => (
           <motion.li
@@ -167,9 +118,9 @@ const Features = () => {
             className="flex items-center gap-2 text-sm text-muted-foreground"
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.2 * index, duration: 0.4 }}
+            transition={{ delay: 0.15 * index, duration: 0.4 }}
           >
-            <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+            <div className="h-1.5 w-1.5 rounded-full bg-primary" />
             {feature}
           </motion.li>
         ))}
@@ -178,125 +129,51 @@ const Features = () => {
   );
 };
 
-const AuthPage = () => {
-  const { publicKey, signMessage } = useWallet();
-  const [viewState, setViewState] = useState<
-    "welcome" | "wallet" | "signature"
-  >("welcome");
-  //eslint-disable-next-line
-  const [signature, setSignature] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [nonce, setNonce] = useState<string>("");
+export default function AuthPage() {
+  const router = useRouter();
+  const { publicKey, connected } = useWallet();
+  const [viewState, setViewState] = useState<"welcome" | "wallet">("welcome");
+  const [redirecting, setRedirecting] = useState(false);
 
-  // Fetch a server-issued one-time nonce from the challenge endpoint.
-  // This replaces the old client-side Math.random() nonce (SEC-001).
-  const fetchChallenge = async (walletPubkey: string): Promise<string> => {
-    const res = await fetch(
-      `/api/auth/challenge?wallet=${encodeURIComponent(walletPubkey)}`
-    );
-    if (!res.ok) throw new Error("Failed to fetch auth challenge");
-    const data: { nonce: string } = await res.json();
-    return data.nonce;
-  };
+  useEffect(() => {
+    if (!connected || !publicKey) {
+      return;
+    }
 
-  // Handle wallet connection
+    setRedirecting(true);
+    toast.success("Wallet connected", {
+      description: "Opening dashboard for the connected wallet.",
+    });
+    router.replace("/dashboard");
+  }, [connected, publicKey, router]);
+
   const handleWalletConnect = (pubKey: PublicKey) => {
     toast.success("Wallet connected successfully", {
       description: `Connected to ${pubKey.toBase58().slice(0, 8)}...`,
     });
-    setViewState("signature");
+    setRedirecting(true);
+    router.replace("/dashboard");
   };
 
-  // Handle wallet disconnection
   const handleWalletDisconnect = () => {
+    setRedirecting(false);
     setViewState("welcome");
-    setSignature(null);
     toast.info("Wallet disconnected", {
-      description: "Your wallet has been disconnected",
+      description: "Your wallet has been disconnected.",
     });
   };
 
-  // Sign message with connected wallet
-  const handleSignMessage = async () => {
-    if (!publicKey || !signMessage) {
-      toast.error("Wallet not connected properly");
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-
-      // Fetch a fresh server-issued nonce for this wallet (SEC-001).
-      const serverNonce = await fetchChallenge(publicKey.toBase58());
-      setNonce(serverNonce);
-
-      // Sign only the server nonce — not a client-generated string.
-      const message = new TextEncoder().encode(serverNonce);
-      const signatureBytes = await signMessage(message);
-      const signatureBase58 = bs58.encode(signatureBytes);
-
-      setSignature(signatureBase58);
-      toast.success("Message signed successfully");
-
-      await handleSignIn(signatureBase58, serverNonce);
-    } catch (error) {
-      console.error("Error signing message:", error);
-      toast.error("Failed to sign message", { description: "Please try again" });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Handle wallet-based sign in
-  const handleSignIn = async (sig: string, challengeNonce: string) => {
-    if (!publicKey) {
-      toast.error("Wallet not connected");
-      return;
-    }
-
-    setIsLoading(true);
-
-    try {
-      const result = await signIn("signin", {
-        publicKey: publicKey.toBase58(),
-        signature: sig,
-        nonce: challengeNonce,  // always the server-issued nonce
-        redirect: false,
-      });
-
-      if (result?.error) {
-        toast.error("Authentication failed", { description: result.error });
-        return;
-      }
-
-      if (result?.status === 200) {
-        toast.success("Signed in successfully", {
-          description: "Redirecting to dashboard…",
-        });
-        window.location.href = "/dashboard";
-      }
-    } catch (error) {
-      console.error("Sign in error:", error);
-      toast.error("Authentication failed", {
-        description: "Please check your wallet connection and try again",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center p-4 relative">
+    <div className="relative flex min-h-screen flex-col items-center justify-center p-4">
       <AnimatedBackground />
-      <FloatingElements />
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="z-10 w-full max-w-md mx-auto"
+        className="z-10 mx-auto w-full max-w-md"
       >
-        <Card className="border border-primary/20 shadow-xl bg-background/95 backdrop-blur-xl">
+        <Card className="border border-primary/20 bg-background/95 shadow-xl backdrop-blur-xl">
           <CardHeader className="space-y-1">
             <div className="flex items-center justify-between">
               <CardTitle className="text-2xl font-bold tracking-tight">
@@ -309,7 +186,6 @@ const AuthPage = () => {
                   AutoSOL
                 </motion.span>
               </CardTitle>
-
               <motion.div
                 initial={{ scale: 0, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
@@ -320,7 +196,7 @@ const AuthPage = () => {
             </div>
 
             <CardDescription className="text-sm text-muted-foreground">
-              Secure, automated recurring payments on Solana
+              Connect a wallet and interact directly with the app. No server session required.
             </CardDescription>
           </CardHeader>
 
@@ -336,22 +212,20 @@ const AuthPage = () => {
                   className="space-y-6"
                 >
                   <div className="space-y-2 text-center">
-                    <h2 className="text-xl font-semibold">
-                      Welcome to AutoSOL
-                    </h2>
+                    <h2 className="text-xl font-semibold">Wallet-first access</h2>
                     <p className="text-sm text-muted-foreground">
-                      Connect your Solana wallet to get started
+                      Connect your Solana wallet to open the dashboard and sign on-chain actions only when needed.
                     </p>
                   </div>
 
                   <div className="space-y-2">
                     <Button
                       variant="default"
-                      className="w-full relative overflow-hidden group"
+                      className="group relative w-full overflow-hidden"
                       onClick={() => setViewState("wallet")}
                     >
                       <motion.div
-                        className="absolute inset-0 bg-primary/10 transform -translate-x-full"
+                        className="absolute inset-0 -translate-x-full bg-primary/10"
                         animate={{ x: ["100%", "0%", "0%", "-100%"] }}
                         transition={{
                           duration: 2,
@@ -359,7 +233,6 @@ const AuthPage = () => {
                           repeatDelay: 1,
                         }}
                       />
-
                       <span className="flex items-center justify-center gap-2">
                         <WalletIcon className="h-4 w-4" />
                         Connect Wallet
@@ -377,17 +250,13 @@ const AuthPage = () => {
                     </Button>
                   </div>
 
-                  <div className="bg-primary/5 rounded-lg p-4 border border-primary/10">
+                  <div className="rounded-lg border border-primary/10 bg-primary/5 p-4">
                     <div className="flex flex-row gap-3">
-                      <ShieldCheck className="text-primary mt-0.5" size={100} />
+                      <ShieldCheck className="mt-0.5 text-primary" size={100} />
                       <div className="space-y-1">
-                        <h3 className="text-sm font-medium">
-                          Secure Authentication
-                        </h3>
+                        <h3 className="text-sm font-medium">Direct wallet flow</h3>
                         <p className="text-xs text-muted-foreground">
-                          Connect your wallet to sign in securely. We never
-                          store your private keys and use signature verification
-                          to protect your account.
+                          The app now uses your connected wallet directly. There is no separate nonce or signature-based login session to maintain.
                         </p>
                       </div>
                     </div>
@@ -407,11 +276,9 @@ const AuthPage = () => {
                   className="space-y-4"
                 >
                   <div className="space-y-2">
-                    <h2 className="text-xl font-semibold">
-                      Connect your wallet
-                    </h2>
+                    <h2 className="text-xl font-semibold">Connect your wallet</h2>
                     <p className="text-sm text-muted-foreground">
-                      Connect your Solana wallet to continue
+                      Connect on the network you want to use. Once connected, you go straight to the dashboard.
                     </p>
                   </div>
 
@@ -423,21 +290,36 @@ const AuthPage = () => {
                       showBalance={true}
                       onConnect={handleWalletConnect}
                       onDisconnect={handleWalletDisconnect}
-                      customLabel="Connect Wallet"
+                      customLabel={redirecting ? "Opening Dashboard..." : "Connect Wallet"}
                     />
                   </div>
 
-                  <div className="bg-primary/5 rounded-lg p-4 border border-primary/10">
+                  {publicKey && (
+                    <div className="rounded-lg border border-border bg-background/50 p-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">Connected wallet</span>
+                        <a
+                          href={`https://explorer.solana.com/address/${publicKey.toBase58()}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 text-xs text-primary hover:underline"
+                        >
+                          View <ExternalLink className="h-3 w-3" />
+                        </a>
+                      </div>
+                      <div className="mt-1 truncate font-mono text-sm">
+                        {publicKey.toBase58()}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="rounded-lg border border-primary/10 bg-primary/5 p-4">
                     <div className="flex items-start space-x-2">
-                      <ShieldCheck className="h-5 w-5 text-primary mt-0.5" />
+                      <ShieldCheck className="mt-0.5 h-5 w-5 text-primary" />
                       <div className="space-y-1">
-                        <h3 className="text-sm font-medium">
-                          Secure Connection
-                        </h3>
+                        <h3 className="text-sm font-medium">No extra auth step</h3>
                         <p className="text-xs text-muted-foreground">
-                          Your wallet connects securely, and we never store
-                          private keys. You&apos;ll be asked to sign a message
-                          to verify ownership.
+                          Wallet connection is enough to use the app. Transaction signatures still happen in your wallet when an on-chain action is submitted.
                         </p>
                       </div>
                     </div>
@@ -454,104 +336,16 @@ const AuthPage = () => {
                   <Features />
                 </motion.div>
               )}
-
-              {viewState === "signature" && (
-                <motion.div
-                  key="signature"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 20 }}
-                  transition={{ duration: 0.3 }}
-                  className="space-y-4"
-                >
-                  <div className="space-y-2">
-                    <h2 className="text-xl font-semibold">
-                      Verify wallet ownership
-                    </h2>
-                    <p className="text-sm text-muted-foreground">
-                      Please sign the message below to verify your wallet
-                      ownership
-                    </p>
-                  </div>
-
-                  <div className="bg-primary/5 rounded-lg p-4 border border-primary/10">
-                    <p className="text-sm font-mono break-all">{nonce}</p>
-                  </div>
-
-                  {publicKey && (
-                    <div className="bg-background/50 rounded-lg p-3 border border-border">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-muted-foreground">
-                          Connected wallet
-                        </span>
-                        <a
-                          href={`https://explorer.solana.com/address/${publicKey.toBase58()}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs flex items-center gap-1 text-primary hover:underline"
-                        >
-                          View <ExternalLink className="h-3 w-3" />
-                        </a>
-                      </div>
-                      <div className="mt-1 font-mono text-sm truncate">
-                        {publicKey.toBase58()}
-                      </div>
-                    </div>
-                  )}
-
-                  <Button
-                    onClick={handleSignMessage}
-                    className="w-full relative overflow-hidden"
-                    disabled={isLoading || !publicKey}
-                  >
-                    {isLoading ? (
-                      <motion.div
-                        animate={{ rotate: 360 }}
-                        transition={{
-                          duration: 1,
-                          repeat: Infinity,
-                          ease: "linear",
-                        }}
-                        className="h-4 w-4 border-2 border-background border-r-transparent rounded-full"
-                      />
-                    ) : (
-                      <span className="flex items-center justify-center gap-2">
-                        <Fingerprint className="h-4 w-4" />
-                        Sign Message to Continue
-                      </span>
-                    )}
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    className="w-full text-sm text-muted-foreground"
-                    onClick={() => setViewState("wallet")}
-                  >
-                    ← Change wallet
-                  </Button>
-
-                  <Features />
-                </motion.div>
-              )}
             </AnimatePresence>
           </CardContent>
 
           <CardFooter className="flex flex-col space-y-2 border-t border-primary/10 pt-4">
-            <p className="text-xs text-center text-muted-foreground">
-              By signing in, you agree to our{" "}
-              <Button variant="link" className="h-auto p-0 text-xs">
-                Terms of Service
-              </Button>{" "}
-              and{" "}
-              <Button variant="link" className="h-auto p-0 text-xs">
-                Privacy Policy
-              </Button>
+            <p className="text-center text-xs text-muted-foreground">
+              Wallet connection only identifies the active signer in the browser. Sensitive actions still require explicit approval in the wallet.
             </p>
           </CardFooter>
         </Card>
       </motion.div>
     </div>
   );
-};
-
-export default AuthPage;
+}

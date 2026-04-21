@@ -1,5 +1,21 @@
-import { authOptions } from "@/lib/auth";
-import NextAuth from "next-auth/next";
+import { NextResponse } from "next/server";
 
-const handler = NextAuth(authOptions);
-export { handler as GET, handler as POST };
+function disabledAuthResponse() {
+  return NextResponse.json(
+    {
+      enabled: false,
+      message:
+        "Wallet session auth has been removed. Use direct wallet connection from the client instead.",
+      providers: [],
+    },
+    { status: 200 }
+  );
+}
+
+export function GET() {
+  return disabledAuthResponse();
+}
+
+export function POST() {
+  return disabledAuthResponse();
+}

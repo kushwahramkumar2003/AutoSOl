@@ -236,10 +236,10 @@ export default function Hero() {
               className="mt-8 flex flex-col gap-3 sm:flex-row"
             >
               <Button
-                onClick={() => router.push("/auth")}
+                onClick={() => router.push("/dashboard")}
                 className="h-10 rounded-[14px] bg-[#3B82F6] px-5 text-sm font-medium text-white hover:bg-[#3B82F6]/90 transition-all"
               >
-                Get Started
+                Open Dashboard
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
               <Button

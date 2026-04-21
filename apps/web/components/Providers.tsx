@@ -12,7 +12,6 @@ import {
   WalletProvider,
 } from "@solana/wallet-adapter-react";
 import { useMemo, useState } from "react";
-import { SessionProvider } from "next-auth/react";
 import {
   PhantomWalletAdapter,
   SolflareWalletAdapter,
@@ -59,14 +58,12 @@ export function Providers({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <SessionProvider>
-      <NetworkConfigContext.Provider value={{ network, endpoint, setNetwork: updateNetwork }}>
-        <ConnectionProvider endpoint={endpoint}>
-          <WalletProvider wallets={wallets} autoConnect>
-            <WalletModalProviderDynamic>{children}</WalletModalProviderDynamic>
-          </WalletProvider>
-        </ConnectionProvider>
-      </NetworkConfigContext.Provider>
-    </SessionProvider>
+    <NetworkConfigContext.Provider value={{ network, endpoint, setNetwork: updateNetwork }}>
+      <ConnectionProvider endpoint={endpoint}>
+        <WalletProvider wallets={wallets} autoConnect>
+          <WalletModalProviderDynamic>{children}</WalletModalProviderDynamic>
+        </WalletProvider>
+      </ConnectionProvider>
+    </NetworkConfigContext.Provider>
   );
 }
