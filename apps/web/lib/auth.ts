@@ -19,8 +19,9 @@ const authTokenExpirationTime =
   z.coerce.number().optional().parse(process.env.AUTH_TOKEN_EXPIRATION_TIME) ??
   60 * 60 * 24 * 7;
 
+const isBuildPhase = process.env.NEXT_PHASE === "phase-production-build";
 const nextAuthSecret = process.env.NEXTAUTH_SECRET;
-if (process.env.NODE_ENV === "production" && !nextAuthSecret) {
+if (process.env.NODE_ENV === "production" && !isBuildPhase && !nextAuthSecret) {
   throw new Error(
     '[AutoSOl] NEXTAUTH_SECRET is required in production for NextAuth.'
   );
