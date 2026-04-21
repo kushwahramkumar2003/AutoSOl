@@ -13,11 +13,15 @@ export const config = {
   rpcEndpoint:
     process.env.NEXT_PUBLIC_RPC_URL ??
     process.env.RPC_URL ??
-    (isProduction ? "https://api.devnet.solana.com" : "http://127.0.0.1:8899"),
+    (isProduction
+      ? "https://devnet.helius-rpc.com/?api-key=eca35b63-7ca1-4bef-ab08-8d0ca13d3850"
+      : "http://127.0.0.1:8899"),
 
   authTokenExpirationTime:
-    z.coerce.number().optional().parse(process.env.AUTH_TOKEN_EXPIRATION_TIME) ??
-    60 * 60 * 24 * 1,
+    z.coerce
+      .number()
+      .optional()
+      .parse(process.env.AUTH_TOKEN_EXPIRATION_TIME) ?? 60 * 60 * 24 * 1,
 
   // Pinata credentials are used only by IPFS upload flows.
   // Do not make auth/bootstrap routes fail when they are unset.

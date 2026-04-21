@@ -12,9 +12,13 @@ type NetworkConfigContextValue = {
 
 export const NETWORK_ENDPOINTS: Record<NetworkType, string> = {
   "mainnet-beta":
-    process.env.NEXT_PUBLIC_RPC_URL_MAINNET ?? "https://api.mainnet-beta.solana.com",
-  devnet: process.env.NEXT_PUBLIC_RPC_URL_DEVNET ?? "https://api.devnet.solana.com",
-  testnet: process.env.NEXT_PUBLIC_RPC_URL_TESTNET ?? "https://api.testnet.solana.com",
+    process.env.NEXT_PUBLIC_RPC_URL_MAINNET ??
+    "https://api.mainnet-beta.solana.com",
+  devnet:
+    process.env.NEXT_PUBLIC_RPC_URL_DEVNET ??
+    "https://devnet.helius-rpc.com/?api-key=eca35b63-7ca1-4bef-ab08-8d0ca13d3850",
+  testnet:
+    process.env.NEXT_PUBLIC_RPC_URL_TESTNET ?? "https://api.testnet.solana.com",
   localnet: process.env.NEXT_PUBLIC_RPC_URL_LOCALNET ?? "http://127.0.0.1:8899",
 };
 
@@ -32,7 +36,8 @@ export function inferNetworkFromEndpoint(endpoint: string): NetworkType {
   return "devnet";
 }
 
-export const NetworkConfigContext = createContext<NetworkConfigContextValue | null>(null);
+export const NetworkConfigContext =
+  createContext<NetworkConfigContextValue | null>(null);
 
 export function useNetworkConfig(): NetworkConfigContextValue {
   const ctx = useContext(NetworkConfigContext);
@@ -41,4 +46,3 @@ export function useNetworkConfig(): NetworkConfigContextValue {
   }
   return ctx;
 }
-
