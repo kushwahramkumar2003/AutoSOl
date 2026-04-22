@@ -14,6 +14,7 @@ import { useProgram } from "@/hooks/use-program";
 import { toast } from "sonner";
 import { CheckCircle2, ShieldCheck, Rocket, RefreshCw } from "lucide-react";
 import { formatRawTokenAmount, getTokenLabel } from "@/lib/token-registry";
+import { getTransactionErrorMessage, isDuplicateTransactionError } from "@/lib/transaction-errors";
 
 export default function CommitmentsPage() {
   const wallet = useWallet();
@@ -67,9 +68,14 @@ export default function CommitmentsPage() {
       toast.success("Commitment proposal accepted");
       await fetchCommitments();
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to accept commitment"
-      );
+      if (isDuplicateTransactionError(error)) {
+        toast.message("Transaction already submitted", {
+          description: "Refreshing commitments to verify whether the acceptance already succeeded.",
+        });
+        await fetchCommitments();
+      } else {
+        toast.error(getTransactionErrorMessage(error, "Failed to accept commitment"));
+      }
     } finally {
       setWorkingId(null);
     }
@@ -94,9 +100,14 @@ export default function CommitmentsPage() {
       toast.success("Commitment activated and funded");
       await fetchCommitments();
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to activate commitment"
-      );
+      if (isDuplicateTransactionError(error)) {
+        toast.message("Transaction already submitted", {
+          description: "Refreshing commitments to verify whether activation already succeeded.",
+        });
+        await fetchCommitments();
+      } else {
+        toast.error(getTransactionErrorMessage(error, "Failed to activate commitment"));
+      }
     } finally {
       setWorkingId(null);
     }

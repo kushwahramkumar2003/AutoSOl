@@ -8,7 +8,8 @@
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types",
     "rebuild": "npm rebuild",
-    "surfpool:fresh": "NO_DNA=1 surfpool start --db :memory: --surfnet-id fresh-local --no-deploy --no-tui --no-studio"
+    "surfpool:fresh": "NO_DNA=1 surfpool start --db :memory: --surfnet-id fresh-local --no-deploy --no-tui --no-studio",
+    "wallet:generate": "node scripts/generate-solana-wallet.cjs"
   },
   "devDependencies": {
     "prettier": "^3.5.3",

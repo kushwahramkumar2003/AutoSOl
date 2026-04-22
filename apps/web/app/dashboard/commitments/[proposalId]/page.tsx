@@ -20,6 +20,7 @@ import {
   ScheduleStatus,
   type PaymentCommitmentProposalData,
 } from "@/lib/program";
+import { getTransactionErrorMessage, isDuplicateTransactionError } from "@/lib/transaction-errors";
 
 export default function CommitmentDetailPage() {
   const params = useParams<{ proposalId: string }>();
@@ -81,7 +82,14 @@ export default function CommitmentDetailPage() {
       toast.success("Commitment proposal accepted");
       await fetchProposal();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Accept failed");
+      if (isDuplicateTransactionError(error)) {
+        toast.message("Transaction already submitted", {
+          description: "Refreshing commitment state to verify whether the acceptance already succeeded.",
+        });
+        await fetchProposal();
+      } else {
+        toast.error(getTransactionErrorMessage(error, "Accept failed"));
+      }
     } finally {
       setWorking(false);
     }
@@ -102,7 +110,14 @@ export default function CommitmentDetailPage() {
       toast.success("Commitment activated");
       await fetchProposal();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Activation failed");
+      if (isDuplicateTransactionError(error)) {
+        toast.message("Transaction already submitted", {
+          description: "Refreshing commitment state to verify whether activation already succeeded.",
+        });
+        await fetchProposal();
+      } else {
+        toast.error(getTransactionErrorMessage(error, "Activation failed"));
+      }
     } finally {
       setWorking(false);
     }

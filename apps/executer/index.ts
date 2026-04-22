@@ -11,6 +11,7 @@ import {
   getAssociatedTokenAddress,
   getOrCreateAssociatedTokenAccount,
 } from "@solana/spl-token";
+import bs58 from "bs58";
 import * as fs from "fs";
 import * as path from "path";
 import * as winston from "winston";
@@ -429,6 +430,46 @@ class ExecutorService {
     );
   }
 
+  private parseSecretKey(raw: string, source: string): Uint8Array {
+    try {
+      const parsed = JSON.parse(raw.trim()) as
+        | number[]
+        | { privateKey?: number[] | string }
+        | string;
+
+      if (Array.isArray(parsed)) {
+        return Uint8Array.from(parsed);
+      }
+
+      if (parsed && typeof parsed === "object" && Array.isArray(parsed.privateKey)) {
+        return Uint8Array.from(parsed.privateKey);
+      }
+
+      if (parsed && typeof parsed === "object" && typeof parsed.privateKey === "string") {
+        return Uint8Array.from(bs58.decode(parsed.privateKey));
+      }
+
+      if (typeof parsed === "string") {
+        return Uint8Array.from(bs58.decode(parsed));
+      }
+
+      throw new ExecutorError(
+        `Unsupported wallet format in ${source}. Expected [..], { "privateKey": [..] }, or a base58 privateKey string.`,
+        "WALLET_FORMAT_ERROR"
+      );
+    } catch (error) {
+      if (error instanceof ExecutorError) {
+        throw error;
+      }
+
+      throw new ExecutorError(
+        `Failed to parse wallet secret key from ${source}. Ensure it is valid JSON.`,
+        "WALLET_PARSE_ERROR",
+        error
+      );
+    }
+  }
+
   private async runExecutionCycle(trigger: "startup" | "interval") {
     if (this.isExecuting) {
       logger.warn("Skipping execution cycle because prior cycle is still running", {
@@ -472,11 +513,37 @@ class ExecutorService {
   private loadWallet(): anchor.Wallet {
     try {
       if (process.env.SOLANA_PRIVATE_KEY) {
-        const privateKeyArray = JSON.parse(process.env.SOLANA_PRIVATE_KEY);
         return new anchor.Wallet(
-          Keypair.fromSecretKey(Uint8Array.from(privateKeyArray))
+          Keypair.fromSecretKey(
+            this.parseSecretKey(process.env.SOLANA_PRIVATE_KEY, "SOLANA_PRIVATE_KEY")
+          )
         );
       }
+
+      const explicitWalletPath = process.env.SOLANA_PRIVATE_KEY_FILE;
+      if (explicitWalletPath && fs.existsSync(explicitWalletPath)) {
+        return new anchor.Wallet(
+          Keypair.fromSecretKey(
+            this.parseSecretKey(
+              fs.readFileSync(explicitWalletPath, "utf-8"),
+              explicitWalletPath
+            )
+          )
+        );
+      }
+
+      const localWalletJsonPath = path.join(process.cwd(), "wallet.json");
+      if (fs.existsSync(localWalletJsonPath)) {
+        return new anchor.Wallet(
+          Keypair.fromSecretKey(
+            this.parseSecretKey(
+              fs.readFileSync(localWalletJsonPath, "utf-8"),
+              localWalletJsonPath
+            )
+          )
+        );
+      }
+
       const walletPath = path.join(
         process.env.HOME || process.env.USERPROFILE || "",
         ".config",
@@ -487,7 +554,7 @@ class ExecutorService {
         throw new ExecutorError("Wallet file not found", "WALLET_NOT_FOUND");
       }
       const walletKeypair = Keypair.fromSecretKey(
-        new Uint8Array(JSON.parse(fs.readFileSync(walletPath, "utf-8")))
+        this.parseSecretKey(fs.readFileSync(walletPath, "utf-8"), walletPath)
       );
       return new anchor.Wallet(walletKeypair);
     } catch (error) {
@@ -571,18 +638,12 @@ async function main() {
       process.exit(0);
     });
   } catch (error) {
-    let errMsg = "";
-    let code = "UNKNOWN";
-    let details = undefined;
-    if (error instanceof Error) {
-      errMsg = error.message;
-    } else if (typeof error === "object" && error !== null) {
-      errMsg = (error as any).message || String(error);
-      code = (error as any).code || "UNKNOWN";
-      details = (error as any).details;
-    } else {
-      errMsg = String(error);
-    }
+    const maybeError = error as Error & { code?: unknown; details?: unknown };
+    const errMsg =
+      maybeError instanceof Error ? maybeError.message : String(error);
+    const code =
+      typeof maybeError?.code === "string" ? maybeError.code : "UNKNOWN";
+    const details = maybeError?.details;
     logger.error("Fatal error in executor service", {
       error: errMsg,
       code,

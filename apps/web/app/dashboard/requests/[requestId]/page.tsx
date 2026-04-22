@@ -19,6 +19,7 @@ import {
   formatRawTokenAmount,
   getTokenLabel,
 } from "@/lib/token-registry";
+import { getTransactionErrorMessage, isDuplicateTransactionError } from "@/lib/transaction-errors";
 import {
   fetchRequestByIdResilient,
   type PaymentRequestProposal,
@@ -235,7 +236,14 @@ export default function RequestDetailPage() {
       toast.success("Request approved and funded");
       await fetchRequest();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Accept failed");
+      if (isDuplicateTransactionError(error)) {
+        toast.message("Transaction already submitted", {
+          description: "Refreshing request state to verify whether approval already succeeded.",
+        });
+        await fetchRequest();
+      } else {
+        toast.error(getTransactionErrorMessage(error, "Accept failed"));
+      }
     } finally {
       setWorking(false);
     }
@@ -249,7 +257,14 @@ export default function RequestDetailPage() {
       toast.success("Request declined");
       await fetchRequest();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Decline failed");
+      if (isDuplicateTransactionError(error)) {
+        toast.message("Transaction already submitted", {
+          description: "Refreshing request state to verify whether decline already succeeded.",
+        });
+        await fetchRequest();
+      } else {
+        toast.error(getTransactionErrorMessage(error, "Decline failed"));
+      }
     } finally {
       setWorking(false);
     }
@@ -263,7 +278,14 @@ export default function RequestDetailPage() {
       toast.success("Request revoked");
       await fetchRequest();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Revoke failed");
+      if (isDuplicateTransactionError(error)) {
+        toast.message("Transaction already submitted", {
+          description: "Refreshing request state to verify whether revoke already succeeded.",
+        });
+        await fetchRequest();
+      } else {
+        toast.error(getTransactionErrorMessage(error, "Revoke failed"));
+      }
     } finally {
       setWorking(false);
     }
@@ -277,7 +299,14 @@ export default function RequestDetailPage() {
       toast.success("Schedule paused");
       await fetchRequest();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Pause failed");
+      if (isDuplicateTransactionError(error)) {
+        toast.message("Transaction already submitted", {
+          description: "Refreshing request state to verify whether pause already succeeded.",
+        });
+        await fetchRequest();
+      } else {
+        toast.error(getTransactionErrorMessage(error, "Pause failed"));
+      }
     } finally {
       setWorking(false);
     }
@@ -291,7 +320,14 @@ export default function RequestDetailPage() {
       toast.success("Schedule resumed");
       await fetchRequest();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Resume failed");
+      if (isDuplicateTransactionError(error)) {
+        toast.message("Transaction already submitted", {
+          description: "Refreshing request state to verify whether resume already succeeded.",
+        });
+        await fetchRequest();
+      } else {
+        toast.error(getTransactionErrorMessage(error, "Resume failed"));
+      }
     } finally {
       setWorking(false);
     }
@@ -305,7 +341,14 @@ export default function RequestDetailPage() {
       toast.success("Schedule cancelled");
       await fetchRequest();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Cancel failed");
+      if (isDuplicateTransactionError(error)) {
+        toast.message("Transaction already submitted", {
+          description: "Refreshing request state to verify whether cancellation already succeeded.",
+        });
+        await fetchRequest();
+      } else {
+        toast.error(getTransactionErrorMessage(error, "Cancel failed"));
+      }
     } finally {
       setWorking(false);
     }

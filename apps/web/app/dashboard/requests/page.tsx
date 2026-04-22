@@ -24,6 +24,7 @@ import {
   Link2,
 } from "lucide-react";
 import { formatRawTokenAmount, getTokenLabel } from "@/lib/token-registry";
+import { getTransactionErrorMessage, isDuplicateTransactionError } from "@/lib/transaction-errors";
 
 export default function RequestsPage() {
   const wallet = useWallet();
@@ -84,7 +85,15 @@ export default function RequestsPage() {
       toast.success("Request approved and funded");
       await fetchRequests();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to accept request");
+      if (isDuplicateTransactionError(error)) {
+        toast.message("Transaction already submitted", {
+          description:
+            "Wallet approval was already sent. Refreshing requests to verify the latest on-chain state.",
+        });
+        await fetchRequests();
+      } else {
+        toast.error(getTransactionErrorMessage(error, "Failed to accept request"));
+      }
     } finally {
       setWorkingId(null);
     }
@@ -101,7 +110,14 @@ export default function RequestsPage() {
       toast.success("Request declined");
       await fetchRequests();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to decline request");
+      if (isDuplicateTransactionError(error)) {
+        toast.message("Transaction already submitted", {
+          description: "Refreshing requests to verify whether the decline already succeeded.",
+        });
+        await fetchRequests();
+      } else {
+        toast.error(getTransactionErrorMessage(error, "Failed to decline request"));
+      }
     } finally {
       setWorkingId(null);
     }
@@ -118,7 +134,14 @@ export default function RequestsPage() {
       toast.success("Request revoked");
       await fetchRequests();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to revoke request");
+      if (isDuplicateTransactionError(error)) {
+        toast.message("Transaction already submitted", {
+          description: "Refreshing requests to verify whether the revoke already succeeded.",
+        });
+        await fetchRequests();
+      } else {
+        toast.error(getTransactionErrorMessage(error, "Failed to revoke request"));
+      }
     } finally {
       setWorkingId(null);
     }

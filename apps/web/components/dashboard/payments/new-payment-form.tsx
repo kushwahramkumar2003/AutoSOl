@@ -13,6 +13,7 @@ import { renderMarkdownPreview } from "@/components/shared/markdown-contract-pre
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { uploadMarkdownToPinata } from "@/lib/ipfs";
+import { getTransactionErrorMessage, isDuplicateTransactionError } from "@/lib/transaction-errors";
 
 import RecipientSection from "./sections/recipient-section";
 import PaymentSection from "./sections/payment-section";
@@ -166,7 +167,18 @@ export default function NewPaymentForm() {
       setScheduleAddress(result.scheduleAddress.toString());
       toast.success("Payment schedule created!");
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to create schedule";
+      if (isDuplicateTransactionError(err)) {
+        const msg =
+          "This transaction was already submitted from your wallet. Refreshing state to verify the latest result.";
+        setError(msg);
+        toast.message("Transaction already submitted", {
+          description: msg,
+        });
+        router.refresh();
+        return;
+      }
+
+      const msg = getTransactionErrorMessage(err, "Failed to create schedule");
       setError(msg);
       toast.error(msg);
     } finally {
