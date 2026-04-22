@@ -23,7 +23,8 @@ export default function Navbar() {
 
   const navLinks = [
     { href: "/#features", label: "Features" },
-    { href: "/#how-it-works", label: "How It Works" },
+    { href: "/#commitments", label: "Commitments" },
+    { href: "/#use-cases", label: "Use Cases" },
     { href: "/#technical", label: "Technical" },
   ];
 
