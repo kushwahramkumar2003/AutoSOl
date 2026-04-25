@@ -1,0 +1,57 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="coreGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(120 82) rotate(67) scale(148 135)">
+      <stop offset="0" stop-color="#3B82F6" stop-opacity="0.95"/>
+      <stop offset="0.42" stop-color="#14F195" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#05070D" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="loopStroke" x1="54" y1="67" x2="208" y2="196" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#14F195"/>
+      <stop offset="0.48" stop-color="#3B82F6"/>
+      <stop offset="1" stop-color="#7C3AED"/>
+    </linearGradient>
+    <linearGradient id="coinStroke" x1="79" y1="70" x2="176" y2="179" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF" stop-opacity="0.88"/>
+      <stop offset="1" stop-color="#94A3B8" stop-opacity="0.42"/>
+    </linearGradient>
+    <filter id="softShadow" x="25" y="25" width="206" height="211" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+      <feOffset dy="12"/>
+      <feGaussianBlur stdDeviation="14"/>
+      <feComposite in2="hardAlpha" operator="out"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0.0117647 0 0 0 0 0.027451 0 0 0 0 0.0705882 0 0 0 0.58 0"/>
+      <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow" result="shape"/>
+    </filter>
+    <clipPath id="roundClip">
+      <rect width="256" height="256" rx="64"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#roundClip)">
+    <rect width="256" height="256" rx="64" fill="#05070D"/>
+    <path d="M18 78C62 36 109 27 159 46C209 65 235 109 226 165C216 218 168 249 112 238C57 228 24 196 18 145C15 119 7 89 18 78Z" fill="url(#coreGlow)" opacity="0.62"/>
+    <path d="M47 51H209V174C209 201 191 222 166 231L128 244L90 231C65 222 47 201 47 174V51Z" fill="#080C14" filter="url(#softShadow)"/>
+    <path d="M54 59H202V173C202 196 186 213 164 221L128 233L92 221C70 213 54 196 54 173V59Z" stroke="white" stroke-opacity="0.09" stroke-width="2"/>
+
+    <circle cx="128" cy="128" r="54" fill="#0B1220" stroke="url(#coinStroke)" stroke-width="2"/>
+    <circle cx="128" cy="128" r="39" stroke="white" stroke-opacity="0.07" stroke-width="1.5"/>
+    <circle cx="128" cy="128" r="16" fill="#0F172A" stroke="#3B82F6" stroke-opacity="0.55" stroke-width="2"/>
+    <path d="M120 128C120 123.582 123.582 120 128 120C132.418 120 136 123.582 136 128C136 132.418 132.418 136 128 136C123.582 136 120 132.418 120 128Z" fill="#14F195"/>
+
+    <path d="M83 115C89 91 111 75 137 78C162 81 181 100 184 124" stroke="url(#loopStroke)" stroke-width="12" stroke-linecap="round"/>
+    <path d="M173 109L185 126L166 132" stroke="#14F195" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M173 141C167 165 145 181 119 178C94 175 75 156 72 132" stroke="url(#loopStroke)" stroke-width="12" stroke-linecap="round"/>
+    <path d="M83 147L71 130L90 124" stroke="#3B82F6" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <circle cx="83" cy="91" r="7" fill="#14F195"/>
+    <circle cx="174" cy="91" r="7" fill="#3B82F6"/>
+    <circle cx="128" cy="187" r="7" fill="#7C3AED"/>
+    <path d="M83 91H174" stroke="white" stroke-opacity="0.12" stroke-width="2" stroke-linecap="round" stroke-dasharray="4 9"/>
+    <path d="M174 91L128 187L83 91" stroke="white" stroke-opacity="0.08" stroke-width="2" stroke-linecap="round" stroke-dasharray="4 10"/>
+
+    <path d="M88 201C104 210 121 214 128 216C135 214 152 210 168 201" stroke="white" stroke-opacity="0.12" stroke-width="3" stroke-linecap="round"/>
+    <path d="M76 67H180" stroke="white" stroke-opacity="0.08" stroke-width="2" stroke-linecap="round"/>
+  </g>
+</svg>

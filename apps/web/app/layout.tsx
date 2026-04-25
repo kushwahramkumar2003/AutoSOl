@@ -14,6 +14,14 @@ export const metadata: Metadata = {
   title: "AutoSOL — Solana Recurring Payments Platform",
   description:
     "Schedule, automate, and manage recurring payments on Solana. Support for SOL and all SPL tokens.",
+  icons: {
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/favicon.ico", sizes: "any" },
+    ],
+    shortcut: "/favicon.svg",
+    apple: "/logo.svg",
+  },
 };
 
 export default function RootLayout({

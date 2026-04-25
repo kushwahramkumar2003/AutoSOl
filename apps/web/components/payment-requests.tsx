@@ -1,14 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import Image from "next/image";
+import { motion } from "framer-motion";
 import {
   Receipt,
   Send,
   CheckCircle2,
   XCircle,
   Clock,
-  ArrowRight,
   User,
   DollarSign,
   CalendarClock,
@@ -23,7 +22,6 @@ function RequestCard({
   amount,
   token,
   tokenIcon,
-  tokenColor,
   frequency,
   memo,
   status,
@@ -33,7 +31,6 @@ function RequestCard({
   amount: string;
   token: string;
   tokenIcon: string;
-  tokenColor: string;
   frequency: string;
   memo: string;
   status: "pending" | "approved" | "declined";
@@ -90,9 +87,11 @@ function RequestCard({
         <div className="flex items-center justify-between rounded-lg border border-white/[0.04] bg-white/[0.015] px-3 py-1.5">
           <span className="text-[10px] text-slate-500">Amount</span>
           <div className="flex items-center gap-1.5">
-            <img
+            <Image
               src={tokenIcon}
               alt={token}
+              width={14}
+              height={14}
               className="h-3.5 w-3.5 rounded-full object-cover"
             />
             <span className="text-[11px] font-medium text-white">
@@ -303,7 +302,6 @@ export default function PaymentRequests() {
                 amount="250"
                 token="USDC"
                 tokenIcon="https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png"
-                tokenColor="#2775CA"
                 frequency="Monthly × 12"
                 memo="Design retainer for product UI/UX support, Q3–Q4 2026."
                 status="pending"
@@ -313,8 +311,7 @@ export default function PaymentRequests() {
                 from="CloudHost Inc."
                 amount="89"
                 token="USDT"
-                tokenIcon="https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB/logo.svg"
-                tokenColor="#26A17B"
+                tokenIcon="https://cryptologos.cc/logos/tether-usdt-logo.png"
                 frequency="Monthly"
                 memo="Server infrastructure subscription — auto-renews."
                 status="approved"

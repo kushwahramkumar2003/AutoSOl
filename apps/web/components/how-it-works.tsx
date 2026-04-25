@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { motion } from "framer-motion";
 import {
   Wallet,
@@ -102,7 +103,13 @@ function WalletSelectMock() {
             style={!w.icon ? { backgroundColor: w.color + "30" } : undefined}
           >
             {w.icon ? (
-              <img src={w.icon} alt={w.name} className="h-full w-full object-contain" />
+              <Image
+                src={w.icon}
+                alt={w.name}
+                width={20}
+                height={20}
+                className="h-full w-full object-contain"
+              />
             ) : null}
           </div>
           <span className="flex-1 text-xs text-slate-300">{w.name}</span>

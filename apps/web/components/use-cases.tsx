@@ -8,17 +8,11 @@ import {
   CreditCard,
   Palette,
   Heart,
-  Calendar,
   ArrowRight,
   CheckCircle2,
   Clock,
   TrendingUp,
-  Users,
-  Repeat,
-  DollarSign,
   FileText,
-  Send,
-  Zap,
 } from "lucide-react";
 
 /* ── Treasury dashboard mock ──────────────────────────────────────────── */
@@ -99,7 +93,7 @@ function TreasuryMock() {
           { label: "Active Streams", value: "14" },
           { label: "Monthly Volume", value: "$18.4K" },
           { label: "Commitments", value: "6" },
-        ].map((stat, i) => (
+        ].map((stat) => (
           <div key={stat.label} className="rounded-lg border border-white/[0.04] bg-white/[0.015] p-2 text-center">
             <div className="text-xs font-semibold text-white">{stat.value}</div>
             <div className="text-[8px] text-slate-500">{stat.label}</div>

@@ -1,18 +1,17 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   FileText,
   Handshake,
   CheckCircle2,
-  Clock,
   ArrowRight,
   Shield,
   Eye,
   Sparkles,
   FileCheck,
-  CalendarRange,
 } from "lucide-react";
 
 /* ── Commitment lifecycle timeline ────────────────────────────────────── */
@@ -188,9 +187,11 @@ function RecipientAcceptMock() {
     >
       <div className="mb-3 flex items-center gap-2">
         <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#2775CA] text-[9px] font-bold text-white">
-          <img
+          <Image
             src="https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png"
             alt="USDC"
+            width={24}
+            height={24}
             className="h-full w-full rounded-full object-cover"
           />
         </div>

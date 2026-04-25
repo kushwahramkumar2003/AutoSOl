@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useEffect, useState } from "react";
+import Image from "next/image";
 import { motion, useMotionValue, useTransform } from "framer-motion";
 import {
   Clock,
@@ -21,7 +22,7 @@ function TokenOrbit() {
   const tokens = [
     { symbol: "◎", icon: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png", color: "#9945FF", label: "SOL" },
     { symbol: "$", icon: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png", color: "#2775CA", label: "USDC" },
-    { symbol: "₮", icon: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB/logo.svg", color: "#26A17B", label: "USDT" },
+    { symbol: "₮", icon: "https://cryptologos.cc/logos/tether-usdt-logo.png", color: "#26A17B", label: "USDT" },
     { symbol: "B", icon: "https://s2.coinmarketcap.com/static/img/coins/64x64/23095.png", color: "#F2A52B", label: "BONK" },
     { symbol: "J", icon: "https://static.jup.ag/jup/icon.png", color: "#4FC08D", label: "JUP" },
     { symbol: "R", icon: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R/logo.png", color: "transparent", label: "RAY" },
@@ -35,28 +36,36 @@ function TokenOrbit() {
       <div className="absolute h-36 w-36 rounded-full border border-white/[0.04]" />
       {tokens.map((token, i) => {
         const angle = (360 / tokens.length) * i;
+        const radius = 72;
+        const radians = (angle * Math.PI) / 180;
+        const x = Math.cos(radians) * radius;
+        const y = Math.sin(radians) * radius;
+
         return (
           <motion.div
             key={token.label}
-            className="absolute"
-            animate={{ rotate: [angle, angle + 360] }}
-            transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+            className="absolute flex h-7 w-7 items-center justify-center overflow-hidden rounded-full text-[10px] font-bold text-white shadow-lg"
+            style={{
+              x,
+              y,
+              backgroundColor: token.color === "transparent" ? "rgba(255,255,255,0.06)" : token.color,
+            }}
+            initial={{ opacity: 0, scale: 0.74 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.35, delay: i * 0.04 }}
           >
-            <motion.div
-              className="absolute flex items-center justify-center rounded-full text-[10px] font-bold text-white overflow-hidden"
-              style={{
-                width: 28, height: 28, backgroundColor: token.color,
-                left: -14, top: -82,
-              }}
-              animate={{ rotate: [-(angle), -(angle + 360)] }}
-              transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-            >
-              {token.icon ? (
-                <img src={token.icon} alt={token.label} className="h-full w-full object-cover" />
-              ) : (
-                token.symbol
-              )}
-            </motion.div>
+            {token.icon ? (
+              <Image
+                src={token.icon}
+                alt={token.label}
+                width={28}
+                height={28}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              token.symbol
+            )}
           </motion.div>
         );
       })}
@@ -195,7 +204,13 @@ function WalletVisual() {
         >
           <div className="h-6 w-6 overflow-hidden rounded-lg">
             {w.icon ? (
-              <img src={w.icon} alt={w.name} className="h-full w-full object-contain" />
+              <Image
+                src={w.icon}
+                alt={w.name}
+                width={24}
+                height={24}
+                className="h-full w-full object-contain"
+              />
             ) : (
               <div className="h-full w-full" style={{ backgroundColor: w.color + "30" }} />
             )}

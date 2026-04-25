@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef } from "react";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { motion, useInView } from "framer-motion";
 import { ArrowRight } from "lucide-react";
@@ -35,12 +36,8 @@ function FloatingToken({
       transition={{ duration: 0.6, delay }}
     >
       <motion.div
-        animate={{ y: [-6, 6, -6] }}
-        transition={{
-          duration: 3 + delay,
-          repeat: Infinity,
-          ease: "easeInOut",
-        }}
+        whileHover={{ y: -3, scale: 1.02 }}
+        transition={{ duration: 0.18 }}
         className="flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 backdrop-blur-sm"
       >
         <div
@@ -52,7 +49,13 @@ function FloatingToken({
           }}
         >
           {icon ? (
-            <img src={icon} alt={name} className="h-full w-full object-cover" />
+            <Image
+              src={icon}
+              alt={name}
+              width={24}
+              height={24}
+              className="h-full w-full object-cover"
+            />
           ) : (
             symbol
           )}
@@ -156,7 +159,13 @@ function PaymentRow({
           style={{ backgroundColor: color }}
         >
           {icon ? (
-            <img src={icon} alt={token} className="h-full w-full object-cover" />
+            <Image
+              src={icon}
+              alt={token}
+              width={28}
+              height={28}
+              className="h-full w-full object-cover"
+            />
           ) : (
             token.charAt(0)
           )}
@@ -184,7 +193,7 @@ export default function Hero() {
   const tokens = [
     { name: "Solana", symbol: "◎", icon: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png", color: "#9945FF", x: "5%", y: "18%" },
     { name: "USDC", symbol: "$", icon: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png", color: "#2775CA", x: "78%", y: "12%" },
-    { name: "USDT", symbol: "₮", icon: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB/logo.svg", color: "#26A17B", x: "85%", y: "45%" },
+    { name: "USDT", symbol: "₮", icon: "https://cryptologos.cc/logos/tether-usdt-logo.png", color: "#26A17B", x: "85%", y: "45%" },
     { name: "BONK", symbol: "B", icon: "https://s2.coinmarketcap.com/static/img/coins/64x64/23095.png", color: "#F2A52B", x: "8%", y: "65%" },
     { name: "JUP", symbol: "J", icon: "https://static.jup.ag/jup/icon.png", color: "#4FC08D", x: "72%", y: "72%" },
   ];
@@ -261,7 +270,7 @@ export default function Hero() {
               {[
                 { label: "SOL", icon: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png" },
                 { label: "USDC", icon: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png" },
-                { label: "USDT", icon: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB/logo.svg" },
+                { label: "USDT", icon: "https://cryptologos.cc/logos/tether-usdt-logo.png" },
                 { label: "BONK", icon: "https://s2.coinmarketcap.com/static/img/coins/64x64/23095.png" },
                 { label: "+ more", icon: null },
               ].map((t, i) => (
@@ -269,7 +278,15 @@ export default function Hero() {
                   key={i}
                   className="flex items-center gap-1.5 rounded-lg border border-white/[0.06] bg-white/[0.03] px-2.5 py-1 text-[11px] font-medium text-slate-400"
                 >
-                  {t.icon && <img src={t.icon} alt={t.label} className="h-3 w-3 rounded-full object-cover" />}
+                  {t.icon && (
+                    <Image
+                      src={t.icon}
+                      alt={t.label}
+                      width={12}
+                      height={12}
+                      className="h-3 w-3 rounded-full object-cover"
+                    />
+                  )}
                   {t.label}
                 </span>
               ))}
@@ -350,7 +367,7 @@ export default function Hero() {
                   />
                   <PaymentRow
                     token="USDT"
-                    icon="https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB/logo.svg"
+                    icon="https://cryptologos.cc/logos/tether-usdt-logo.png"
                     color="#26A17B"
                     recipient="Freelancer"
                     amount="120 USDT · Biweekly"

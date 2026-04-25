@@ -51,7 +51,7 @@ export default function Navbar() {
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5">
-          <Image src="/favicon.ico" alt="AutoSOL" height={28} width={28} />
+          <Image src="/logo.svg" alt="AutoSOL" height={28} width={28} priority />
           <span className="text-lg font-semibold tracking-tight text-white">
             AutoSOL
           </span>
@@ -99,7 +99,7 @@ export default function Navbar() {
             <SheetHeader className="border-b border-white/[0.06] p-6">
               <SheetTitle>
                 <div className="flex items-center gap-2.5">
-                  <Image src="/favicon.ico" alt="AutoSOL" height={26} width={26} />
+                  <Image src="/logo.svg" alt="AutoSOL" height={26} width={26} />
                   <span className="text-lg font-semibold text-white">
                     AutoSOL
                   </span>

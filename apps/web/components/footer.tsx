@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
-import { Twitter, Github, Linkedin, Send, CheckCircle } from "lucide-react";
+import { Send, CheckCircle, Twitter, Github, Linkedin } from "lucide-react";
 import Image from "next/image";
 
 export default function Footer(): React.ReactElement {
@@ -14,7 +14,7 @@ export default function Footer(): React.ReactElement {
   const currentYear = new Date().getFullYear();
 
   const socialLinks = [
-    { icon: Twitter, href: "#", label: "Twitter" },
+    { icon: Twitter, href: "#", label: "X" },
     { icon: Github, href: "#", label: "GitHub" },
     { icon: Linkedin, href: "#", label: "LinkedIn" },
   ];
@@ -36,7 +36,7 @@ export default function Footer(): React.ReactElement {
           {/* Brand */}
           <div className="space-y-4">
             <div className="flex items-center gap-2.5">
-              <Image src="/favicon.ico" alt="AutoSOL" height={24} width={24} />
+              <Image src="/logo.svg" alt="AutoSOL" height={24} width={24} />
               <span className="text-base font-semibold text-white">AutoSOL</span>
             </div>
             <p className="text-sm leading-relaxed text-slate-500">
@@ -45,8 +45,8 @@ export default function Footer(): React.ReactElement {
             <div className="flex gap-2">
               {socialLinks.map((item, idx) => (
                 <Link key={idx} href={item.href} aria-label={item.label}>
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/[0.06] bg-white/[0.02] text-slate-500 transition-colors hover:bg-white/[0.06] hover:text-white">
-                    <item.icon className="h-3.5 w-3.5" />
+                  <div className="group flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.07] bg-white/[0.025] text-slate-500 transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:bg-primary/[0.08] hover:text-white">
+                    <item.icon className="h-3.5 w-3.5 transition-transform group-hover:scale-110" />
                   </div>
                 </Link>
               ))}
